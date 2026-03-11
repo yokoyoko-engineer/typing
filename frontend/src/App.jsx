@@ -12,7 +12,7 @@ function App() {
   
   useEffect(() => {
     // Viteはデフォルトでローカルホストの相対パスをフォールバックできます
-    const newSocket = io('http://localhost:3001')
+    const newSocket = io(`http://${window.location.hostname}:3001`)
     setSocket(newSocket)
 
     newSocket.on('connect', () => {
