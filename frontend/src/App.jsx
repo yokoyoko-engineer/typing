@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { io } from 'socket.io-client'
 import Lobby from './components/Lobby'
 import Game from './components/Game'
+import Home from './components/Home'
+import CPUGame from './components/CPUGame'
 import './App.css'
 
 function App() {
@@ -9,6 +11,7 @@ function App() {
   const [roomState, setRoomState] = useState(null)
   const [lobbies, setLobbies] = useState([])
   const [myId, setMyId] = useState(null)
+  const [gameMode, setGameMode] = useState('home') // 'home', 'online', 'cpu'
 
   useEffect(() => {
     // Viteのプロキシを経由するため、ホスト名やポートの指定をなくします
@@ -34,6 +37,10 @@ function App() {
     return () => newSocket.close()
   }, [])
 
+  const handleSelectMode = (mode) => {
+    setGameMode(mode)
+  }
+
   const handleJoinRoom = (roomId, playerName) => {
     if (socket) {
       socket.emit('joinRoom', { roomId, playerName })
@@ -42,12 +49,27 @@ function App() {
 
   return (
     <div className="app-main">
-      <h1 className="game-title">TYPING BATTLE . IO</h1>
+      <h1 className="game-title" style={{ cursor: gameMode !== 'home' ? 'pointer' : 'default' }} onClick={() => setGameMode('home')}>TYPING BATTLE . IO</h1>
 
-      {!roomState ? (
-        <Lobby socket={socket} lobbies={lobbies} onJoinRoom={handleJoinRoom} />
-      ) : (
-        <Game socket={socket} roomState={roomState} myId={myId} />
+      {gameMode === 'home' && (
+        <Home onSelectMode={handleSelectMode} />
+      )}
+
+      {gameMode === 'cpu' && (
+        <CPUGame onBackToHome={() => setGameMode('home')} />
+      )}
+
+      {gameMode === 'online' && (
+        !roomState ? (
+          <div>
+            <button className="action-btn" onClick={() => setGameMode('home')} style={{ marginBottom: '20px', background: '#555' }}>
+              {'< Back to Mode Select'}
+            </button>
+            <Lobby socket={socket} lobbies={lobbies} onJoinRoom={handleJoinRoom} />
+          </div>
+        ) : (
+          <Game socket={socket} roomState={roomState} myId={myId} />
+        )
       )}
     </div>
   )
