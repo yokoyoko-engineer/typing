@@ -9,10 +9,10 @@ function App() {
   const [roomState, setRoomState] = useState(null)
   const [lobbies, setLobbies] = useState([])
   const [myId, setMyId] = useState(null)
-  
+
   useEffect(() => {
-    // Viteはデフォルトでローカルホストの相対パスをフォールバックできます
-    const newSocket = io(`http://${window.location.hostname}:3001`)
+    // Viteのプロキシを経由するため、ホスト名やポートの指定をなくします
+    const newSocket = io()
     setSocket(newSocket)
 
     newSocket.on('connect', () => {
@@ -30,7 +30,7 @@ function App() {
     newSocket.on('error', (msg) => {
       alert(msg)
     })
-    
+
     return () => newSocket.close()
   }, [])
 
@@ -43,7 +43,7 @@ function App() {
   return (
     <div className="app-main">
       <h1 className="game-title">TYPING BATTLE . IO</h1>
-      
+
       {!roomState ? (
         <Lobby socket={socket} lobbies={lobbies} onJoinRoom={handleJoinRoom} />
       ) : (

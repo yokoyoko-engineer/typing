@@ -10,6 +10,12 @@ export default defineConfig({
     watch: {
       usePolling: true, // Dockerのボリュームマウント環境でもホットリロードが効くようにする
     },
-    allowedHosts: true // すべてのホスト名からのアクセスを許可 ("www.yokoyamateam.com"等)
+    allowedHosts: true, // すべてのホスト名からのアクセスを許可 ("www.yokoyamateam.com"等)
+    proxy: {
+      '/socket.io': {
+        target: 'http://backend:3001',
+        ws: true
+      }
+    }
   }
 })
