@@ -15,7 +15,7 @@ export class GameRoom {
       id: socketId,
       name: name || `Player ${Object.keys(this.players).length + 1}`,
       isReady: false,
-      hp: 100,
+      hp: 1000,
       currentWord: '',
       typedChars: 0,
       isWinner: false
@@ -52,7 +52,7 @@ export class GameRoom {
   startGame() {
     this.status = 'playing';
     Object.values(this.players).forEach(p => {
-      p.hp = 100;
+      p.hp = 1000;
       p.currentWord = getRandomWord();
       p.typedChars = 0;
       p.isWinner = false;
@@ -64,22 +64,22 @@ export class GameRoom {
     if (!player || this.status !== 'playing' || player.hp <= 0) return null;
 
     const targetChar = player.currentWord.romaji[player.typedChars];
-    
+
     // Correct typing
     if (typedChar === targetChar) {
       player.typedChars++;
-      
+
       // Word completed
       if (player.typedChars === player.currentWord.romaji.length) {
-        // Calculate based on length (1 char = 2 damage for example, to scale it better)
-        const damage = player.currentWord.romaji.length * 2; 
-        
+        // Calculate based on length and scale for ~2 mins game for A rank (210 chars/min)
+        const damage = Math.round(player.currentWord.romaji.length * 2.4);
+
         player.currentWord = getRandomWord();
         player.typedChars = 0;
-        
+
         // Calculate damage to other players
         const otherPlayers = Object.values(this.players).filter(p => p.id !== socketId && p.hp > 0);
-        
+
         if (otherPlayers.length > 0) {
           // 分散ダメージ
           const splitDamage = Math.floor(damage / otherPlayers.length);
@@ -87,13 +87,13 @@ export class GameRoom {
             p.hp = Math.max(0, p.hp - splitDamage);
           });
         }
-        
+
         this.checkWinCondition();
         return { success: true, wordCompleted: true, damageDealt: damage };
       }
       return { success: true, wordCompleted: false };
     }
-    
+
     // Incorrect typing
     return { success: false, wordCompleted: false };
   }

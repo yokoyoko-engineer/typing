@@ -17,7 +17,7 @@ export default function Game({ socket, roomState, myId }) {
         setTimeout(() => setDamageFlash(false), 300);
       }
     };
-    
+
     // 状態が playing になったら auto focus
     if (roomState.status === 'playing') {
       setGameStarted(true);
@@ -77,8 +77,8 @@ export default function Game({ socket, roomState, myId }) {
           ))}
         </div>
         <div className="game-actions">
-          <button 
-            className={`action-btn ${isReady ? 'ready-btn' : ''}`} 
+          <button
+            className={`action-btn ${isReady ? 'ready-btn' : ''}`}
             onClick={handleReady}
           >
             {isReady ? 'CANCEL READY' : 'READY TO FIGHT'}
@@ -106,12 +106,12 @@ export default function Game({ socket, roomState, myId }) {
           <h1 className="loser-text">YOU LOST...</h1>
         )}
         <div className="players-list">
-           {Object.values(roomState.players).map(p => (
-              <div key={p.id} className={`player-card ${p.isWinner ? 'winner' : ''}`}>
-                  <span>{p.name}</span>
-                  <span>{p.isWinner ? 'Winner' : 'Defeated'}</span>
-              </div>
-           ))}
+          {Object.values(roomState.players).map(p => (
+            <div key={p.id} className={`player-card ${p.isWinner ? 'winner' : ''}`}>
+              <span>{p.name}</span>
+              <span>{p.isWinner ? 'Winner' : 'Defeated'}</span>
+            </div>
+          ))}
         </div>
         <button className="action-btn" onClick={resetGame}>PLAY AGAIN</button>
       </div>
@@ -129,7 +129,7 @@ export default function Game({ socket, roomState, myId }) {
               <span>{p.hp} HP</span>
             </div>
             <div className="hp-bar-container">
-              <div className="hp-bar" style={{ width: `${Math.max(0, p.hp)}%`, backgroundColor: p.hp > 50 ? '#4caf50' : p.hp > 20 ? '#ff9800' : '#f44336' }}></div>
+              <div className="hp-bar" style={{ width: `${Math.max(0, p.hp) / 10}%`, backgroundColor: p.hp > 500 ? '#4caf50' : p.hp > 200 ? '#ff9800' : '#f44336' }}></div>
             </div>
             <div className="progress-container" style={{ marginTop: '8px', background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
               <div className="progress-bar" style={{ width: `${(p.typedChars / (p.currentWord?.romaji?.length || 1)) * 100}%`, backgroundColor: '#00d2ff', height: '100%', transition: 'width 0.1s' }}></div>
