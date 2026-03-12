@@ -132,7 +132,10 @@ export default function Game({ socket, roomState, myId }) {
               <div className="hp-bar" style={{ width: `${Math.max(0, p.hp) / 10}%`, backgroundColor: p.hp > 500 ? '#4caf50' : p.hp > 200 ? '#ff9800' : '#f44336' }}></div>
             </div>
             <div className="progress-container" style={{ marginTop: '8px', background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
-              <div className="progress-bar" style={{ width: `${(p.typedChars / (p.currentWord?.romaji?.length || 1)) * 100}%`, backgroundColor: '#00d2ff', height: '100%', transition: 'width 0.1s' }}></div>
+              <div className="progress-bar" style={{
+                width: p.typingState ? `${(p.typingState.typedRomaji.length / Math.max(1, p.typingState.typedRomaji.length + p.typingState.targetRomaji.length)) * 100}%` : '0%',
+                backgroundColor: '#00d2ff', height: '100%', transition: 'width 0.1s'
+              }}></div>
             </div>
           </div>
         ))}
@@ -145,12 +148,15 @@ export default function Game({ socket, roomState, myId }) {
             <div className="kanji" style={{ fontSize: '2em', fontWeight: 'bold', marginBottom: '15px' }}>{me.currentWord.text}</div>
           </div>
           <div className="target-word">
-            {me.currentWord.romaji.split('').map((char, i) => {
-              let className = 'char';
-              if (i < me.typedChars) className += ' typed';
-              else if (i === me.typedChars) className += ' current';
-              return <span key={i} className={className}>{char}</span>;
-            })}
+            {me.typingState && (
+              <>
+                <span className="char typed" style={{ color: '#4caf50' }}>{me.typingState.typedRomaji}</span>
+                {me.typingState.targetRomaji.length > 0 && (
+                  <span className="char current" style={{ textDecoration: 'underline' }}>{me.typingState.targetRomaji[0]}</span>
+                )}
+                <span className="char">{me.typingState.targetRomaji.slice(1)}</span>
+              </>
+            )}
           </div>
           <div className="instruction" style={{ marginTop: '20px' }}>Type the romaji to attack!</div>
         </div>

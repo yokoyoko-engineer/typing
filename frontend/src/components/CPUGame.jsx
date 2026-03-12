@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getRandomWord } from '../words';
+import { TypingSession } from '../utils/typingEngine';
 import './Game.css'; // Reuse existing Game styles
 
 // CPU difficulty settings (ms per character) based on requested tiers
@@ -25,13 +26,13 @@ export default function CPUGame({ onBackToHome }) {
     const [playerInfo, setPlayerInfo] = useState({
         hp: 1000,
         currentWord: null,
-        typedChars: 0,
+        typingState: null,
     });
 
     const [cpuInfo, setCpuInfo] = useState({
         hp: 1000,
         currentWord: null,
-        typedChars: 0,
+        typingState: null,
     });
 
     const [winner, setWinner] = useState(null);
@@ -41,17 +42,26 @@ export default function CPUGame({ onBackToHome }) {
     const cpuStateRef = useRef(cpuInfo); // To properly track CPU progress without stale closures
     const playerStateRef = useRef(playerInfo); // To track player HP for win conditions
 
+    // TypingSession instances
+    const pSessionRef = useRef(null);
+    const cSessionRef = useRef(null);
+
     // Keep refs synchronized with state
     useEffect(() => { cpuStateRef.current = cpuInfo; }, [cpuInfo]);
     useEffect(() => { playerStateRef.current = playerInfo; }, [playerInfo]);
 
-    // Start the battle countdown
     const startBattle = (lvl) => {
         setDifficulty(lvl);
         setGameState('countdown');
         setCountdown(3);
-        setPlayerInfo({ hp: 1000, currentWord: getRandomWord(), typedChars: 0 });
-        setCpuInfo({ hp: 1000, currentWord: getRandomWord(), typedChars: 0 });
+
+        const pWord = getRandomWord();
+        const cWord = getRandomWord();
+        pSessionRef.current = new TypingSession(pWord.ruby);
+        cSessionRef.current = new TypingSession(cWord.ruby);
+
+        setPlayerInfo({ hp: 1000, currentWord: pWord, typingState: pSessionRef.current.state });
+        setCpuInfo({ hp: 1000, currentWord: cWord, typingState: cSessionRef.current.state });
     };
 
     // Handle Countdown
@@ -87,32 +97,39 @@ export default function CPUGame({ onBackToHome }) {
 
                 if (currentCpu.hp <= 0 || pState.hp <= 0) return;
 
-                let nextTyped = currentCpu.typedChars + 1;
+                // CPU types the first character of the target romaji
+                const charToType = cSessionRef.current.state.targetRomaji[0];
+                const res = cSessionRef.current.input(charToType);
 
-                if (nextTyped >= currentCpu.currentWord.romaji.length) {
-                    // Word Complete
-                    const damage = Math.round(currentCpu.currentWord.romaji.length * 2.4);
-                    const newPlayerHp = Math.max(0, pState.hp - damage);
+                if (res && res.success) {
+                    if (res.finishedWord) {
+                        // Word Complete (calculating roughly based on ruby * 2 equivalents)
+                        const damage = Math.round((currentCpu.currentWord.ruby.length * 2) * 2.4);
+                        const newPlayerHp = Math.max(0, pState.hp - damage);
 
-                    setPlayerInfo(prev => ({ ...prev, hp: newPlayerHp }));
-                    setCpuInfo(prev => ({
-                        ...prev,
-                        typedChars: 0,
-                        currentWord: getRandomWord()
-                    }));
+                        const newWord = getRandomWord();
+                        cSessionRef.current = new TypingSession(newWord.ruby);
 
-                    // Trigger screen flash (we got hit)
-                    setDamageFlash(true);
-                    setTimeout(() => setDamageFlash(false), 300);
+                        setPlayerInfo(prev => ({ ...prev, hp: newPlayerHp }));
+                        setCpuInfo(prev => ({
+                            ...prev,
+                            typingState: cSessionRef.current.state,
+                            currentWord: newWord
+                        }));
 
-                    if (newPlayerHp <= 0) {
-                        setGameState('finished');
-                        setWinner('CPU');
-                        return;
+                        // Trigger screen flash (we got hit)
+                        setDamageFlash(true);
+                        setTimeout(() => setDamageFlash(false), 300);
+
+                        if (newPlayerHp <= 0) {
+                            setGameState('finished');
+                            setWinner('CPU');
+                            return;
+                        }
+                    } else {
+                        // Just typing
+                        setCpuInfo(prev => ({ ...prev, typingState: cSessionRef.current.state }));
                     }
-                } else {
-                    // Just typing
-                    setCpuInfo(prev => ({ ...prev, typedChars: nextTyped }));
                 }
 
                 // Add 10% randomness to the typing speed to make it feel more human
@@ -137,21 +154,22 @@ export default function CPUGame({ onBackToHome }) {
         // key length === 1 means a printable character
         if (e.key.length === 1) {
             const typedChar = e.key.toLowerCase();
-            const targetChar = playerInfo.currentWord.romaji[playerInfo.typedChars];
+            const res = pSessionRef.current.input(typedChar);
 
-            if (typedChar === targetChar) {
-                let nextTyped = playerInfo.typedChars + 1;
-
-                if (nextTyped >= playerInfo.currentWord.romaji.length) {
+            if (res && res.success) {
+                if (res.finishedWord) {
                     // Word Complete
-                    const damage = Math.round(playerInfo.currentWord.romaji.length * 2.4);
+                    const damage = Math.round((playerInfo.currentWord.ruby.length * 2) * 2.4);
                     const newCpuHp = Math.max(0, cpuInfo.hp - damage);
+
+                    const newWord = getRandomWord();
+                    pSessionRef.current = new TypingSession(newWord.ruby);
 
                     setCpuInfo(prev => ({ ...prev, hp: newCpuHp }));
                     setPlayerInfo(prev => ({
                         ...prev,
-                        typedChars: 0,
-                        currentWord: getRandomWord()
+                        typingState: pSessionRef.current.state,
+                        currentWord: newWord
                     }));
 
                     if (newCpuHp <= 0) {
@@ -160,7 +178,7 @@ export default function CPUGame({ onBackToHome }) {
                     }
                 } else {
                     // Progress within word
-                    setPlayerInfo(prev => ({ ...prev, typedChars: nextTyped }));
+                    setPlayerInfo(prev => ({ ...prev, typingState: pSessionRef.current.state }));
                 }
             }
         }
@@ -252,7 +270,10 @@ export default function CPUGame({ onBackToHome }) {
                         <div className="hp-bar" style={{ width: `${Math.max(0, playerInfo.hp) / 10}%`, backgroundColor: playerInfo.hp > 500 ? '#4caf50' : playerInfo.hp > 200 ? '#ff9800' : '#f44336' }}></div>
                     </div>
                     <div className="progress-container" style={{ marginTop: '8px', background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
-                        <div className="progress-bar" style={{ width: `${(playerInfo.typedChars / (playerInfo.currentWord?.romaji?.length || 1)) * 100}%`, backgroundColor: '#00d2ff', height: '100%', transition: 'width 0.1s' }}></div>
+                        <div className="progress-bar" style={{
+                            width: playerInfo.typingState ? `${(playerInfo.typingState.typedRomaji.length / Math.max(1, playerInfo.typingState.typedRomaji.length + playerInfo.typingState.targetRomaji.length)) * 100}%` : '0%',
+                            backgroundColor: '#00d2ff', height: '100%', transition: 'width 0.1s'
+                        }}></div>
                     </div>
                 </div>
 
@@ -266,7 +287,10 @@ export default function CPUGame({ onBackToHome }) {
                         <div className="hp-bar" style={{ width: `${Math.max(0, cpuInfo.hp) / 10}%`, backgroundColor: cpuInfo.hp > 500 ? '#4caf50' : cpuInfo.hp > 200 ? '#ff9800' : '#f44336' }}></div>
                     </div>
                     <div className="progress-container" style={{ marginTop: '8px', background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
-                        <div className="progress-bar" style={{ width: `${(cpuInfo.typedChars / (cpuInfo.currentWord?.romaji?.length || 1)) * 100}%`, backgroundColor: '#e91e63', height: '100%', transition: 'width 0.1s' }}></div>
+                        <div className="progress-bar" style={{
+                            width: cpuInfo.typingState ? `${(cpuInfo.typingState.typedRomaji.length / Math.max(1, cpuInfo.typingState.typedRomaji.length + cpuInfo.typingState.targetRomaji.length)) * 100}%` : '0%',
+                            backgroundColor: '#e91e63', height: '100%', transition: 'width 0.1s'
+                        }}></div>
                     </div>
                 </div>
             </div>
@@ -279,12 +303,15 @@ export default function CPUGame({ onBackToHome }) {
                             <div className="kanji" style={{ fontSize: '2em', fontWeight: 'bold', marginBottom: '15px' }}>{playerInfo.currentWord?.text}</div>
                         </div>
                         <div className="target-word">
-                            {(playerInfo.currentWord?.romaji || '').split('').map((char, i) => {
-                                let className = 'char';
-                                if (i < playerInfo.typedChars) className += ' typed';
-                                else if (i === playerInfo.typedChars) className += ' current';
-                                return <span key={i} className={className}>{char}</span>;
-                            })}
+                            {playerInfo.typingState && (
+                                <>
+                                    <span className="char typed" style={{ color: '#4caf50' }}>{playerInfo.typingState.typedRomaji}</span>
+                                    {playerInfo.typingState.targetRomaji.length > 0 && (
+                                        <span className="char current" style={{ textDecoration: 'underline' }}>{playerInfo.typingState.targetRomaji[0]}</span>
+                                    )}
+                                    <span className="char">{playerInfo.typingState.targetRomaji.slice(1)}</span>
+                                </>
+                            )}
                         </div>
                         <div className="instruction" style={{ marginTop: '20px' }}>Type the romaji to attack!</div>
                     </>

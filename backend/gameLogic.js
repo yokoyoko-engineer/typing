@@ -1,4 +1,5 @@
 import { getRandomWord } from './words.js';
+import { TypingSession } from './utils/typingEngine.js';
 
 export class GameRoom {
   constructor(roomId) {
@@ -16,8 +17,8 @@ export class GameRoom {
       name: name || `Player ${Object.keys(this.players).length + 1}`,
       isReady: false,
       hp: 1000,
-      currentWord: '',
-      typedChars: 0,
+      currentWord: null,
+      typingSession: null,
       isWinner: false
     };
     return true;
@@ -53,8 +54,9 @@ export class GameRoom {
     this.status = 'playing';
     Object.values(this.players).forEach(p => {
       p.hp = 1000;
-      p.currentWord = getRandomWord();
-      p.typedChars = 0;
+      const word = getRandomWord();
+      p.currentWord = word;
+      p.typingSession = new TypingSession(word.ruby);
       p.isWinner = false;
     });
   }
@@ -63,25 +65,22 @@ export class GameRoom {
     const player = this.players[socketId];
     if (!player || this.status !== 'playing' || player.hp <= 0) return null;
 
-    const targetChar = player.currentWord.romaji[player.typedChars];
+    const result = player.typingSession.input(typedChar);
 
-    // Correct typing
-    if (typedChar === targetChar) {
-      player.typedChars++;
+    if (result && result.success) {
+      if (result.finishedWord) {
+        // Calculate based on ruby length (roughly equivalent to 2+ romaji chars each)
+        // or we could use the fully typed length, but ruby length is safe enough. Let's say ruby = 2 romaji chars
+        const damage = Math.round((player.currentWord.ruby.length * 2) * 2.4);
 
-      // Word completed
-      if (player.typedChars === player.currentWord.romaji.length) {
-        // Calculate based on length and scale for ~2 mins game for A rank (210 chars/min)
-        const damage = Math.round(player.currentWord.romaji.length * 2.4);
-
-        player.currentWord = getRandomWord();
-        player.typedChars = 0;
+        const newWord = getRandomWord();
+        player.currentWord = newWord;
+        player.typingSession = new TypingSession(newWord.ruby);
 
         // Calculate damage to other players
         const otherPlayers = Object.values(this.players).filter(p => p.id !== socketId && p.hp > 0);
 
         if (otherPlayers.length > 0) {
-          // 分散ダメージ
           const splitDamage = Math.floor(damage / otherPlayers.length);
           otherPlayers.forEach(p => {
             p.hp = Math.max(0, p.hp - splitDamage);
@@ -94,7 +93,6 @@ export class GameRoom {
       return { success: true, wordCompleted: false };
     }
 
-    // Incorrect typing
     return { success: false, wordCompleted: false };
   }
 
@@ -109,10 +107,23 @@ export class GameRoom {
   }
 
   getState() {
+    const serializedPlayers = {};
+    for (const [id, p] of Object.entries(this.players)) {
+      serializedPlayers[id] = {
+        id: p.id,
+        name: p.name,
+        isReady: p.isReady,
+        hp: p.hp,
+        currentWord: p.currentWord,
+        typingState: p.typingSession ? p.typingSession.state : null,
+        isWinner: p.isWinner
+      };
+    }
+
     return {
       roomId: this.roomId,
       status: this.status,
-      players: this.players
+      players: serializedPlayers
     };
   }
 }
