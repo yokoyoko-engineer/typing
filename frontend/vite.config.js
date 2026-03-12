@@ -9,6 +9,7 @@ export default defineConfig({
     port: 5173,
     watch: {
       usePolling: true, // Dockerのボリュームマウント環境でもホットリロードが効くようにする
-    }
+    },
+    allowedHosts: true // すべてのホスト名からのアクセスを許可 ("www.yokoyamateam.com"等)
   }
 })
