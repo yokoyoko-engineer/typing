@@ -13,7 +13,7 @@ export default defineConfig({
     allowedHosts: true, // すべてのホスト名からのアクセスを許可 ("www.yokoyamateam.com"等)
     proxy: {
       '/socket.io': {
-        target: 'http://backend:3001',
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:3001',
         ws: true
       }
     }

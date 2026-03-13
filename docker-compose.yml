@@ -24,4 +24,5 @@ services:
     environment:
       - NODE_ENV=development
       - CHOKIDAR_USEPOLLING=true
+      - VITE_BACKEND_URL=http://backend:3001
     command: npm run dev

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getRandomWord } from '../words';
+import { getRandomWord, CATEGORIES, CLOUD_GENRES, GENRES_BY_CATEGORY } from '../words';
 import { TypingSession } from '../utils/typingEngine';
 import './Game.css'; // Reuse existing Game styles
 
@@ -19,7 +19,10 @@ const CPU_DIFFICULTY = {
 
 export default function CPUGame({ onBackToHome }) {
     const [difficulty, setDifficulty] = useState(null);
-    const [gameState, setGameState] = useState('select'); // select, playing, finished
+    const [category, setCategory] = useState(null);
+    const [genre, setGenre] = useState(null);
+    const [gameState, setGameState] = useState('select'); // select, countdown, playing, finished
+    const [selectionStep, setSelectionStep] = useState('category'); // category, genre, difficulty
     const [countdown, setCountdown] = useState(3);
     const [damageFlash, setDamageFlash] = useState(false);
 
@@ -39,24 +42,38 @@ export default function CPUGame({ onBackToHome }) {
 
     const inputRef = useRef(null);
     const cpuIntervalRef = useRef(null);
-    const cpuStateRef = useRef(cpuInfo); // To properly track CPU progress without stale closures
-    const playerStateRef = useRef(playerInfo); // To track player HP for win conditions
+    const cpuStateRef = useRef(cpuInfo);
+    const playerStateRef = useRef(playerInfo);
 
-    // TypingSession instances
     const pSessionRef = useRef(null);
     const cSessionRef = useRef(null);
 
-    // Keep refs synchronized with state
     useEffect(() => { cpuStateRef.current = cpuInfo; }, [cpuInfo]);
     useEffect(() => { playerStateRef.current = playerInfo; }, [playerInfo]);
+
+    const selectCategory = (cat) => {
+        setCategory(cat);
+        // If ことわざ, skip genre selection since it's a single genre
+        if (cat === CATEGORIES.KOTOWAZA) {
+            setGenre(CATEGORIES.KOTOWAZA);
+            setSelectionStep('difficulty');
+        } else {
+            setSelectionStep('genre');
+        }
+    };
+
+    const selectGenre = (g) => {
+        setGenre(g);
+        setSelectionStep('difficulty');
+    };
 
     const startBattle = (lvl) => {
         setDifficulty(lvl);
         setGameState('countdown');
         setCountdown(3);
 
-        const pWord = getRandomWord();
-        const cWord = getRandomWord();
+        const pWord = getRandomWord(genre);
+        const cWord = getRandomWord(genre);
         pSessionRef.current = new TypingSession(pWord.ruby);
         cSessionRef.current = new TypingSession(cWord.ruby);
 
@@ -97,17 +114,15 @@ export default function CPUGame({ onBackToHome }) {
 
                 if (currentCpu.hp <= 0 || pState.hp <= 0) return;
 
-                // CPU types the first character of the target romaji
                 const charToType = cSessionRef.current.state.targetRomaji[0];
                 const res = cSessionRef.current.input(charToType);
 
                 if (res && res.success) {
                     if (res.finishedWord) {
-                        // Word Complete (calculating roughly based on ruby * 2 equivalents)
                         const damage = Math.round((currentCpu.currentWord.ruby.length * 2) * 2.4);
                         const newPlayerHp = Math.max(0, pState.hp - damage);
 
-                        const newWord = getRandomWord();
+                        const newWord = getRandomWord(genre);
                         cSessionRef.current = new TypingSession(newWord.ruby);
 
                         setPlayerInfo(prev => ({ ...prev, hp: newPlayerHp }));
@@ -117,7 +132,6 @@ export default function CPUGame({ onBackToHome }) {
                             currentWord: newWord
                         }));
 
-                        // Trigger screen flash (we got hit)
                         setDamageFlash(true);
                         setTimeout(() => setDamageFlash(false), 300);
 
@@ -127,12 +141,10 @@ export default function CPUGame({ onBackToHome }) {
                             return;
                         }
                     } else {
-                        // Just typing
                         setCpuInfo(prev => ({ ...prev, typingState: cSessionRef.current.state }));
                     }
                 }
 
-                // Add 10% randomness to the typing speed to make it feel more human
                 const variance = msPerKey * 0.1;
                 const randomDelay = msPerKey + (Math.random() * variance * 2 - variance);
                 cpuIntervalRef.current = setTimeout(typeNextChar, randomDelay);
@@ -144,25 +156,23 @@ export default function CPUGame({ onBackToHome }) {
                 if (cpuIntervalRef.current) clearTimeout(cpuIntervalRef.current);
             };
         }
-    }, [gameState, difficulty]);
+    }, [gameState, difficulty, genre]);
 
 
     // Player Typing Logic
     const handleKeyDown = (e) => {
         if (gameState !== 'playing' || playerInfo.hp <= 0) return;
 
-        // key length === 1 means a printable character
         if (e.key.length === 1) {
             const typedChar = e.key.toLowerCase();
             const res = pSessionRef.current.input(typedChar);
 
             if (res && res.success) {
                 if (res.finishedWord) {
-                    // Word Complete
                     const damage = Math.round((playerInfo.currentWord.ruby.length * 2) * 2.4);
                     const newCpuHp = Math.max(0, cpuInfo.hp - damage);
 
-                    const newWord = getRandomWord();
+                    const newWord = getRandomWord(genre);
                     pSessionRef.current = new TypingSession(newWord.ruby);
 
                     setCpuInfo(prev => ({ ...prev, hp: newCpuHp }));
@@ -177,7 +187,6 @@ export default function CPUGame({ onBackToHome }) {
                         setWinner('PLAYER');
                     }
                 } else {
-                    // Progress within word
                     setPlayerInfo(prev => ({ ...prev, typingState: pSessionRef.current.state }));
                 }
             }
@@ -188,9 +197,75 @@ export default function CPUGame({ onBackToHome }) {
     // --- Render Functions ---
 
     if (gameState === 'select') {
+        // Category selection
+        if (selectionStep === 'category') {
+            return (
+                <div className="game-container">
+                    <h2>カテゴリを選択</h2>
+                    <div className="genre-grid" style={{
+                        display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '20px', maxWidth: '400px', margin: '20px auto'
+                    }}>
+                        {Object.values(CATEGORIES).map((cat) => (
+                            <button
+                                key={cat}
+                                className="action-btn"
+                                onClick={() => selectCategory(cat)}
+                                style={{ height: '70px', fontSize: '1.3em' }}
+                            >
+                                {cat}
+                            </button>
+                        ))}
+                    </div>
+                    <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '40px', background: '#555' }}>
+                        Back to Home
+                    </button>
+                </div>
+            );
+        }
+
+        // Genre selection (for クラウド category)
+        if (selectionStep === 'genre') {
+            const genreList = GENRES_BY_CATEGORY[category] || [];
+            return (
+                <div className="game-container">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                        <button onClick={() => setSelectionStep('category')} style={{ background: 'none', border: 'none', color: '#00d2ff', cursor: 'pointer', fontSize: '1.1em' }}>‹ カテゴリに戻る</button>
+                        <h2>ジャンルを選択 ({category})</h2>
+                    </div>
+                    <div className="genre-grid" style={{
+                        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '10px', marginTop: '20px', maxWidth: '800px', margin: '20px auto', padding: '0 20px'
+                    }}>
+                        {genreList.map((g) => (
+                            <button
+                                key={g}
+                                className="action-btn"
+                                onClick={() => selectGenre(g)}
+                                style={{ height: '60px', fontSize: '1em', padding: '8px' }}
+                            >
+                                {g}
+                            </button>
+                        ))}
+                    </div>
+                    <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '40px', background: '#555' }}>
+                        Back to Home
+                    </button>
+                </div>
+            );
+        }
+
+        // Difficulty selection
         return (
             <div className="game-container">
-                <h2>Select CPU Difficulty</h2>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+                    <button onClick={() => {
+                        if (category === CATEGORIES.KOTOWAZA) {
+                            setSelectionStep('category');
+                        } else {
+                            setSelectionStep('genre');
+                        }
+                    }} style={{ background: 'none', border: 'none', color: '#00d2ff', cursor: 'pointer', fontSize: '1.1em' }}>‹ 戻る</button>
+                    <h2>難易度を選択 ({genre})</h2>
+                </div>
 
                 <div className="difficulty-grid" style={{
                     display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px', marginTop: '20px'
@@ -237,12 +312,16 @@ export default function CPUGame({ onBackToHome }) {
                     <h1 className="loser-text">YOU LOST...</h1>
                 )}
                 <div style={{ marginTop: '20px' }}>
-                    <p>Difficulty: Level {difficulty}</p>
+                    <p>ジャンル: {genre}</p>
+                    <p>難易度: Level {difficulty}</p>
                     <p>Your HP: {playerInfo.hp}</p>
                     <p>CPU HP: {cpuInfo.hp}</p>
                 </div>
                 <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', marginTop: '30px' }}>
-                    <button className="action-btn" onClick={() => setGameState('select')}>PLAY AGAIN</button>
+                    <button className="action-btn" onClick={() => {
+                        setGameState('select');
+                        setSelectionStep('category');
+                    }}>PLAY AGAIN</button>
                     <button className="action-btn" onClick={onBackToHome} style={{ background: '#555' }}>BACK TO HOME</button>
                 </div>
             </div>
@@ -256,7 +335,7 @@ export default function CPUGame({ onBackToHome }) {
                 <button className="action-btn" onClick={onBackToHome} style={{ padding: '5px 10px', background: '#555', fontSize: '0.8em' }}>
                     Quit
                 </button>
-                <span style={{ fontSize: '1.5em', fontWeight: 'bold' }}>vs CPU Lv.{difficulty}</span>
+                <span style={{ fontSize: '1em', fontWeight: 'bold' }}>{genre} - Lv.{difficulty}</span>
             </div>
 
             <div className="players-hud">

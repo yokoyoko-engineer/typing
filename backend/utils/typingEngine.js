@@ -1,5 +1,5 @@
 export const ROMAJI_MAP = {
-    'あ': ['a'], 'い': ['i'], 'う': ['u', 'wu'], 'え': ['e'], 'お': ['o'],
+    'あ': ['a'], 'い': ['i'], 'う': ['u', 'wu', 'whu'], 'え': ['e'], 'お': ['o'],
     'か': ['ka', 'ca'], 'き': ['ki'], 'く': ['ku', 'cu', 'qu'], 'け': ['ke'], 'こ': ['ko', 'co'],
     'さ': ['sa'], 'し': ['shi', 'si', 'ci'], 'す': ['su'], 'せ': ['se', 'ce'], 'そ': ['so'],
     'た': ['ta'], 'ち': ['chi', 'ti'], 'つ': ['tsu', 'tu'], 'て': ['te'], 'と': ['to'],
@@ -20,20 +20,35 @@ export const ROMAJI_MAP = {
     'ゃ': ['lya', 'xya'], 'ゅ': ['lyu', 'xyu'], 'ょ': ['lyo', 'xyo'],
     'っ': ['ltsu', 'xtsu', 'ltu', 'xtu'],
     'ー': ['-'],
+    'ゎ': ['lwa', 'xwa'],
 
     // contractions
-    'きゃ': ['kya'], 'きゅ': ['kyu'], 'きょ': ['kyo'],
-    'しゃ': ['sha', 'sya'], 'しゅ': ['shu', 'syu'], 'しょ': ['sho', 'syo'],
-    'ちゃ': ['cha', 'tya', 'cya'], 'ちゅ': ['chu', 'tyu', 'cyu'], 'ちょ': ['cho', 'tyo', 'cyo'],
-    'にゃ': ['nya'], 'にゅ': ['nyu'], 'にょ': ['nyo'],
-    'ひゃ': ['hya'], 'ひゅ': ['hyu'], 'ひょ': ['hyo'],
-    'みゃ': ['mya'], 'みゅ': ['myu'], 'みょ': ['myo'],
-    'りゃ': ['rya'], 'りゅ': ['ryu'], 'りょ': ['ryo'],
+    'きゃ': ['kya'], 'きぃ': ['kyi'], 'きゅ': ['kyu'], 'きぇ': ['kye'], 'きょ': ['kyo'],
+    'しゃ': ['sha', 'sya'], 'しぃ': ['syi'], 'しゅ': ['shu', 'syu'], 'しぇ': ['she', 'sye'], 'しょ': ['sho', 'syo'],
+    'ちゃ': ['cha', 'tya', 'cya'], 'ちぃ': ['tyi', 'cyi'], 'ちゅ': ['chu', 'tyu', 'cyu'], 'ちぇ': ['che', 'tye', 'cye'], 'ちょ': ['cho', 'tyo', 'cyo'],
+    'にゃ': ['nya'], 'にぃ': ['nyi'], 'にゅ': ['nyu'], 'にぇ': ['nye'], 'にょ': ['nyo'],
+    'ひゃ': ['hya'], 'ひぃ': ['hyi'], 'ひゅ': ['hyu'], 'ひぇ': ['hye'], 'ひょ': ['hyo'],
+    'みゃ': ['mya'], 'みぃ': ['myi'], 'みゅ': ['myu'], 'みぇ': ['mye'], 'みょ': ['myo'],
+    'りゃ': ['rya'], 'りぃ': ['ryi'], 'りゅ': ['ryu'], 'りぇ': ['rye'], 'りょ': ['ryo'],
 
-    'ぎゃ': ['gya'], 'ぎゅ': ['gyu'], 'ぎょ': ['gyo'],
-    'じゃ': ['ja', 'jya', 'zya'], 'じゅ': ['ju', 'jyu', 'zyu'], 'じょ': ['jo', 'jyo', 'zyo'],
-    'びゃ': ['bya'], 'びゅ': ['byu'], 'びょ': ['byo'],
-    'ぴゃ': ['pya'], 'ぴゅ': ['pyu'], 'ぴょ': ['pyo'],
+    'ぎゃ': ['gya'], 'ぎぃ': ['gyi'], 'ぎゅ': ['gyu'], 'ぎぇ': ['gye'], 'ぎょ': ['gyo'],
+    'じゃ': ['ja', 'jya', 'zya'], 'じぃ': ['jyi', 'zyi'], 'じゅ': ['ju', 'jyu', 'zyu'], 'じぇ': ['je', 'jye', 'zye'], 'じょ': ['jo', 'jyo', 'zyo'],
+    'ぢゃ': ['dya', 'ja', 'jya', 'zya'], 'ぢぃ': ['dyi'], 'ぢゅ': ['dyu', 'ju', 'jyu', 'zyu'], 'ぢぇ': ['dye'], 'ぢょ': ['dyo', 'jo', 'jyo', 'zyo'],
+    'びゃ': ['bya'], 'びぃ': ['byi'], 'びゅ': ['byu'], 'びぇ': ['bye'], 'びょ': ['byo'],
+    'ぴゃ': ['pya'], 'ぴぃ': ['pyi'], 'ぴゅ': ['pyu'], 'ぴぇ': ['pye'], 'ぴょ': ['pyo'],
+
+    'ふぁ': ['fa', 'fwa'], 'ふぃ': ['fi', 'fwi', 'fyi'], 'ふぇ': ['fe', 'fwe', 'fye'], 'ふぉ': ['fo', 'fwo'],
+    'くぁ': ['qa', 'qwa', 'kwa'], 'くぃ': ['qi', 'qwi', 'qyi'], 'くぅ': ['qu'], 'くぇ': ['qe', 'qwe', 'qye'], 'くぉ': ['qo', 'qwo'],
+    'ぐぁ': ['gwa'], 'ぐぃ': ['gwi'], 'ぐぅ': ['gwu'], 'ぐぇ': ['gwe'], 'ぐぉ': ['gwo'],
+    'すぁ': ['swa'], 'すぃ': ['swi'], 'すぅ': ['swu'], 'すぇ': ['swe'], 'すぉ': ['swo'],
+    'つぁ': ['tsa'], 'つぃ': ['tsi'], 'つぇ': ['tse'], 'つぉ': ['tso'],
+    'てゃ': ['tha'], 'てぃ': ['thi'], 'てゅ': ['thu'], 'てぇ': ['the'], 'てょ': ['tho'],
+    'でゃ': ['dha'], 'でぃ': ['dhi'], 'でゅ': ['dhu'], 'でぇ': ['dhe'], 'でょ': ['dho'],
+    'とぁ': ['twa'], 'とぃ': ['twi'], 'とぅ': ['twu'], 'とぇ': ['twe'], 'とぉ': ['two'],
+    'どぁ': ['dwa'], 'どぃ': ['dwi'], 'どぅ': ['dwu'], 'どぇ': ['dwe'], 'どぉ': ['dwo'],
+    'うぁ': ['wha'], 'うぃ': ['wi', 'whi'], 'うぇ': ['we', 'whe'], 'うぉ': ['who'],
+    'ゔぁ': ['va'], 'ゔぃ': ['vi'], 'ゔ': ['vu'], 'ゔぇ': ['ve'], 'ゔぉ': ['vo'],
+    'ゔゃ': ['vya'], 'ゔゅ': ['vyu'], 'ゔょ': ['vyo']
 };
 
 export class TypingSession {
@@ -62,13 +77,18 @@ export class TypingSession {
             if (char === 'っ' && nextChar && nextChar !== 'っ') {
                 let baseOpts = [...ROMAJI_MAP['っ']]; // fallback ltu, xtu
 
-                let testNextOpt = ROMAJI_MAP[nextChar + (ruby[i + 2] || '')] ? ROMAJI_MAP[nextChar + (ruby[i + 2] || '')][0]
-                    : (ROMAJI_MAP[nextChar] ? ROMAJI_MAP[nextChar][0] : null);
+                let nextOpts = ROMAJI_MAP[nextChar + (ruby[i + 2] || '')]
+                    ? ROMAJI_MAP[nextChar + (ruby[i + 2] || '')]
+                    : (ROMAJI_MAP[nextChar] ? ROMAJI_MAP[nextChar] : []);
 
-                if (testNextOpt && !['a', 'i', 'u', 'e', 'o'].includes(testNextOpt[0])) {
-                    baseOpts.unshift(testNextOpt[0]); // the consonant to double
+                let consonants = [];
+                for (let opt of nextOpts) {
+                    if (opt && !['a', 'i', 'u', 'e', 'o'].includes(opt[0]) && !consonants.includes(opt[0])) {
+                        consonants.push(opt[0]);
+                    }
                 }
-                opts = baseOpts;
+
+                opts = [...consonants, ...baseOpts];
             }
             // 2. Check for yoon (2 chars combined)
             else if (nextChar && ROMAJI_MAP[char + nextChar]) {

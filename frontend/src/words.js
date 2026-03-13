@@ -1,4 +1,41 @@
-export const WORDS = [
+import { LINUX_BASIC, LINUX_STORAGE } from './data/cloudWords1';
+import { NETWORK_BASIC, WEB_SERVER } from './data/cloudWords2';
+import { APP_SERVER, DB_SERVER, DNS_WORDS } from './data/cloudWords3';
+import { MAIL_SERVER, NFS_WORDS, SECURITY_WORDS } from './data/cloudWords4';
+import { NON_FUNCTIONAL, SHELL_SCRIPT, ZABBIX_WORDS, ALB_WORDS } from './data/cloudWords5';
+import { NETWORK_ADV, L2_SWITCH, L3_SWITCH_ROUTER, BIGIP_WORDS, SRX_WORDS } from './data/cloudWords6';
+
+// Categories
+export const CATEGORIES = {
+  KOTOWAZA: "ことわざ",
+  CLOUD: "クラウド"
+};
+
+// Genre keys for クラウド category
+export const CLOUD_GENRES = {
+  LINUX_BASIC: "Linux基礎①②",
+  LINUX_STORAGE: "Linux基礎③/ストレージ管理基礎",
+  NETWORK_BASIC: "ネットワーク基礎Ⅰ",
+  WEB_SERVER: "WebServer",
+  APP_SERVER: "ApplicationServer",
+  DB_SERVER: "DatabaseServer",
+  DNS: "DNS",
+  MAIL: "Postfix/Dovecot",
+  NFS: "NFS",
+  SECURITY: "セキュリティ",
+  NON_FUNCTIONAL: "非機能要件",
+  SHELL_SCRIPT: "シェルスクリプト",
+  ZABBIX: "Zabbix",
+  ALB: "ALB",
+  NETWORK_ADV: "ネットワークⅡ",
+  L2_SWITCH: "L2スイッチ",
+  L3_ROUTER: "L3スイッチ/Router",
+  BIGIP: "BIGIP",
+  SRX: "SRX"
+};
+
+// ことわざ Words
+const KOTOWAZA_WORDS = [
   { text: "猿も木から落ちる", ruby: "さるもきからおちる" },
   { text: "犬も歩けば棒に当たる", ruby: "いぬもあるけばぼうにあたる" },
   { text: "豚に真珠", ruby: "ぶたにしんじゅ" },
@@ -65,50 +102,46 @@ export const WORDS = [
   { text: "大胆不敵", ruby: "だいたんふてき" },
   { text: "二人三脚", ruby: "ににんさんきゃく" },
   { text: "白紙撤回", ruby: "はくしてっかい" },
-  { text: "波瀾万丈", ruby: "はらんばんじょう" },
-  { text: "半信半疑", ruby: "はんしんはんぎ" },
-  { text: "品行方正", ruby: "ひんこうほうせい" },
-  { text: "不言実行", ruby: "ふげんじっこう" },
-  { text: "付和雷同", ruby: "ふわらいどう" },
-  { text: "本心坦懐", ruby: "ほんしんたんかい" },
-  { text: "明鏡止水", ruby: "めいきょうしすい" },
-  { text: "用意周到", ruby: "よういしゅうとう" },
-  { text: "利益至上", ruby: "りえきしじょう" },
-  { text: "臨機応変", ruby: "りんきおうへん" },
-  { text: "和洋折衷", ruby: "わようせっちゅう" },
-  { text: "暗中模索", ruby: "あんちゅうもさく" },
-  { text: "意味深長", ruby: "いみしんちょう" },
-  { text: "海千山千", ruby: "うみせんやません" },
-  { text: "外柔内剛", ruby: "がいじゅうないごう" },
-  { text: "換骨奪胎", ruby: "かんこつだったい" },
-  { text: "起承転結", ruby: "きしょうてんけつ" },
-  { text: "空中楼閣", ruby: "くうちゅうろうかく" },
-  { text: "牽強付会", ruby: "けんきょうふかい" },
-  { text: "語学堪能", ruby: "ごがくたんのう" },
-  { text: "再起不能", ruby: "さいきふのう" },
-  { text: "三位一体", ruby: "さんみいったい" },
-  { text: "時代錯誤", ruby: "じだいさくご" },
-  { text: "取捨選択", ruby: "しゅしゃせんたく" },
-  { text: "少数精鋭", ruby: "しょうすうせいえい" },
-  { text: "切磋琢磨", ruby: "せっさたくま" },
-  { text: "即断即決", ruby: "そくだんそっけつ" },
-  { text: "大山鳴動", ruby: "たいざんめいどう" },
-  { text: "単身赴任", ruby: "たんしんふにん" },
-  { text: "朝三暮四", ruby: "ちょうさんぼし" },
-  { text: "天衣無縫", ruby: "てんいむほう" },
-  { text: "独立独歩", ruby: "どくりつどっぽ" },
-  { text: "難攻不落", ruby: "なんこうふらく" },
-  { text: "日進月歩", ruby: "にっしんげっぽ" },
-  { text: "破邪顕正", ruby: "はじゃけんしょう" },
-  { text: "百家争鳴", ruby: "ひゃっかそうめい" },
-  { text: "風林火山", ruby: "ふうりんかざん" },
-  { text: "無理難題", ruby: "むりなんだい" },
-  { text: "有名無実", ruby: "ゆうめいむじつ" },
-  { text: "竜頭蛇尾", ruby: "りゅうとうだび" },
-  { text: "輪廻転生", ruby: "りんねてんしょう" }
+  { text: "波瀾万丈", ruby: "はらんばんじょう" }
 ];
 
-export function getRandomWord() {
-  const index = Math.floor(Math.random() * WORDS.length);
-  return WORDS[index];
+// Map genres to their word arrays
+export const WORDS_BY_GENRE = {
+  // ことわざ
+  [CATEGORIES.KOTOWAZA]: KOTOWAZA_WORDS,
+
+  // クラウド genres
+  [CLOUD_GENRES.LINUX_BASIC]: LINUX_BASIC,
+  [CLOUD_GENRES.LINUX_STORAGE]: LINUX_STORAGE,
+  [CLOUD_GENRES.NETWORK_BASIC]: NETWORK_BASIC,
+  [CLOUD_GENRES.WEB_SERVER]: WEB_SERVER,
+  [CLOUD_GENRES.APP_SERVER]: APP_SERVER,
+  [CLOUD_GENRES.DB_SERVER]: DB_SERVER,
+  [CLOUD_GENRES.DNS]: DNS_WORDS,
+  [CLOUD_GENRES.MAIL]: MAIL_SERVER,
+  [CLOUD_GENRES.NFS]: NFS_WORDS,
+  [CLOUD_GENRES.SECURITY]: SECURITY_WORDS,
+  [CLOUD_GENRES.NON_FUNCTIONAL]: NON_FUNCTIONAL,
+  [CLOUD_GENRES.SHELL_SCRIPT]: SHELL_SCRIPT,
+  [CLOUD_GENRES.ZABBIX]: ZABBIX_WORDS,
+  [CLOUD_GENRES.ALB]: ALB_WORDS,
+  [CLOUD_GENRES.NETWORK_ADV]: NETWORK_ADV,
+  [CLOUD_GENRES.L2_SWITCH]: L2_SWITCH,
+  [CLOUD_GENRES.L3_ROUTER]: L3_SWITCH_ROUTER,
+  [CLOUD_GENRES.BIGIP]: BIGIP_WORDS,
+  [CLOUD_GENRES.SRX]: SRX_WORDS,
+};
+
+// Genres grouped by category
+export const GENRES_BY_CATEGORY = {
+  [CATEGORIES.KOTOWAZA]: [CATEGORIES.KOTOWAZA],
+  [CATEGORIES.CLOUD]: Object.values(CLOUD_GENRES),
+};
+
+export const ALL_WORDS = Object.values(WORDS_BY_GENRE).flat();
+
+export function getRandomWord(genre = null) {
+  const pool = genre && WORDS_BY_GENRE[genre] ? WORDS_BY_GENRE[genre] : ALL_WORDS;
+  const index = Math.floor(Math.random() * pool.length);
+  return pool[index];
 }
