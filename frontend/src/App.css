@@ -9,16 +9,17 @@
 }
 
 .game-title {
-  font-size: 3.2em;
+  font-size: 3.5em;
+  font-weight: 800;
   line-height: 1.1;
-  background: -webkit-linear-gradient(45deg, #00d2ff 0%, #3a7bd5 100%);
+  background: linear-gradient(135deg, #4f46e5 0%, #0ea5e9 100%);
   -webkit-background-clip: text;
-  background-clip: text; /* standard property */
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent; 
   text-transform: uppercase;
-  letter-spacing: 4px;
-  text-shadow: 0 4px 10px rgba(0,210,255,0.3);
+  letter-spacing: 2px;
   margin-top: 0;
   margin-bottom: 2rem;
+  text-shadow: 0 4px 15px rgba(14, 165, 233, 0.2);
 }

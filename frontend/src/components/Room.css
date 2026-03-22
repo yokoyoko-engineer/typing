@@ -2,21 +2,20 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: rgba(255, 255, 255, 0.05);
+  background: #ffffff;
   padding: 3rem;
-  border-radius: 16px;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  box-shadow: 0 10px 40px -10px rgba(0,0,0,0.08);
+  border: 1px solid #ffffff;
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
 }
 
 .room-container h2 {
   margin-top: 0;
   margin-bottom: 2rem;
-  color: #fff;
+  color: #0f172a;
+  font-weight: 700;
 }
 
 .room-form {
@@ -31,41 +30,45 @@
   flex-direction: column;
   text-align: left;
   font-size: 0.9em;
-  color: #ccc;
+  font-weight: 600;
+  color: #475569;
   gap: 0.5rem;
 }
 
 .room-form input {
   padding: 0.8rem 1rem;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(0, 0, 0, 0.2);
-  color: #fff;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
   font-size: 1rem;
-  transition: border-color 0.2s;
+  font-family: inherit;
+  transition: all 0.2s ease;
   outline: none;
 }
 
 .room-form input:focus {
-  border-color: #00d2ff;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  background: #ffffff;
 }
 
 .join-btn {
   margin-top: 1rem;
   padding: 1rem;
   border: none;
-  border-radius: 8px;
-  background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
   color: white;
-  font-weight: bold;
-  font-size: 1rem;
+  font-weight: 600;
+  font-size: 1.05rem;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .join-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(0, 210, 255, 0.4);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
 }
 
 .join-btn:active {
@@ -81,18 +84,21 @@
 }
 
 .lobby-container h2 {
-  color: #fff;
+  color: #0f172a;
   margin-bottom: 2rem;
+  font-weight: 700;
+  font-size: 2rem;
 }
 
 .player-name-input {
-  background: rgba(255, 255, 255, 0.05);
+  background: #ffffff;
   padding: 1.5rem;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  margin-bottom: 2rem;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 15px -3px rgba(0,0,0,0.05);
+  margin-bottom: 2.5rem;
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
 }
 
 .player-name-input label {
@@ -100,82 +106,103 @@
   flex-direction: column;
   text-align: left;
   font-size: 0.9em;
-  color: #ccc;
-  gap: 0.5rem;
+  font-weight: 600;
+  color: #475569;
+  gap: 0.6rem;
 }
 
 .player-name-input input {
   padding: 0.8rem 1rem;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(0, 0, 0, 0.2);
-  color: #fff;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
   font-size: 1rem;
+  font-family: inherit;
   outline: none;
+  transition: all 0.2s;
 }
 
 .player-name-input input:focus {
-  border-color: #00d2ff;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  background: #ffffff;
 }
 
 .room-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  grid-template-rows: repeat(2, auto);
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.2rem;
   width: 100%;
-  max-width: 1200px;
+  max-width: 1000px;
 }
 
 .room-card {
   width: 100%;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+  transition: all 0.2s ease;
 }
 
 .room-card:hover:not(.full):not(.playing) {
-  transform: translateY(-5px);
-  border-color: #00d2ff;
-  box-shadow: 0 5px 20px rgba(0, 210, 255, 0.2);
+  transform: translateY(-4px);
+  border-color: #6366f1;
+  box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.15);
 }
 
 .room-card.full, .room-card.playing {
   opacity: 0.7;
+  background: #f8fafc;
 }
 
 .room-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 1rem;
 }
 
 .room-card-header h3 {
   margin: 0;
-  color: #fff;
+  color: #0f172a;
+  font-weight: 700;
+  font-size: 1.1rem;
 }
 
 .player-count {
-  font-weight: bold;
-  color: #aaa;
+  font-weight: 600;
+  color: #64748b;
+  font-size: 0.9em;
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 12px;
 }
 
 .room-status {
   margin-bottom: 1rem;
   font-size: 0.85em;
+  font-weight: 600;
 }
 
 .status.playing {
-  color: #ff9800;
+  color: #ea580c;
+  background: #fff7ed;
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
 }
 
 .status.waiting {
-  color: #4caf50;
+  color: #059669;
+  background: #ecfdf5;
+  padding: 4px 8px;
+  border-radius: 6px;
+  display: inline-block;
 }
 
 .room-players {
@@ -192,10 +219,10 @@
 }
 
 .room-players li {
-  font-size: 0.9rem;
-  color: #ddd;
-  padding: 0.2rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.95rem;
+  color: #334155;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .room-players li:last-child {
@@ -203,7 +230,7 @@
 }
 
 .empty-text {
-  color: #666;
+  color: #94a3b8;
   font-style: italic;
   font-size: 0.9rem;
 }
@@ -211,9 +238,6 @@
 .join-btn.small {
   margin-top: auto;
   padding: 0.7rem;
-  font-size: 0.9rem;
-}
-
-.join-btn:active {
-  transform: translateY(0);
+  font-size: 0.95rem;
+  border-radius: 8px;
 }
