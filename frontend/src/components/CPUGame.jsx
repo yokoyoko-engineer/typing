@@ -25,6 +25,7 @@ export default function CPUGame({ onBackToHome }) {
     const [selectionStep, setSelectionStep] = useState('category'); // category, genre, difficulty
     const [countdown, setCountdown] = useState(3);
     const [damageFlash, setDamageFlash] = useState(false);
+    const [isMiss, setIsMiss] = useState(false);
 
     const [playerInfo, setPlayerInfo] = useState({
         hp: 1000,
@@ -168,6 +169,7 @@ export default function CPUGame({ onBackToHome }) {
             const res = pSessionRef.current.input(typedChar);
 
             if (res && res.success) {
+                setIsMiss(false);
                 if (res.finishedWord) {
                     const damage = Math.round((playerInfo.currentWord.ruby.length * 2) * 2.4);
                     const newCpuHp = Math.max(0, cpuInfo.hp - damage);
@@ -189,6 +191,8 @@ export default function CPUGame({ onBackToHome }) {
                 } else {
                     setPlayerInfo(prev => ({ ...prev, typingState: pSessionRef.current.state }));
                 }
+            } else {
+                setIsMiss(true);
             }
         }
     };
@@ -386,7 +390,7 @@ export default function CPUGame({ onBackToHome }) {
                                 <>
                                     <span className="char typed" style={{ color: '#4caf50' }}>{playerInfo.typingState.typedRomaji}</span>
                                     {playerInfo.typingState.targetRomaji.length > 0 && (
-                                        <span className="char current" style={{ textDecoration: 'underline' }}>{playerInfo.typingState.targetRomaji[0]}</span>
+                                        <span className={`char ${isMiss ? 'miss' : 'current'}`}>{playerInfo.typingState.targetRomaji[0]}</span>
                                     )}
                                     <span className="char">{playerInfo.typingState.targetRomaji.slice(1)}</span>
                                 </>

@@ -5,6 +5,7 @@ export default function Game({ socket, roomState, myId }) {
   const [isReady, setIsReady] = useState(false);
   const [gameStarted, setGameStarted] = useState(roomState.status === 'playing');
   const [damageFlash, setDamageFlash] = useState(false);
+  const [isMiss, setIsMiss] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -24,12 +25,22 @@ export default function Game({ socket, roomState, myId }) {
       if (inputRef.current) inputRef.current.focus();
     }
 
+    const handleTypingResult = ({ success }) => {
+      if (success) {
+        setIsMiss(false);
+      } else {
+        setIsMiss(true);
+      }
+    };
+
     socket.on('gameStarted', handleGameStarted);
     socket.on('takingDamage', handleTakingDamage);
+    socket.on('typingResult', handleTypingResult);
 
     return () => {
       socket.off('gameStarted', handleGameStarted);
       socket.off('takingDamage', handleTakingDamage);
+      socket.off('typingResult', handleTypingResult);
     };
   }, [socket, myId, roomState.status]);
 
@@ -152,7 +163,7 @@ export default function Game({ socket, roomState, myId }) {
               <>
                 <span className="char typed" style={{ color: '#4caf50' }}>{me.typingState.typedRomaji}</span>
                 {me.typingState.targetRomaji.length > 0 && (
-                  <span className="char current" style={{ textDecoration: 'underline' }}>{me.typingState.targetRomaji[0]}</span>
+                  <span className={`char ${isMiss ? 'miss' : 'current'}`}>{me.typingState.targetRomaji[0]}</span>
                 )}
                 <span className="char">{me.typingState.targetRomaji.slice(1)}</span>
               </>

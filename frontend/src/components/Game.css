@@ -125,25 +125,29 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 3rem 1rem;
+  padding: 2rem 1.5rem;
   width: 100%;
   background: #f8f9fa;
   border-radius: 12px;
   border: 1px solid #e8e8e8;
+  overflow-wrap: break-word;
+  word-break: break-all;
 }
 
 .target-word {
-  font-size: 3rem;
+  font-size: 1.6rem;
   font-weight: bold;
-  letter-spacing: 4px;
+  letter-spacing: 2px;
   font-family: monospace;
   margin-bottom: 1rem;
   color: #bbb;
+  max-width: 100%;
+  text-align: center;
 }
 
 .char {
   color: #ccc;
-  transition: color 0.1s;
+  transition: color 0.15s;
 }
 
 .char.typed {
@@ -153,6 +157,18 @@
 .char.current {
   color: #2c3e50;
   border-bottom: 3px solid #e8734a;
+}
+
+.char.miss {
+  color: #e53935;
+  border-bottom: 3px solid #e53935;
+  animation: shake 0.2s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
 }
 
 .instruction {
