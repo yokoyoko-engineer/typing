@@ -17,10 +17,8 @@ const CPU_DIFFICULTY = {
     10: 158  // Fast
 };
 
-// API base URL relative to current host
-const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? `http://${window.location.hostname}:3001` 
-    : ''; // Adjust for production if needed
+// API calls will now automatically be routed through the Vite/Nginx proxy
+
 
 export default function CPUGame({ onBackToHome }) {
     const [playerName, setPlayerName] = useState('');
@@ -113,7 +111,7 @@ export default function CPUGame({ onBackToHome }) {
             const newRankings = {};
             // Fetch all 10 levels in parallel
             const promises = Array.from({ length: 10 }, (_, i) => i + 1).map(async (level) => {
-                const res = await fetch(`${API_BASE}/api/rankings/${encodeURIComponent(g)}/${level}`);
+                const res = await fetch(`/api/rankings/${encodeURIComponent(g)}/${level}`);
                 if (res.ok) {
                     newRankings[level] = await res.json();
                 } else {
@@ -263,7 +261,7 @@ export default function CPUGame({ onBackToHome }) {
                         setWinner('PLAYER');
 
                         // Save ranking to backend
-                        fetch(`${API_BASE}/api/rankings/${encodeURIComponent(genre)}/${difficulty}`, {
+                        fetch(`/api/rankings/${encodeURIComponent(genre)}/${difficulty}`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ username: playerName, time: roundedTime })
