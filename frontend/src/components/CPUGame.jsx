@@ -216,7 +216,7 @@ export default function CPUGame({ onBackToHome }) {
                             </button>
                         ))}
                     </div>
-                    <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '40px', background: '#555' }}>
+                    <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '40px', background: '#e0e0e0', color: '#2c3e50' }}>
                         Back to Home
                     </button>
                 </div>
@@ -229,7 +229,7 @@ export default function CPUGame({ onBackToHome }) {
             return (
                 <div className="game-container">
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-                        <button onClick={() => setSelectionStep('category')} style={{ background: 'none', border: 'none', color: '#00d2ff', cursor: 'pointer', fontSize: '1.1em' }}>‹ カテゴリに戻る</button>
+                        <button onClick={() => setSelectionStep('category')} style={{ background: 'none', border: 'none', color: '#5c6bc0', cursor: 'pointer', fontSize: '1.1em' }}>‹ カテゴリに戻る</button>
                         <h2>ジャンルを選択 ({category})</h2>
                     </div>
                     <div className="genre-grid" style={{
@@ -246,7 +246,7 @@ export default function CPUGame({ onBackToHome }) {
                             </button>
                         ))}
                     </div>
-                    <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '40px', background: '#555' }}>
+                    <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '40px', background: '#e0e0e0', color: '#2c3e50' }}>
                         Back to Home
                     </button>
                 </div>
@@ -263,7 +263,7 @@ export default function CPUGame({ onBackToHome }) {
                         } else {
                             setSelectionStep('genre');
                         }
-                    }} style={{ background: 'none', border: 'none', color: '#00d2ff', cursor: 'pointer', fontSize: '1.1em' }}>‹ 戻る</button>
+                    }} style={{ background: 'none', border: 'none', color: '#5c6bc0', cursor: 'pointer', fontSize: '1.1em' }}>‹ 戻る</button>
                     <h2>難易度を選択 ({genre})</h2>
                 </div>
 
@@ -285,7 +285,7 @@ export default function CPUGame({ onBackToHome }) {
                     })}
                 </div>
 
-                <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '40px', background: '#555' }}>
+                <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '40px', background: '#e0e0e0', color: '#2c3e50' }}>
                     Back to Home
                 </button>
             </div>
@@ -322,7 +322,7 @@ export default function CPUGame({ onBackToHome }) {
                         setGameState('select');
                         setSelectionStep('category');
                     }}>PLAY AGAIN</button>
-                    <button className="action-btn" onClick={onBackToHome} style={{ background: '#555' }}>BACK TO HOME</button>
+                    <button className="action-btn" onClick={onBackToHome} style={{ background: '#e0e0e0', color: '#2c3e50' }}>BACK TO HOME</button>
                 </div>
             </div>
         );
@@ -332,10 +332,10 @@ export default function CPUGame({ onBackToHome }) {
     return (
         <div className={`game-container battle-screen ${damageFlash ? 'flash-damage' : ''}`} onKeyDown={handleKeyDown} tabIndex="0" ref={inputRef}>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px' }}>
-                <button className="action-btn" onClick={onBackToHome} style={{ padding: '5px 10px', background: '#555', fontSize: '0.8em' }}>
+                <button className="action-btn" onClick={onBackToHome} style={{ padding: '5px 10px', background: '#e0e0e0', color: '#2c3e50', fontSize: '0.8em' }}>
                     Quit
                 </button>
-                <span style={{ fontSize: '1em', fontWeight: 'bold' }}>{genre} - Lv.{difficulty}</span>
+                <span style={{ fontSize: '1em', fontWeight: 'bold', color: '#2c3e50' }}>{genre} - Lv.{difficulty}</span>
             </div>
 
             <div className="players-hud">
@@ -348,10 +348,10 @@ export default function CPUGame({ onBackToHome }) {
                     <div className="hp-bar-container">
                         <div className="hp-bar" style={{ width: `${Math.max(0, playerInfo.hp) / 10}%`, backgroundColor: playerInfo.hp > 500 ? '#4caf50' : playerInfo.hp > 200 ? '#ff9800' : '#f44336' }}></div>
                     </div>
-                    <div className="progress-container" style={{ marginTop: '8px', background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div className="progress-container" style={{ marginTop: '8px', background: '#e8e8e8', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
                         <div className="progress-bar" style={{
                             width: playerInfo.typingState ? `${(playerInfo.typingState.typedRomaji.length / Math.max(1, playerInfo.typingState.typedRomaji.length + playerInfo.typingState.targetRomaji.length)) * 100}%` : '0%',
-                            backgroundColor: '#00d2ff', height: '100%', transition: 'width 0.1s'
+                            backgroundColor: '#5c6bc0', height: '100%', transition: 'width 0.1s'
                         }}></div>
                     </div>
                 </div>
@@ -365,10 +365,10 @@ export default function CPUGame({ onBackToHome }) {
                     <div className="hp-bar-container">
                         <div className="hp-bar" style={{ width: `${Math.max(0, cpuInfo.hp) / 10}%`, backgroundColor: cpuInfo.hp > 500 ? '#4caf50' : cpuInfo.hp > 200 ? '#ff9800' : '#f44336' }}></div>
                     </div>
-                    <div className="progress-container" style={{ marginTop: '8px', background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
+                    <div className="progress-container" style={{ marginTop: '8px', background: '#e8e8e8', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
                         <div className="progress-bar" style={{
                             width: cpuInfo.typingState ? `${(cpuInfo.typingState.typedRomaji.length / Math.max(1, cpuInfo.typingState.typedRomaji.length + cpuInfo.typingState.targetRomaji.length)) * 100}%` : '0%',
-                            backgroundColor: '#e91e63', height: '100%', transition: 'width 0.1s'
+                            backgroundColor: '#e8734a', height: '100%', transition: 'width 0.1s'
                         }}></div>
                     </div>
                 </div>
@@ -378,8 +378,8 @@ export default function CPUGame({ onBackToHome }) {
                 {playerInfo.hp > 0 ? (
                     <>
                         <div className="target-word-japanese">
-                            <div className="ruby" style={{ fontSize: '0.9em', color: '#ccc', marginBottom: '5px' }}>{playerInfo.currentWord?.ruby}</div>
-                            <div className="kanji" style={{ fontSize: '2em', fontWeight: 'bold', marginBottom: '15px' }}>{playerInfo.currentWord?.text}</div>
+                            <div className="ruby" style={{ fontSize: '0.9em', color: '#888', marginBottom: '5px' }}>{playerInfo.currentWord?.ruby}</div>
+                            <div className="kanji" style={{ fontSize: '2em', fontWeight: 'bold', marginBottom: '15px', color: '#2c3e50' }}>{playerInfo.currentWord?.text}</div>
                         </div>
                         <div className="target-word">
                             {playerInfo.typingState && (

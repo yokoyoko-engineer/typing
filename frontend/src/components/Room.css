@@ -2,13 +2,11 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: rgba(255, 255, 255, 0.05);
+  background: #ffffff;
   padding: 3rem;
   border-radius: 16px;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e8e8e8;
   width: 100%;
   max-width: 400px;
 }
@@ -16,7 +14,7 @@
 .room-container h2 {
   margin-top: 0;
   margin-bottom: 2rem;
-  color: #fff;
+  color: #2c3e50;
 }
 
 .room-form {
@@ -31,23 +29,23 @@
   flex-direction: column;
   text-align: left;
   font-size: 0.9em;
-  color: #ccc;
+  color: #555;
   gap: 0.5rem;
 }
 
 .room-form input {
   padding: 0.8rem 1rem;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(0, 0, 0, 0.2);
-  color: #fff;
+  border: 1px solid #d0d0d0;
+  background: #ffffff;
+  color: #2c3e50;
   font-size: 1rem;
   transition: border-color 0.2s;
   outline: none;
 }
 
 .room-form input:focus {
-  border-color: #00d2ff;
+  border-color: #5c6bc0;
 }
 
 .join-btn {
@@ -55,7 +53,7 @@
   padding: 1rem;
   border: none;
   border-radius: 8px;
-  background: linear-gradient(90deg, #00d2ff 0%, #3a7bd5 100%);
+  background: linear-gradient(90deg, #e8734a 0%, #d4553b 100%);
   color: white;
   font-weight: bold;
   font-size: 1rem;
@@ -65,7 +63,7 @@
 
 .join-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(0, 210, 255, 0.4);
+  box-shadow: 0 4px 15px rgba(232, 115, 74, 0.3);
 }
 
 .join-btn:active {
@@ -81,15 +79,16 @@
 }
 
 .lobby-container h2 {
-  color: #fff;
+  color: #2c3e50;
   margin-bottom: 2rem;
 }
 
 .player-name-input {
-  background: rgba(255, 255, 255, 0.05);
+  background: #ffffff;
   padding: 1.5rem;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid #e8e8e8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   margin-bottom: 2rem;
   width: 100%;
   max-width: 400px;
@@ -100,22 +99,22 @@
   flex-direction: column;
   text-align: left;
   font-size: 0.9em;
-  color: #ccc;
+  color: #555;
   gap: 0.5rem;
 }
 
 .player-name-input input {
   padding: 0.8rem 1rem;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(0, 0, 0, 0.2);
-  color: #fff;
+  border: 1px solid #d0d0d0;
+  background: #ffffff;
+  color: #2c3e50;
   font-size: 1rem;
   outline: none;
 }
 
 .player-name-input input:focus {
-  border-color: #00d2ff;
+  border-color: #5c6bc0;
 }
 
 .room-grid {
@@ -129,23 +128,24 @@
 
 .room-card {
   width: 100%;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
   border-radius: 12px;
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
   transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .room-card:hover:not(.full):not(.playing) {
   transform: translateY(-5px);
-  border-color: #00d2ff;
-  box-shadow: 0 5px 20px rgba(0, 210, 255, 0.2);
+  border-color: #5c6bc0;
+  box-shadow: 0 8px 24px rgba(92, 107, 192, 0.12);
 }
 
 .room-card.full, .room-card.playing {
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 .room-card-header {
@@ -157,12 +157,12 @@
 
 .room-card-header h3 {
   margin: 0;
-  color: #fff;
+  color: #2c3e50;
 }
 
 .player-count {
   font-weight: bold;
-  color: #aaa;
+  color: #888;
 }
 
 .room-status {
@@ -193,9 +193,9 @@
 
 .room-players li {
   font-size: 0.9rem;
-  color: #ddd;
+  color: #555;
   padding: 0.2rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .room-players li:last-child {
@@ -203,7 +203,7 @@
 }
 
 .empty-text {
-  color: #666;
+  color: #aaa;
   font-style: italic;
   font-size: 0.9rem;
 }

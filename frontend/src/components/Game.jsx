@@ -131,10 +131,10 @@ export default function Game({ socket, roomState, myId }) {
             <div className="hp-bar-container">
               <div className="hp-bar" style={{ width: `${Math.max(0, p.hp) / 10}%`, backgroundColor: p.hp > 500 ? '#4caf50' : p.hp > 200 ? '#ff9800' : '#f44336' }}></div>
             </div>
-            <div className="progress-container" style={{ marginTop: '8px', background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
+            <div className="progress-container" style={{ marginTop: '8px', background: '#e8e8e8', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
               <div className="progress-bar" style={{
                 width: p.typingState ? `${(p.typingState.typedRomaji.length / Math.max(1, p.typingState.typedRomaji.length + p.typingState.targetRomaji.length)) * 100}%` : '0%',
-                backgroundColor: '#00d2ff', height: '100%', transition: 'width 0.1s'
+                backgroundColor: '#5c6bc0', height: '100%', transition: 'width 0.1s'
               }}></div>
             </div>
           </div>
@@ -144,8 +144,8 @@ export default function Game({ socket, roomState, myId }) {
       {me.hp > 0 ? (
         <div className="typing-area">
           <div className="target-word-japanese">
-            <div className="ruby" style={{ fontSize: '0.9em', color: '#ccc', marginBottom: '5px' }}>{me.currentWord.ruby}</div>
-            <div className="kanji" style={{ fontSize: '2em', fontWeight: 'bold', marginBottom: '15px' }}>{me.currentWord.text}</div>
+            <div className="ruby" style={{ fontSize: '0.9em', color: '#888', marginBottom: '5px' }}>{me.currentWord.ruby}</div>
+            <div className="kanji" style={{ fontSize: '2em', fontWeight: 'bold', marginBottom: '15px', color: '#2c3e50' }}>{me.currentWord.text}</div>
           </div>
           <div className="target-word">
             {me.typingState && (

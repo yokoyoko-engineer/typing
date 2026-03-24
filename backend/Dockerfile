@@ -3,10 +3,13 @@ FROM node:20-alpine
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+RUN npm ci --omit=dev
 
 COPY . .
 
+# Security: 非rootユーザーで実行
+USER node
+
 EXPOSE 3001
 
-CMD ["npm", "run", "dev"]
+CMD ["node", "server.js"]

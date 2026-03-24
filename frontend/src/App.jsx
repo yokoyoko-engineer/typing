@@ -62,7 +62,7 @@ function App() {
       {gameMode === 'online' && (
         !roomState ? (
           <div>
-            <button className="action-btn" onClick={() => setGameMode('home')} style={{ marginBottom: '20px', background: '#555' }}>
+            <button className="action-btn" onClick={() => setGameMode('home')} style={{ marginBottom: '20px', background: '#e0e0e0', color: '#2c3e50' }}>
               {'< Back to Mode Select'}
             </button>
             <Lobby socket={socket} lobbies={lobbies} onJoinRoom={handleJoinRoom} />
