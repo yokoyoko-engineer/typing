@@ -4,11 +4,13 @@ import { APP_SERVER, DB_SERVER, DNS_WORDS } from './data/cloudWords3';
 import { MAIL_SERVER, NFS_WORDS, SECURITY_WORDS } from './data/cloudWords4';
 import { NON_FUNCTIONAL, SHELL_SCRIPT, ZABBIX_WORDS, ALB_WORDS } from './data/cloudWords5';
 import { NETWORK_ADV, L2_SWITCH, L3_SWITCH_ROUTER, BIGIP_WORDS, SRX_WORDS } from './data/cloudWords6';
+import { BUSINESS_WORDS } from './data/businessWords';
 
 // Categories
 export const CATEGORIES = {
   KOTOWAZA: "ことわざ",
-  CLOUD: "クラウド"
+  CLOUD: "クラウド",
+  BUSINESS: "ビジネス用語"
 };
 
 // Genre keys for クラウド category
@@ -110,6 +112,9 @@ export const WORDS_BY_GENRE = {
   // ことわざ
   [CATEGORIES.KOTOWAZA]: KOTOWAZA_WORDS,
 
+  // ビジネス用語
+  [CATEGORIES.BUSINESS]: BUSINESS_WORDS,
+
   // クラウド genres
   [CLOUD_GENRES.LINUX_BASIC]: LINUX_BASIC,
   [CLOUD_GENRES.LINUX_STORAGE]: LINUX_STORAGE,
@@ -135,6 +140,7 @@ export const WORDS_BY_GENRE = {
 // Genres grouped by category
 export const GENRES_BY_CATEGORY = {
   [CATEGORIES.KOTOWAZA]: [CATEGORIES.KOTOWAZA],
+  [CATEGORIES.BUSINESS]: [CATEGORIES.BUSINESS],
   [CATEGORIES.CLOUD]: Object.values(CLOUD_GENRES),
 };
 

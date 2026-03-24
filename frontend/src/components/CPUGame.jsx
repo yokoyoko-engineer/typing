@@ -54,9 +54,9 @@ export default function CPUGame({ onBackToHome }) {
 
     const selectCategory = (cat) => {
         setCategory(cat);
-        // If ことわざ, skip genre selection since it's a single genre
-        if (cat === CATEGORIES.KOTOWAZA) {
-            setGenre(CATEGORIES.KOTOWAZA);
+        // If ことわざ or ビジネス用語, skip genre selection since it's a single genre
+        if (cat === CATEGORIES.KOTOWAZA || cat === CATEGORIES.BUSINESS) {
+            setGenre(cat);
             setSelectionStep('difficulty');
         } else {
             setSelectionStep('genre');
@@ -262,7 +262,7 @@ export default function CPUGame({ onBackToHome }) {
             <div className="game-container">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
                     <button onClick={() => {
-                        if (category === CATEGORIES.KOTOWAZA) {
+                        if (category === CATEGORIES.KOTOWAZA || category === CATEGORIES.BUSINESS) {
                             setSelectionStep('category');
                         } else {
                             setSelectionStep('genre');
