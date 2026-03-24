@@ -17,27 +17,10 @@ const CPU_DIFFICULTY = {
     10: 158  // Fast
 };
 
-// --- Ranking helpers (localStorage) ---
-function getRankingKey(genre, level) {
-    return `typing_rank_${genre}_lv${level}`;
-}
-
-function getRankings(genre, level) {
-    try {
-        const data = localStorage.getItem(getRankingKey(genre, level));
-        return data ? JSON.parse(data) : [];
-    } catch { return []; }
-}
-
-function saveRanking(genre, level, username, timeSeconds) {
-    const key = getRankingKey(genre, level);
-    const rankings = getRankings(genre, level);
-    rankings.push({ username, time: timeSeconds, date: new Date().toISOString() });
-    rankings.sort((a, b) => a.time - b.time);
-    const top10 = rankings.slice(0, 10);
-    localStorage.setItem(key, JSON.stringify(top10));
-    return top10;
-}
+// API base URL relative to current host
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? `http://${window.location.hostname}:3001` 
+    : ''; // Adjust for production if needed
 
 export default function CPUGame({ onBackToHome }) {
     const [playerName, setPlayerName] = useState('');
@@ -57,6 +40,9 @@ export default function CPUGame({ onBackToHome }) {
     const [battleElapsed, setBattleElapsed] = useState(0);
     const [finalTime, setFinalTime] = useState(null);
     const [latestRankings, setLatestRankings] = useState([]);
+    
+    // Rankings state cache for the selected genre
+    const [allRankings, setAllRankings] = useState({});
 
     const [playerInfo, setPlayerInfo] = useState({
         hp: 1000,
@@ -113,6 +99,32 @@ export default function CPUGame({ onBackToHome }) {
     const selectGenre = (g) => {
         setGenre(g);
         setSelectionStep('difficulty');
+    };
+
+    // Fetch rankings when genre is selected
+    useEffect(() => {
+        if (genre && selectionStep === 'difficulty') {
+            fetchAllRankings(genre);
+        }
+    }, [genre, selectionStep]);
+
+    const fetchAllRankings = async (g) => {
+        try {
+            const newRankings = {};
+            // Fetch all 10 levels in parallel
+            const promises = Array.from({ length: 10 }, (_, i) => i + 1).map(async (level) => {
+                const res = await fetch(`${API_BASE}/api/rankings/${encodeURIComponent(g)}/${level}`);
+                if (res.ok) {
+                    newRankings[level] = await res.json();
+                } else {
+                    newRankings[level] = [];
+                }
+            });
+            await Promise.all(promises);
+            setAllRankings(newRankings);
+        } catch (error) {
+            console.error('Failed to fetch rankings', error);
+        }
     };
 
     const startBattle = (lvl) => {
@@ -250,9 +262,22 @@ export default function CPUGame({ onBackToHome }) {
                         setGameState('finished');
                         setWinner('PLAYER');
 
-                        // Save ranking
-                        const updated = saveRanking(genre, difficulty, playerName, roundedTime);
-                        setLatestRankings(updated);
+                        // Save ranking to backend
+                        fetch(`${API_BASE}/api/rankings/${encodeURIComponent(genre)}/${difficulty}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ username: playerName, time: roundedTime })
+                        })
+                        .then(res => res.json())
+                        .then(updated => {
+                            setLatestRankings(updated);
+                            // Also update the allRankings state so if they play again it's fresh
+                            setAllRankings(prev => ({
+                                ...prev,
+                                [difficulty]: updated
+                            }));
+                        })
+                        .catch(err => console.error("Error saving ranking:", err));
                     }
                 } else {
                     setPlayerInfo(prev => ({ ...prev, typingState: pSessionRef.current.state }));
@@ -373,7 +398,7 @@ export default function CPUGame({ onBackToHome }) {
         }
 
         // Difficulty selection + Ranking preview
-        const previewRankings = genre ? getRankings(genre, previewLevel) : [];
+        const previewRankings = allRankings[previewLevel] || [];
         return (
             <div className="game-container" style={{ maxWidth: '900px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '10px' }}>
@@ -395,7 +420,7 @@ export default function CPUGame({ onBackToHome }) {
                         }}>
                             {[...Array(10)].map((_, i) => {
                                 const level = i + 1;
-                                const levelRankings = getRankings(genre, level);
+                                const levelRankings = allRankings[level] || [];
                                 const bestTime = levelRankings.length > 0 ? levelRankings[0].time : null;
                                 return (
                                     <button

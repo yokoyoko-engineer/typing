@@ -1,11 +1,24 @@
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import cors from 'cors';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
 // --- Security: CORS制限 ---
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'http://localhost';
+
+app.use(cors({
+  origin: ALLOWED_ORIGIN,
+  methods: ["GET", "POST"]
+}));
+app.use(express.json());
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -13,6 +26,68 @@ const io = new Server(server, {
     origin: ALLOWED_ORIGIN,
     methods: ["GET", "POST"]
   }
+});
+
+// --- ランキング永続化ロジック ---
+const RANKINGS_FILE = path.join(__dirname, 'data', 'rankings.json');
+
+async function getRankingsData() {
+  try {
+    const data = await fs.readFile(RANKINGS_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return {}; // ファイルがない場合は空オブジェクトを返す
+    }
+    console.error("Error reading rankings file:", err);
+    return {};
+  }
+}
+
+async function saveRankingsData(data) {
+  try {
+    await fs.mkdir(path.dirname(RANKINGS_FILE), { recursive: true });
+    await fs.writeFile(RANKINGS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (err) {
+    console.error("Error saving rankings file:", err);
+  }
+}
+
+// --- Ranking API Endpoints ---
+app.get('/api/rankings/:genre/:level', async (req, res) => {
+  const { genre, level } = req.params;
+  const rankings = await getRankingsData();
+  const key = `${genre}_lv${level}`;
+  res.json(rankings[key] || []);
+});
+
+app.post('/api/rankings/:genre/:level', async (req, res) => {
+  const { genre, level } = req.params;
+  const { username, time } = req.body;
+  
+  if (!username || typeof time !== 'number') {
+    return res.status(400).json({ error: 'Invalid input data' });
+  }
+
+  const safeName = sanitizePlayerName(username);
+  if (!safeName) {
+    return res.status(400).json({ error: 'Invalid username' });
+  }
+
+  const rankings = await getRankingsData();
+  const key = `${genre}_lv${level}`;
+  
+  if (!rankings[key]) {
+    rankings[key] = [];
+  }
+  
+  rankings[key].push({ username: safeName, time, date: new Date().toISOString() });
+  rankings[key].sort((a, b) => a.time - b.time);
+  rankings[key] = rankings[key].slice(0, 10); // TOP 10を維持
+  
+  await saveRankingsData(rankings);
+  
+  res.json(rankings[key]);
 });
 
 // ヘルスチェック用
