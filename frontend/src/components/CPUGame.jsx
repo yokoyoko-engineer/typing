@@ -50,6 +50,7 @@ export default function CPUGame({ onBackToHome }) {
     const [countdown, setCountdown] = useState(3);
     const [damageFlash, setDamageFlash] = useState(false);
     const [isMiss, setIsMiss] = useState(false);
+    const [previewLevel, setPreviewLevel] = useState(1);
 
     // Timer
     const [battleStartTime, setBattleStartTime] = useState(null);
@@ -372,10 +373,10 @@ export default function CPUGame({ onBackToHome }) {
         }
 
         // Difficulty selection + Ranking preview
-        const previewRankings = genre && difficulty === null ? [] : [];
+        const previewRankings = genre ? getRankings(genre, previewLevel) : [];
         return (
-            <div className="game-container">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+            <div className="game-container" style={{ maxWidth: '900px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '10px' }}>
                     <button onClick={() => {
                         if (category === CATEGORIES.KOTOWAZA || category === CATEGORIES.BUSINESS) {
                             setSelectionStep('category');
@@ -386,30 +387,71 @@ export default function CPUGame({ onBackToHome }) {
                     <h2>難易度を選択 ({genre})</h2>
                 </div>
 
-                <div className="difficulty-grid" style={{
-                    display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px', marginTop: '20px'
-                }}>
-                    {[...Array(10)].map((_, i) => {
-                        const level = i + 1;
-                        const levelRankings = getRankings(genre, level);
-                        const bestTime = levelRankings.length > 0 ? levelRankings[0].time : null;
-                        return (
-                            <button
-                                key={level}
-                                className="action-btn"
-                                onClick={() => startBattle(level)}
-                                style={{ height: '80px', fontSize: '1em', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
-                            >
-                                <span style={{ fontWeight: 'bold', fontSize: '1.1em' }}>Lv.{level}</span>
-                                {bestTime !== null && (
-                                    <span style={{ fontSize: '0.7em', color: '#e8734a' }}>🏆 {bestTime}s</span>
-                                )}
-                            </button>
-                        )
-                    })}
+                <div className="difficulty-ranking-layout">
+                    {/* Left: Difficulty buttons */}
+                    <div className="difficulty-panel">
+                        <div className="difficulty-grid" style={{
+                            display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px'
+                        }}>
+                            {[...Array(10)].map((_, i) => {
+                                const level = i + 1;
+                                const levelRankings = getRankings(genre, level);
+                                const bestTime = levelRankings.length > 0 ? levelRankings[0].time : null;
+                                return (
+                                    <button
+                                        key={level}
+                                        className={`action-btn ${previewLevel === level ? 'preview-active' : ''}`}
+                                        onClick={() => startBattle(level)}
+                                        onMouseEnter={() => setPreviewLevel(level)}
+                                        style={{ height: '80px', fontSize: '1em', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                                    >
+                                        <span style={{ fontWeight: 'bold', fontSize: '1.1em' }}>Lv.{level}</span>
+                                        {bestTime !== null && (
+                                            <span style={{ fontSize: '0.7em', color: '#e8734a' }}>🏆 {bestTime}s</span>
+                                        )}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Right: Ranking TOP10 preview */}
+                    <div className="ranking-preview-panel">
+                        <h3 style={{ margin: '0 0 15px', color: '#2c3e50', fontSize: '1.1em', textAlign: 'center' }}>
+                            🏆 ランキング TOP10 — Lv.{previewLevel}
+                        </h3>
+                        {previewRankings.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                {previewRankings.map((entry, idx) => {
+                                    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+                                    return (
+                                        <div key={idx} className="ranking-row" style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            padding: '8px 12px',
+                                            borderRadius: '8px',
+                                            background: idx % 2 === 0 ? '#f9f9f9' : '#fff',
+                                            border: '1px solid #eee',
+                                        }}>
+                                            <span style={{ minWidth: '35px', textAlign: 'center' }}>{medal}</span>
+                                            <span style={{ flex: 1, textAlign: 'left', paddingLeft: '10px', color: '#2c3e50' }}>{entry.username}</span>
+                                            <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '80px', textAlign: 'right' }}>{entry.time}秒</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="ranking-empty">
+                                <p style={{ textAlign: 'center', color: '#aaa', fontSize: '0.95em', margin: '30px 0' }}>
+                                    まだ記録がありません
+                                </p>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '40px', background: '#e0e0e0', color: '#2c3e50' }}>
+                <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '30px', background: '#e0e0e0', color: '#2c3e50' }}>
                     Back to Home
                 </button>
             </div>

@@ -72,6 +72,37 @@
   margin-top: 1rem;
 }
 
+/* Difficulty & Ranking Preview Layout */
+.difficulty-ranking-layout {
+  display: flex;
+  flex-direction: row;
+  gap: 30px;
+  width: 100%;
+  margin-top: 20px;
+}
+
+.difficulty-panel {
+  flex: 1;
+}
+
+.ranking-preview-panel {
+  width: 320px;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+  display: flex;
+  flex-direction: column;
+}
+
+.action-btn.preview-active {
+  border: 2px solid #5c6bc0;
+  background: #e8eaf6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(92, 107, 192, 0.2);
+}
+
 /* HUD */
 .players-hud {
   display: grid;
