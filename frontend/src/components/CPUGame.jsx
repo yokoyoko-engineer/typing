@@ -17,15 +17,45 @@ const CPU_DIFFICULTY = {
     10: 158  // Fast
 };
 
+// --- Ranking helpers (localStorage) ---
+function getRankingKey(genre, level) {
+    return `typing_rank_${genre}_lv${level}`;
+}
+
+function getRankings(genre, level) {
+    try {
+        const data = localStorage.getItem(getRankingKey(genre, level));
+        return data ? JSON.parse(data) : [];
+    } catch { return []; }
+}
+
+function saveRanking(genre, level, username, timeSeconds) {
+    const key = getRankingKey(genre, level);
+    const rankings = getRankings(genre, level);
+    rankings.push({ username, time: timeSeconds, date: new Date().toISOString() });
+    rankings.sort((a, b) => a.time - b.time);
+    const top10 = rankings.slice(0, 10);
+    localStorage.setItem(key, JSON.stringify(top10));
+    return top10;
+}
+
 export default function CPUGame({ onBackToHome }) {
+    const [playerName, setPlayerName] = useState('');
+    const [nameInput, setNameInput] = useState('');
     const [difficulty, setDifficulty] = useState(null);
     const [category, setCategory] = useState(null);
     const [genre, setGenre] = useState(null);
     const [gameState, setGameState] = useState('select'); // select, countdown, playing, finished
-    const [selectionStep, setSelectionStep] = useState('category'); // category, genre, difficulty
+    const [selectionStep, setSelectionStep] = useState('username'); // username, category, genre, difficulty
     const [countdown, setCountdown] = useState(3);
     const [damageFlash, setDamageFlash] = useState(false);
     const [isMiss, setIsMiss] = useState(false);
+
+    // Timer
+    const [battleStartTime, setBattleStartTime] = useState(null);
+    const [battleElapsed, setBattleElapsed] = useState(0);
+    const [finalTime, setFinalTime] = useState(null);
+    const [latestRankings, setLatestRankings] = useState([]);
 
     const [playerInfo, setPlayerInfo] = useState({
         hp: 1000,
@@ -45,12 +75,28 @@ export default function CPUGame({ onBackToHome }) {
     const cpuIntervalRef = useRef(null);
     const cpuStateRef = useRef(cpuInfo);
     const playerStateRef = useRef(playerInfo);
+    const nameInputRef = useRef(null);
 
     const pSessionRef = useRef(null);
     const cSessionRef = useRef(null);
 
     useEffect(() => { cpuStateRef.current = cpuInfo; }, [cpuInfo]);
     useEffect(() => { playerStateRef.current = playerInfo; }, [playerInfo]);
+
+    // Focus name input on mount
+    useEffect(() => {
+        if (selectionStep === 'username' && nameInputRef.current) {
+            nameInputRef.current.focus();
+        }
+    }, [selectionStep]);
+
+    const confirmName = () => {
+        const trimmed = nameInput.trim();
+        if (trimmed.length > 0 && trimmed.length <= 12) {
+            setPlayerName(trimmed);
+            setSelectionStep('category');
+        }
+    };
 
     const selectCategory = (cat) => {
         setCategory(cat);
@@ -72,6 +118,7 @@ export default function CPUGame({ onBackToHome }) {
         setDifficulty(lvl);
         setGameState('countdown');
         setCountdown(3);
+        setFinalTime(null);
 
         const pWord = getRandomWord(genre);
         const cWord = getRandomWord(genre);
@@ -90,10 +137,21 @@ export default function CPUGame({ onBackToHome }) {
                 return () => clearTimeout(timer);
             } else {
                 setGameState('playing');
+                setBattleStartTime(Date.now());
                 if (inputRef.current) inputRef.current.focus();
             }
         }
     }, [gameState, countdown]);
+
+    // Battle timer display
+    useEffect(() => {
+        if (gameState === 'playing' && battleStartTime) {
+            const interval = setInterval(() => {
+                setBattleElapsed(((Date.now() - battleStartTime) / 1000).toFixed(1));
+            }, 100);
+            return () => clearInterval(interval);
+        }
+    }, [gameState, battleStartTime]);
 
     // Focus maintainer
     useEffect(() => {
@@ -185,8 +243,15 @@ export default function CPUGame({ onBackToHome }) {
                     }));
 
                     if (newCpuHp <= 0) {
+                        const elapsed = ((Date.now() - battleStartTime) / 1000);
+                        const roundedTime = Math.round(elapsed * 100) / 100;
+                        setFinalTime(roundedTime);
                         setGameState('finished');
                         setWinner('PLAYER');
+
+                        // Save ranking
+                        const updated = saveRanking(genre, difficulty, playerName, roundedTime);
+                        setLatestRankings(updated);
                     }
                 } else {
                     setPlayerInfo(prev => ({ ...prev, typingState: pSessionRef.current.state }));
@@ -201,10 +266,59 @@ export default function CPUGame({ onBackToHome }) {
     // --- Render Functions ---
 
     if (gameState === 'select') {
+        // Username input
+        if (selectionStep === 'username') {
+            return (
+                <div className="game-container">
+                    <h2>プレイヤー名を入力</h2>
+                    <p style={{ color: '#888', fontSize: '0.9em', marginBottom: '20px' }}>ランキングに表示される名前です（最大12文字）</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', maxWidth: '400px', margin: '0 auto' }}>
+                        <input
+                            ref={nameInputRef}
+                            type="text"
+                            value={nameInput}
+                            onChange={(e) => setNameInput(e.target.value.slice(0, 12))}
+                            onKeyDown={(e) => { if (e.key === 'Enter') confirmName(); }}
+                            placeholder="名前を入力..."
+                            style={{
+                                width: '100%',
+                                padding: '15px 20px',
+                                fontSize: '1.3em',
+                                border: '2px solid #ddd',
+                                borderRadius: '10px',
+                                textAlign: 'center',
+                                outline: 'none',
+                                transition: 'border-color 0.2s',
+                            }}
+                            onFocus={(e) => e.target.style.borderColor = '#5c6bc0'}
+                            onBlur={(e) => e.target.style.borderColor = '#ddd'}
+                        />
+                        <button
+                            className="action-btn"
+                            onClick={confirmName}
+                            disabled={nameInput.trim().length === 0}
+                            style={{
+                                width: '100%',
+                                height: '55px',
+                                fontSize: '1.2em',
+                                opacity: nameInput.trim().length === 0 ? 0.5 : 1,
+                            }}
+                        >
+                            決定
+                        </button>
+                    </div>
+                    <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '40px', background: '#e0e0e0', color: '#2c3e50' }}>
+                        Back to Home
+                    </button>
+                </div>
+            );
+        }
+
         // Category selection
         if (selectionStep === 'category') {
             return (
                 <div className="game-container">
+                    <p style={{ color: '#5c6bc0', fontWeight: 'bold', marginBottom: '5px' }}>プレイヤー: {playerName}</p>
                     <h2>カテゴリを選択</h2>
                     <div className="genre-grid" style={{
                         display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '20px', maxWidth: '400px', margin: '20px auto'
@@ -257,7 +371,8 @@ export default function CPUGame({ onBackToHome }) {
             );
         }
 
-        // Difficulty selection
+        // Difficulty selection + Ranking preview
+        const previewRankings = genre && difficulty === null ? [] : [];
         return (
             <div className="game-container">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
@@ -276,14 +391,19 @@ export default function CPUGame({ onBackToHome }) {
                 }}>
                     {[...Array(10)].map((_, i) => {
                         const level = i + 1;
+                        const levelRankings = getRankings(genre, level);
+                        const bestTime = levelRankings.length > 0 ? levelRankings[0].time : null;
                         return (
                             <button
                                 key={level}
                                 className="action-btn"
                                 onClick={() => startBattle(level)}
-                                style={{ height: '80px', fontSize: '1.2em' }}
+                                style={{ height: '80px', fontSize: '1em', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
                             >
-                                Level {level}
+                                <span style={{ fontWeight: 'bold', fontSize: '1.1em' }}>Lv.{level}</span>
+                                {bestTime !== null && (
+                                    <span style={{ fontSize: '0.7em', color: '#e8734a' }}>🏆 {bestTime}s</span>
+                                )}
                             </button>
                         )
                     })}
@@ -316,11 +436,56 @@ export default function CPUGame({ onBackToHome }) {
                     <h1 className="loser-text">YOU LOST...</h1>
                 )}
                 <div style={{ marginTop: '20px' }}>
+                    <p>プレイヤー: {playerName}</p>
                     <p>ジャンル: {genre}</p>
                     <p>難易度: Level {difficulty}</p>
-                    <p>Your HP: {playerInfo.hp}</p>
-                    <p>CPU HP: {cpuInfo.hp}</p>
+                    {finalTime !== null && (
+                        <p style={{ fontSize: '1.4em', fontWeight: 'bold', color: '#e8734a' }}>
+                            ⏱ クリアタイム: {finalTime}秒
+                        </p>
+                    )}
                 </div>
+
+                {/* Ranking display */}
+                {winner === 'PLAYER' && latestRankings.length > 0 && (
+                    <div style={{
+                        marginTop: '25px',
+                        background: '#fff',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: '12px',
+                        padding: '20px',
+                        maxWidth: '500px',
+                        margin: '25px auto 0',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                    }}>
+                        <h3 style={{ margin: '0 0 15px', color: '#2c3e50', fontSize: '1.1em' }}>
+                            🏆 ランキング TOP10 — {genre} Lv.{difficulty}
+                        </h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {latestRankings.map((entry, idx) => {
+                                const isMe = entry.time === finalTime && entry.username === playerName;
+                                const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+                                return (
+                                    <div key={idx} style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        padding: '8px 12px',
+                                        borderRadius: '8px',
+                                        background: isMe ? '#ede7f6' : (idx % 2 === 0 ? '#f9f9f9' : '#fff'),
+                                        border: isMe ? '2px solid #5c6bc0' : '1px solid transparent',
+                                        fontWeight: isMe ? 'bold' : 'normal',
+                                    }}>
+                                        <span style={{ minWidth: '35px', textAlign: 'center' }}>{medal}</span>
+                                        <span style={{ flex: 1, textAlign: 'left', paddingLeft: '10px', color: '#2c3e50' }}>{entry.username}</span>
+                                        <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '80px', textAlign: 'right' }}>{entry.time}秒</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
                 <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', marginTop: '30px' }}>
                     <button className="action-btn" onClick={() => {
                         setGameState('select');
@@ -335,18 +500,19 @@ export default function CPUGame({ onBackToHome }) {
     // Battle screen
     return (
         <div className={`game-container battle-screen ${damageFlash ? 'flash-damage' : ''}`} onKeyDown={handleKeyDown} tabIndex="0" ref={inputRef}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', alignItems: 'center' }}>
                 <button className="action-btn" onClick={onBackToHome} style={{ padding: '5px 10px', background: '#e0e0e0', color: '#2c3e50', fontSize: '0.8em' }}>
                     Quit
                 </button>
                 <span style={{ fontSize: '1em', fontWeight: 'bold', color: '#2c3e50' }}>{genre} - Lv.{difficulty}</span>
+                <span style={{ fontSize: '1em', fontWeight: 'bold', color: '#e8734a', fontFamily: 'monospace' }}>⏱ {battleElapsed}s</span>
             </div>
 
             <div className="players-hud">
                 {/* Player HUD */}
                 <div className={`hud-card me ${playerInfo.hp <= 0 ? 'dead' : ''}`}>
                     <div className="hud-header">
-                        <span>You</span>
+                        <span>{playerName}</span>
                         <span>{playerInfo.hp} HP</span>
                     </div>
                     <div className="hp-bar-container">
