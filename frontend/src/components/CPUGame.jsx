@@ -522,94 +522,91 @@ export default function CPUGame({ onBackToHome }) {
                 ) : (
                     <h1 className="loser-text">YOU LOST...</h1>
                 )}
-                <div style={{ marginTop: '20px' }}>
-                    <p>プレイヤー: {playerName}</p>
-                    <p>ジャンル: {genre}</p>
-                    <p>難易度: Level {difficulty}</p>
-                    {finalTime !== null && (
-                        <p style={{ fontSize: '1.4em', fontWeight: 'bold', color: '#e8734a' }}>
-                            ⏱ クリアタイム: {finalTime}秒
-                        </p>
-                    )}
-                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '30px', marginTop: '15px' }}>
+                    {/* Left Column: Game Info & Ranking & Buttons */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', minWidth: '220px', maxWidth: '350px' }}>
+                        <div style={{ background: '#f8f9fa', padding: '10px 15px', borderRadius: '8px' }}>
+                            <p style={{ margin: '3px 0', fontSize:'0.9em' }}>プレイヤー: {playerName}</p>
+                            <p style={{ margin: '3px 0', fontSize:'0.9em' }}>ジャンル: {genre}</p>
+                            <p style={{ margin: '3px 0', fontSize:'0.9em' }}>難易度: Level {difficulty}</p>
+                            {finalTime !== null && (
+                                <p style={{ fontSize: '1.3em', fontWeight: 'bold', color: '#e8734a', margin: '5px 0 0 0' }}>
+                                    ⏱ クリア: {finalTime}秒
+                                </p>
+                            )}
+                        </div>
 
-                {/* Tracking Stats display */}
-                <div style={{
-                    marginTop: '20px', display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap'
-                }}>
-                    <div style={{ background: '#fff', padding: '15px', borderRadius: '10px', minWidth: '150px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                        <h4 style={{ margin: '0 0 10px', color: '#5c6bc0' }}>ミスタイプ</h4>
-                        <div style={{ fontSize: '2em', fontWeight: 'bold', color: '#e53935' }}>{stats.missCount} <span style={{fontSize:'0.4em', color:'#888'}}>回</span></div>
-                        <div style={{ marginTop: '10px', fontSize: '0.9em', textAlign: 'left' }}>
-                            <div style={{color:'#888', marginBottom:'4px'}}>ミスの多いキー:</div>
-                            {topMisses.length > 0 ? topMisses.map((m, i) => (
-                                <div key={i}>
-                                    <span style={{ display:'inline-block', width:'20px', fontWeight:'bold' }}>{m.k}</span>
-                                    <span style={{ color:'#e53935' }}>{m.c}回</span>
+                        {/* Ranking display */}
+                        {winner === 'PLAYER' && latestRankings.length > 0 && (
+                            <div style={{
+                                background: '#fff', border: '1px solid #e0e0e0', borderRadius: '10px',
+                                padding: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                            }}>
+                                <h3 style={{ margin: '0 0 10px', color: '#2c3e50', fontSize: '1em' }}>
+                                    🏆 TOP10 — Lv.{difficulty}
+                                </h3>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.85em' }}>
+                                    {latestRankings.slice(0, 5).map((entry, idx) => { // show only top 5 to save space
+                                        const isMe = entry.time === finalTime && entry.username === playerName;
+                                        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+                                        return (
+                                            <div key={idx} style={{
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                padding: '4px 8px', borderRadius: '6px',
+                                                background: isMe ? '#ede7f6' : (idx % 2 === 0 ? '#f9f9f9' : '#fff'),
+                                                border: isMe ? '2px solid #5c6bc0' : '1px solid transparent',
+                                                fontWeight: isMe ? 'bold' : 'normal',
+                                            }}>
+                                                <span style={{ minWidth: '25px', textAlign: 'center' }}>{medal}</span>
+                                                <span style={{ flex: 1, textAlign: 'left', paddingLeft: '5px', color: '#2c3e50', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.username}</span>
+                                                <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '50px', textAlign: 'right' }}>{entry.time}s</span>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                            )) : <div style={{color:'#aaa'}}>なし🎉</div>}
+                            </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: 'auto' }}>
+                            <button className="action-btn" style={{ padding: '10px' }} onClick={() => {
+                                setGameState('select');
+                                setSelectionStep('category');
+                            }}>PLAY AGAIN</button>
+                            <button className="action-btn" onClick={onBackToHome} style={{ padding: '10px', background: '#e0e0e0', color: '#2c3e50' }}>HOME</button>
                         </div>
                     </div>
-                    
-                    <div style={{ background: '#fff', padding: '15px', borderRadius: '10px', minWidth: '150px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                        <h4 style={{ margin: '0 0 10px', color: '#5c6bc0' }}>苦手キー (遅延)</h4>
-                        <div style={{ marginTop: '5px', fontSize: '0.9em', textAlign: 'left' }}>
-                            {topSlow.length > 0 ? topSlow.map((s, i) => (
-                                <div key={i} style={{ marginBottom: '6px' }}>
-                                    <span style={{ display:'inline-block', width:'20px', fontWeight:'bold' }}>{s.k}</span>
-                                    <span style={{ color:'#e8734a' }}>{s.avg}ms</span>
-                                </div>
-                            )) : <div style={{color:'#aaa'}}>データ不足</div>}
-                        </div>
-                    </div>
-                </div>
 
-                {/* Ranking display */}
-                {winner === 'PLAYER' && latestRankings.length > 0 && (
+                    {/* Right Column: Tracking Stats */}
                     <div style={{
-                        marginTop: '25px',
-                        background: '#fff',
-                        border: '1px solid #e0e0e0',
-                        borderRadius: '12px',
-                        padding: '20px',
-                        maxWidth: '500px',
-                        margin: '25px auto 0',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
+                        display: 'flex', flexDirection: 'column', gap: '15px'
                     }}>
-                        <h3 style={{ margin: '0 0 15px', color: '#2c3e50', fontSize: '1.1em' }}>
-                            🏆 ランキング TOP10 — {genre} Lv.{difficulty}
-                        </h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {latestRankings.map((entry, idx) => {
-                                const isMe = entry.time === finalTime && entry.username === playerName;
-                                const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
-                                return (
-                                    <div key={idx} style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        padding: '8px 12px',
-                                        borderRadius: '8px',
-                                        background: isMe ? '#ede7f6' : (idx % 2 === 0 ? '#f9f9f9' : '#fff'),
-                                        border: isMe ? '2px solid #5c6bc0' : '1px solid transparent',
-                                        fontWeight: isMe ? 'bold' : 'normal',
-                                    }}>
-                                        <span style={{ minWidth: '35px', textAlign: 'center' }}>{medal}</span>
-                                        <span style={{ flex: 1, textAlign: 'left', paddingLeft: '10px', color: '#2c3e50' }}>{entry.username}</span>
-                                        <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '80px', textAlign: 'right' }}>{entry.time}秒</span>
+                        <div style={{ background: '#fff', padding: '15px', borderRadius: '10px', minWidth: '160px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                            <h4 style={{ margin: '0 0 10px', color: '#5c6bc0' }}>ミスタイプ</h4>
+                            <div style={{ fontSize: '1.8em', fontWeight: 'bold', color: '#e53935' }}>{stats.missCount} <span style={{fontSize:'0.4em', color:'#888'}}>回</span></div>
+                            <div style={{ marginTop: '5px', fontSize: '0.85em', textAlign: 'left' }}>
+                                <div style={{color:'#888', marginBottom:'2px'}}>ワースト3:</div>
+                                {topMisses.length > 0 ? topMisses.map((m, i) => (
+                                    <div key={i}>
+                                        <span style={{ display:'inline-block', width:'20px', fontWeight:'bold' }}>{m.k}</span>
+                                        <span style={{ color:'#e53935' }}>{m.c}回</span>
                                     </div>
-                                );
-                            })}
+                                )) : <div style={{color:'#aaa'}}>なし🎉</div>}
+                            </div>
+                        </div>
+                        
+                        <div style={{ background: '#fff', padding: '15px', borderRadius: '10px', minWidth: '160px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                            <h4 style={{ margin: '0 0 10px', color: '#5c6bc0' }}>苦手キー (遅延)</h4>
+                            <div style={{ marginTop: '0', fontSize: '0.85em', textAlign: 'left' }}>
+                                <div style={{color:'#888', marginBottom:'2px'}}>ワースト3:</div>
+                                {topSlow.length > 0 ? topSlow.map((s, i) => (
+                                    <div key={i} style={{ marginBottom: '4px' }}>
+                                        <span style={{ display:'inline-block', width:'20px', fontWeight:'bold' }}>{s.k}</span>
+                                        <span style={{ color:'#e8734a' }}>{s.avg}ms</span>
+                                    </div>
+                                )) : <div style={{color:'#aaa'}}>データ不足</div>}
+                            </div>
                         </div>
                     </div>
-                )}
-
-                <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', marginTop: '30px' }}>
-                    <button className="action-btn" onClick={() => {
-                        setGameState('select');
-                        setSelectionStep('category');
-                    }}>PLAY AGAIN</button>
-                    <button className="action-btn" onClick={onBackToHome} style={{ background: '#e0e0e0', color: '#2c3e50' }}>BACK TO HOME</button>
                 </div>
             </div>
         );
