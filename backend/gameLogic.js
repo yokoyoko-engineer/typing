@@ -19,7 +19,8 @@ export class GameRoom {
       hp: 1000,
       currentWord: null,
       typingSession: null,
-      isWinner: false
+      isWinner: false,
+      stats: { missCount: 0, keyMisses: {}, keyLatencies: {}, lastKeyTime: null }
     };
     return true;
   }
@@ -58,6 +59,7 @@ export class GameRoom {
       p.currentWord = word;
       p.typingSession = new TypingSession(word.ruby);
       p.isWinner = false;
+      p.stats = { missCount: 0, keyMisses: {}, keyLatencies: {}, lastKeyTime: null };
     });
   }
 
@@ -66,8 +68,18 @@ export class GameRoom {
     if (!player || this.status !== 'playing' || player.hp <= 0) return null;
 
     const result = player.typingSession.input(typedChar);
+    const now = Date.now();
 
     if (result && result.success) {
+      if (player.stats.lastKeyTime) {
+        const latency = now - player.stats.lastKeyTime;
+        if (latency < 2000) {
+          if (!player.stats.keyLatencies[typedChar]) player.stats.keyLatencies[typedChar] = [];
+          player.stats.keyLatencies[typedChar].push(latency);
+        }
+      }
+      player.stats.lastKeyTime = now;
+
       if (result.finishedWord) {
         // Calculate based on ruby length (roughly equivalent to 2+ romaji chars each)
         // or we could use the fully typed length, but ruby length is safe enough. Let's say ruby = 2 romaji chars
@@ -93,6 +105,11 @@ export class GameRoom {
       return { success: true, wordCompleted: false };
     }
 
+    player.stats.missCount++;
+    if (typedChar && typedChar.length === 1 && /^[a-z0-9\-']$/.test(typedChar)) {
+        player.stats.keyMisses[typedChar] = (player.stats.keyMisses[typedChar] || 0) + 1;
+    }
+
     return { success: false, wordCompleted: false };
   }
 
@@ -116,7 +133,8 @@ export class GameRoom {
         hp: p.hp,
         currentWord: p.currentWord,
         typingState: p.typingSession ? p.typingSession.state : null,
-        isWinner: p.isWinner
+        isWinner: p.isWinner,
+        stats: p.stats
       };
     }
 

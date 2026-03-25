@@ -62,6 +62,22 @@ docker compose up -d --build
 
 > **Note**: 外部公開時は `docker-compose.yml` の `ALLOWED_ORIGIN` を実際のドメインに変更してください。
 
+### EC2などでのコンテナ自動起動設定（OS起動時）
+Amazon Linux 2023などのサーバー運用において、インスタンス起動時に自動でアプリを立ち上げるには以下の設定を行います。
+
+1. **Dockerサービスの自動起動を有効化**
+   EC2が起動したときにDockerの土台が立ち上がるようにします。
+   ```bash
+   sudo systemctl enable docker
+   sudo systemctl start docker
+   ```
+2. **コンテナの自動起動**
+   `docker-compose.yml` には `restart: always` が設定されているため、Dockerサービスさえ立ち上がれば自動的にアプリのコンテナも起動します。
+   そのため、初回に以下のコマンドでコンテナを作成しておけば以降は自動運用されます。
+   ```bash
+   docker compose up -d --build
+   ```
+
 ### 開発起動（HMR・ホットリロード有効）
 ```bash
 docker compose -f docker-compose.dev.yml up --build

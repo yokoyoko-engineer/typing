@@ -108,6 +108,12 @@ export default function Game({ socket, roomState, myId }) {
 
   // Render Result Screen
   if (roomState.status === 'finished') {
+    const stats = me.stats || { missCount: 0, keyMisses: {}, keyLatencies: {} };
+    const topMisses = Object.entries(stats.keyMisses || {}).map(([k, c]) => ({ k, c })).sort((a,b) => b.c - a.c).slice(0,3);
+    const topSlow = Object.entries(stats.keyLatencies || {}).map(([k, times]) => ({
+        k, avg: Math.round(times.reduce((a,b) => a+b, 0) / Math.max(1, times.length))
+    })).sort((a,b) => b.avg - a.avg).slice(0,3);
+
     return (
       <div className="game-container result-screen">
         <h2>Game Over!</h2>
@@ -116,7 +122,7 @@ export default function Game({ socket, roomState, myId }) {
         ) : (
           <h1 className="loser-text">YOU LOST...</h1>
         )}
-        <div className="players-list">
+        <div className="players-list" style={{ marginBottom: '10px' }}>
           {Object.values(roomState.players).map(p => (
             <div key={p.id} className={`player-card ${p.isWinner ? 'winner' : ''}`}>
               <span>{p.name}</span>
@@ -124,6 +130,38 @@ export default function Game({ socket, roomState, myId }) {
             </div>
           ))}
         </div>
+
+        {/* Tracking Stats display */}
+        <div style={{
+            display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '30px'
+        }}>
+            <div style={{ background: '#fff', padding: '15px', borderRadius: '10px', minWidth: '150px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                <h4 style={{ margin: '0 0 10px', color: '#5c6bc0' }}>あなたのミスタイプ</h4>
+                <div style={{ fontSize: '2em', fontWeight: 'bold', color: '#e53935' }}>{stats.missCount || 0} <span style={{fontSize:'0.4em', color:'#888'}}>回</span></div>
+                <div style={{ marginTop: '10px', fontSize: '0.9em', textAlign: 'left' }}>
+                    <div style={{color:'#888', marginBottom:'4px'}}>ミスの多いキー:</div>
+                    {topMisses.length > 0 ? topMisses.map((m, i) => (
+                        <div key={i}>
+                            <span style={{ display:'inline-block', width:'20px', fontWeight:'bold' }}>{m.k}</span>
+                            <span style={{ color:'#e53935' }}>{m.c}回</span>
+                        </div>
+                    )) : <div style={{color:'#aaa'}}>なし🎉</div>}
+                </div>
+            </div>
+            
+            <div style={{ background: '#fff', padding: '15px', borderRadius: '10px', minWidth: '150px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                <h4 style={{ margin: '0 0 10px', color: '#5c6bc0' }}>あなたの苦手キー (遅延)</h4>
+                <div style={{ marginTop: '5px', fontSize: '0.9em', textAlign: 'left' }}>
+                    {topSlow.length > 0 ? topSlow.map((s, i) => (
+                        <div key={i} style={{ marginBottom: '6px' }}>
+                            <span style={{ display:'inline-block', width:'20px', fontWeight:'bold' }}>{s.k}</span>
+                            <span style={{ color:'#e8734a' }}>{s.avg}ms</span>
+                        </div>
+                    )) : <div style={{color:'#aaa'}}>データ不足</div>}
+                </div>
+            </div>
+        </div>
+
         <button className="action-btn" onClick={resetGame}>PLAY AGAIN</button>
       </div>
     );

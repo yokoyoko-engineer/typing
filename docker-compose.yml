@@ -9,7 +9,7 @@ services:
     environment:
       - NODE_ENV=production
       - ALLOWED_ORIGIN=http://localhost
-    restart: unless-stopped
+    restart: always
 
   frontend:
     build:
@@ -18,4 +18,4 @@ services:
       - "80:80"
     depends_on:
       - backend
-    restart: unless-stopped
+    restart: always
