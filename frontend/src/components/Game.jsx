@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { CATEGORIES, GENRES_BY_CATEGORY } from '../words';
 import './Game.css';
 
-export default function Game({ socket, roomState, myId }) {
+export default function Game({ socket, roomState, myId, onLeaveRoom }) {
   const [isReady, setIsReady] = useState(false);
   const [gameStarted, setGameStarted] = useState(roomState.status === 'playing');
   const [damageFlash, setDamageFlash] = useState(false);
@@ -23,6 +24,10 @@ export default function Game({ socket, roomState, myId }) {
     if (roomState.status === 'playing') {
       setGameStarted(true);
       if (inputRef.current) inputRef.current.focus();
+    } else if (roomState.status === 'waiting') {
+      // 待機状態に戻ったらリセット
+      setGameStarted(false);
+      setIsReady(false);
     }
 
     const handleTypingResult = ({ success }) => {
@@ -76,9 +81,50 @@ export default function Game({ socket, roomState, myId }) {
 
   // Render waiting room
   if (!gameStarted || roomState.status === 'waiting') {
+    const currentGenre = roomState.genre || '';
+    const currentCategory = Object.keys(GENRES_BY_CATEGORY).find(cat => GENRES_BY_CATEGORY[cat].includes(currentGenre)) || '';
+
+    const handleCategoryChange = (e) => {
+        const cat = e.target.value;
+        if (cat === CATEGORIES.KOTOWAZA || cat === CATEGORIES.BUSINESS) {
+            socket.emit('changeGenre', { genre: cat });
+        } else {
+            // Default to first genre in category
+            const genres = GENRES_BY_CATEGORY[cat];
+            if (genres && genres.length > 0) {
+                socket.emit('changeGenre', { genre: genres[0] });
+            }
+        }
+    };
+
+    const handleGenreChange = (e) => {
+        socket.emit('changeGenre', { genre: e.target.value });
+    };
+
     return (
       <div className="game-container">
-        <h2>Room: {roomState.roomId}</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2>Room: {roomState.roomId}</h2>
+          <button className="action-btn" onClick={onLeaveRoom} style={{ padding: '5px 10px', fontSize: '0.8em', background: '#e53935', color: '#fff' }}>🚪 LEAVE ROOM</button>
+        </div>
+
+        <div style={{ background: '#f5f5f5', padding: '15px', borderRadius: '10px', marginBottom: '20px' }}>
+            <h3 style={{ marginTop: 0, fontSize: '1.1em' }}>ゲーム設定 (ジャンル)</h3>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <select value={currentCategory} onChange={handleCategoryChange} style={{ padding: '8px', borderRadius: '5px' }}>
+                    <option value="" disabled>カテゴリを選択</option>
+                    {Object.values(CATEGORIES).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+                
+                {currentCategory && currentCategory !== CATEGORIES.KOTOWAZA && currentCategory !== CATEGORIES.BUSINESS && (
+                    <select value={currentGenre} onChange={handleGenreChange} style={{ padding: '8px', borderRadius: '5px' }}>
+                        {GENRES_BY_CATEGORY[currentCategory].map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                )}
+            </div>
+            {!currentGenre && <p style={{ color: '#e8734a', fontSize: '0.85em', margin: '5px 0 0' }}>ジャンルが未選択の場合はランダムになります</p>}
+        </div>
+
         <div className="players-list">
           {Object.values(roomState.players).map(p => (
             <div key={p.id} className={`player-card ${p.isReady ? 'ready' : ''} ${p.id === myId ? 'me' : ''}`}>
@@ -134,6 +180,7 @@ export default function Game({ socket, roomState, myId }) {
                   ))}
                 </div>
                 <button className="action-btn" onClick={resetGame} style={{ marginTop: 'auto' }}>PLAY AGAIN</button>
+                <button className="action-btn" onClick={onLeaveRoom} style={{ marginTop: '10px', background: '#e53935', color: '#fff' }}>LEAVE ROOM</button>
             </div>
 
             {/* Right Column: Tracking Stats display */}

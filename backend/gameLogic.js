@@ -6,6 +6,11 @@ export class GameRoom {
     this.roomId = roomId;
     this.players = {}; // socketId -> Player
     this.status = 'waiting'; // waiting, playing, finished
+    this.genre = null; // null means random genre
+  }
+
+  setGenre(genre) {
+    this.genre = genre;
   }
 
   addPlayer(socketId, name) {
@@ -55,7 +60,7 @@ export class GameRoom {
     this.status = 'playing';
     Object.values(this.players).forEach(p => {
       p.hp = 1000;
-      const word = getRandomWord();
+      const word = getRandomWord(this.genre);
       p.currentWord = word;
       p.typingSession = new TypingSession(word.ruby);
       p.isWinner = false;
@@ -85,7 +90,7 @@ export class GameRoom {
         // or we could use the fully typed length, but ruby length is safe enough. Let's say ruby = 2 romaji chars
         const damage = Math.round((player.currentWord.ruby.length * 2) * 2.4);
 
-        const newWord = getRandomWord();
+        const newWord = getRandomWord(this.genre);
         player.currentWord = newWord;
         player.typingSession = new TypingSession(newWord.ruby);
 
@@ -141,6 +146,7 @@ export class GameRoom {
     return {
       roomId: this.roomId,
       status: this.status,
+      genre: this.genre,
       players: serializedPlayers
     };
   }

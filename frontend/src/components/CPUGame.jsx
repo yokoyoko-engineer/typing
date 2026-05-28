@@ -42,6 +42,9 @@ export default function CPUGame({ onBackToHome }) {
     // Rankings state cache for the selected genre
     const [allRankings, setAllRankings] = useState({});
 
+    // Overall e-typing score rankings
+    const [overallTopScores, setOverallTopScores] = useState([]);
+
     const [playerInfo, setPlayerInfo] = useState({
         hp: 1000,
         currentWord: null,
@@ -64,7 +67,7 @@ export default function CPUGame({ onBackToHome }) {
 
     const pSessionRef = useRef(null);
     const cSessionRef = useRef(null);
-    const playerStatsRef = useRef({ missCount: 0, keyMisses: {}, keyLatencies: {}, lastKeyTime: null });
+    const playerStatsRef = useRef({ missCount: 0, keyMisses: {}, keyLatencies: {}, lastKeyTime: null, totalCorrect: 0 });
 
     useEffect(() => { cpuStateRef.current = cpuInfo; }, [cpuInfo]);
     useEffect(() => { playerStateRef.current = playerInfo; }, [playerInfo]);
@@ -76,11 +79,25 @@ export default function CPUGame({ onBackToHome }) {
         }
     }, [selectionStep]);
 
+    // Fetch overall top scores on mount
+    useEffect(() => {
+        if (selectionStep === 'username') {
+            fetch('/api/scores/top')
+                .then(res => res.json())
+                .then(data => {
+                    if (Array.isArray(data)) setOverallTopScores(data);
+                })
+                .catch(err => console.error("Error fetching top scores:", err));
+        }
+    }, [selectionStep]);
+
     const confirmName = () => {
         const trimmed = nameInput.trim();
-        if (trimmed.length > 0 && trimmed.length <= 12) {
+        if (/^[0-9]{1,4}$/.test(trimmed)) {
             setPlayerName(trimmed);
             setSelectionStep('category');
+        } else {
+            alert('ユーザ番号は1〜4桁の数字で入力してください');
         }
     };
 
@@ -136,7 +153,7 @@ export default function CPUGame({ onBackToHome }) {
         const cWord = getRandomWord(genre);
         pSessionRef.current = new TypingSession(pWord.ruby);
         cSessionRef.current = new TypingSession(cWord.ruby);
-        playerStatsRef.current = { missCount: 0, keyMisses: {}, keyLatencies: {}, lastKeyTime: null };
+        playerStatsRef.current = { missCount: 0, keyMisses: {}, keyLatencies: {}, lastKeyTime: null, totalCorrect: 0 };
 
         setPlayerInfo({ hp: 1000, currentWord: pWord, typingState: pSessionRef.current.state });
         setCpuInfo({ hp: 1000, currentWord: cWord, typingState: cSessionRef.current.state });
@@ -242,6 +259,7 @@ export default function CPUGame({ onBackToHome }) {
             const res = pSessionRef.current.input(typedChar);
 
             if (res && res.success) {
+                stats.totalCorrect++;
                 if (stats.lastKeyTime) {
                     const latency = now - stats.lastKeyTime;
                     if (latency < 2000) {
@@ -271,6 +289,27 @@ export default function CPUGame({ onBackToHome }) {
                         setFinalTime(roundedTime);
                         setGameState('finished');
                         setWinner('PLAYER');
+
+                        // Calculate e-typing score
+                        const totalCorrect = stats.totalCorrect;
+                        const totalMiss = stats.missCount;
+                        const totalTyped = totalCorrect + totalMiss;
+                        let eScore = 0;
+                        if (totalTyped > 0 && elapsed > 0) {
+                            const wpm = totalCorrect / (elapsed / 60);
+                            const accuracy = totalCorrect / totalTyped;
+                            eScore = Math.round(wpm * Math.pow(accuracy, 3));
+                        }
+                        
+                        // Save score in ref so it can be displayed
+                        stats.finalScore = eScore;
+
+                        // Save e-typing score to SQLite
+                        fetch('/api/scores', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ user_id: playerName, score: eScore })
+                        }).catch(err => console.error("Error saving score:", err));
 
                         // Save ranking to backend
                         fetch(`/api/rankings/${encodeURIComponent(genre)}/${difficulty}`, {
@@ -315,11 +354,13 @@ export default function CPUGame({ onBackToHome }) {
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', maxWidth: '400px', margin: '0 auto' }}>
                         <input
                             ref={nameInputRef}
-                            type="text"
+                            type="number"
+                            min="1"
+                            max="9999"
                             value={nameInput}
-                            onChange={(e) => setNameInput(e.target.value.slice(0, 12))}
+                            onChange={(e) => setNameInput(e.target.value.slice(0, 4))}
                             onKeyDown={(e) => { if (e.key === 'Enter') confirmName(); }}
-                            placeholder="名前を入力..."
+                            placeholder="ユーザ番号 (1〜9999)"
                             style={{
                                 width: '100%',
                                 padding: '15px 20px',
@@ -336,17 +377,49 @@ export default function CPUGame({ onBackToHome }) {
                         <button
                             className="action-btn"
                             onClick={confirmName}
-                            disabled={nameInput.trim().length === 0}
+                            disabled={!/^[0-9]{1,4}$/.test(nameInput.trim())}
                             style={{
                                 width: '100%',
                                 height: '55px',
                                 fontSize: '1.2em',
-                                opacity: nameInput.trim().length === 0 ? 0.5 : 1,
+                                opacity: !/^[0-9]{1,4}$/.test(nameInput.trim()) ? 0.5 : 1,
                             }}
                         >
                             決定
                         </button>
                     </div>
+
+                    {/* Overall Ranking Panel */}
+                    <div style={{ marginTop: '40px', maxWidth: '400px', margin: '40px auto 0', background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                        <h3 style={{ margin: '0 0 15px', color: '#2c3e50', fontSize: '1.2em', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{ marginRight: '8px' }}>👑</span> 総合 ハイスコアランキング
+                        </h3>
+                        {overallTopScores.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {overallTopScores.map((entry, idx) => {
+                                    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+                                    return (
+                                        <div key={idx} style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            padding: '8px 15px',
+                                            borderRadius: '8px',
+                                            background: idx % 2 === 0 ? '#f9f9f9' : '#fff',
+                                            border: '1px solid #eee',
+                                        }}>
+                                            <span style={{ minWidth: '35px', textAlign: 'center', fontSize: '1.2em' }}>{medal}</span>
+                                            <span style={{ flex: 1, textAlign: 'left', paddingLeft: '10px', color: '#2c3e50', fontWeight: 'bold' }}>ユーザ {entry.user_id}</span>
+                                            <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '80px', textAlign: 'right', fontSize: '1.1em' }}>{entry.score}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <p style={{ textAlign: 'center', color: '#aaa', margin: '20px 0' }}>まだ記録がありません</p>
+                        )}
+                    </div>
+
                     <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '40px', background: '#e0e0e0', color: '#2c3e50' }}>
                         Back to Home
                     </button>
@@ -530,9 +603,14 @@ export default function CPUGame({ onBackToHome }) {
                             <p style={{ margin: '3px 0', fontSize:'0.9em' }}>ジャンル: {genre}</p>
                             <p style={{ margin: '3px 0', fontSize:'0.9em' }}>難易度: Level {difficulty}</p>
                             {finalTime !== null && (
-                                <p style={{ fontSize: '1.3em', fontWeight: 'bold', color: '#e8734a', margin: '5px 0 0 0' }}>
-                                    ⏱ クリア: {finalTime}秒
-                                </p>
+                                <>
+                                    <p style={{ fontSize: '1.3em', fontWeight: 'bold', color: '#e8734a', margin: '5px 0 0 0' }}>
+                                        ⏱ クリア: {finalTime}秒
+                                    </p>
+                                    <p style={{ fontSize: '1.3em', fontWeight: 'bold', color: '#d4af37', margin: '5px 0 0 0' }}>
+                                        ⭐ スコア: {stats.finalScore || 0}
+                                    </p>
+                                </>
                             )}
                         </div>
 

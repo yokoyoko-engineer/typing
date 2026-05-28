@@ -21,11 +21,12 @@ export default function Lobby({ socket, lobbies, onJoinRoom }) {
         <label>
           Your Name:
           <input 
-            type="text" 
+            type="number" 
+            min="1"
+            max="9999"
             value={playerName} 
-            onChange={(e) => setPlayerName(e.target.value)} 
-            placeholder="Type your name"
-            maxLength={12}
+            onChange={(e) => setPlayerName(e.target.value.slice(0, 4))} 
+            placeholder="1〜4桁のユーザ番号"
             required 
           />
         </label>

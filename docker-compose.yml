@@ -4,18 +4,24 @@ services:
   backend:
     build:
       context: ./backend
+    user: "root"
     expose:
       - "3001"
     environment:
       - NODE_ENV=production
       - ALLOWED_ORIGIN=http://localhost
+    volumes:
+      - typing_data:/app/data
     restart: always
 
   frontend:
     build:
       context: ./frontend
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       - backend
     restart: always
+
+volumes:
+  typing_data:

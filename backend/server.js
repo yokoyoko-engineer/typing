@@ -5,11 +5,28 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// --- Security: Security Headers ---
+app.use(helmet());
+
+// --- Security: Rate Limiting ---
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200, // Limit each IP to 200 requests per 15 minutes
+  standardHeaders: true, 
+  legacyHeaders: false, 
+  message: { error: 'Too many requests from this IP, please try again later.' }
+});
+
+// Apply rate limiting to all /api/ routes
+app.use('/api/', apiLimiter);
 
 // --- Security: CORS制限 ---
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'http://localhost';
@@ -90,6 +107,86 @@ app.post('/api/rankings/:genre/:level', async (req, res) => {
   res.json(rankings[key]);
 });
 
+// --- Score API Endpoints (SQLite) ---
+import { getDb } from './db.js';
+
+app.post('/api/scores', async (req, res) => {
+  const { user_id, score } = req.body;
+  const safeId = sanitizePlayerName(user_id);
+  
+  if (!safeId || typeof score !== 'number') {
+    return res.status(400).json({ error: 'Invalid input data' });
+  }
+
+  try {
+    const db = await getDb();
+    const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    await db.run(
+      'INSERT INTO scores (user_id, score, play_date) VALUES (?, ?, ?)',
+      [safeId, score, dateStr]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error saving score:", err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/api/scores/top', async (req, res) => {
+  try {
+    const db = await getDb();
+    const rows = await db.all(`
+      SELECT user_id, MAX(score) as score 
+      FROM scores 
+      GROUP BY user_id 
+      ORDER BY score DESC 
+      LIMIT 10
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error("Error fetching top scores:", err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/api/scores/admin', async (req, res) => {
+  const { min_user, max_user, start_date, end_date } = req.query;
+  
+  if (!min_user || !max_user) {
+    return res.status(400).json({ error: 'Missing range parameters' });
+  }
+
+  try {
+    const db = await getDb();
+    let query = `
+      SELECT id, user_id, play_date as date, score 
+      FROM scores 
+      WHERE user_id >= ? AND user_id <= ?
+    `;
+    const params = [min_user, max_user];
+
+    if (start_date) {
+      query += ` AND play_date >= ?`;
+      params.push(start_date);
+    }
+    if (end_date) {
+      query += ` AND play_date <= ?`;
+      params.push(end_date);
+    }
+
+    query += `
+      ORDER BY id ASC
+    `;
+
+    const rows = await db.all(query, params);
+
+    res.json(rows);
+  } catch (err) {
+    console.error("Error fetching scores:", err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // ヘルスチェック用
 app.get('/', (req, res) => {
   res.send('Server is running');
@@ -101,13 +198,13 @@ import { GameRoom } from './gameLogic.js';
 
 // --- Security: 入力バリデーション ---
 function sanitizePlayerName(name) {
-  if (typeof name !== 'string') return null;
-  // HTMLタグを除去
-  const stripped = name.replace(/<[^>]*>/g, '').trim();
-  if (stripped.length === 0 || stripped.length > 12) return null;
-  // 英数字、ひらがな、カタカナ、漢字、スペース、一般記号のみ許可
-  if (!/^[\w\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u0020\-_.!]+$/u.test(stripped)) return null;
-  return stripped;
+  if (typeof name !== 'string' && typeof name !== 'number') return null;
+  const str = String(name).trim();
+  // Allow only 1 to 4 digits (1 - 9999)
+  if (/^[0-9]{1,4}$/.test(str)) {
+    return str;
+  }
+  return null;
 }
 
 function isValidRoomId(roomId) {
@@ -200,6 +297,25 @@ io.on('connection', (socket) => {
       const room = rooms[currentRoomId];
       room.setPlayerReady(socket.id, isReady);
       io.to(currentRoomId).emit('roomState', room.getState());
+    }
+  });
+
+  socket.on('changeGenre', ({ genre }) => {
+    if (currentRoomId && rooms[currentRoomId]) {
+      const room = rooms[currentRoomId];
+      room.setGenre(genre);
+      io.to(currentRoomId).emit('roomState', room.getState());
+    }
+  });
+
+  socket.on('leaveRoom', () => {
+    if (currentRoomId && rooms[currentRoomId]) {
+      const room = rooms[currentRoomId];
+      room.removePlayer(socket.id);
+      socket.leave(currentRoomId);
+      currentRoomId = null;
+      io.to(room.roomId).emit('roomState', room.getState());
+      sendLobbiesState();
     }
   });
 
