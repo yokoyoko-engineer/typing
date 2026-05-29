@@ -97,7 +97,7 @@ export default function CPUGame({ onBackToHome }) {
             setPlayerName(trimmed);
             setSelectionStep('category');
         } else {
-            alert('ユーザ番号は1〜4桁の数字で入力してください');
+            alert('社員番号は1〜4桁の数字で入力してください');
         }
     };
 
@@ -349,8 +349,8 @@ export default function CPUGame({ onBackToHome }) {
         if (selectionStep === 'username') {
             return (
                 <div className="game-container">
-                    <h2>プレイヤー名を入力</h2>
-                    <p style={{ color: '#888', fontSize: '0.9em', marginBottom: '20px' }}>ランキングに表示される名前です（最大12文字）</p>
+                    <h2>社員番号を入力</h2>
+                    <p style={{ color: '#888', fontSize: '0.9em', marginBottom: '20px' }}>ランキングに表示される社員番号です</p>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', maxWidth: '400px', margin: '0 auto' }}>
                         <input
                             ref={nameInputRef}
@@ -360,7 +360,7 @@ export default function CPUGame({ onBackToHome }) {
                             value={nameInput}
                             onChange={(e) => setNameInput(e.target.value.slice(0, 4))}
                             onKeyDown={(e) => { if (e.key === 'Enter') confirmName(); }}
-                            placeholder="ユーザ番号 (1〜9999)"
+                            placeholder="社員番号 (1〜9999)"
                             style={{
                                 width: '100%',
                                 padding: '15px 20px',
@@ -527,10 +527,10 @@ export default function CPUGame({ onBackToHome }) {
                         </div>
                     </div>
 
-                    {/* Right: Ranking TOP10 preview */}
+                    {/* Right: Ranking TOP30 preview */}
                     <div className="ranking-preview-panel">
                         <h3 style={{ margin: '0 0 15px', color: '#2c3e50', fontSize: '1.1em', textAlign: 'center' }}>
-                            🏆 ランキング TOP10 — Lv.{previewLevel}
+                            🏆 ランキング TOP30 — Lv.{previewLevel}
                         </h3>
                         {previewRankings.length > 0 ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -621,10 +621,10 @@ export default function CPUGame({ onBackToHome }) {
                                 padding: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
                             }}>
                                 <h3 style={{ margin: '0 0 10px', color: '#2c3e50', fontSize: '1em' }}>
-                                    🏆 TOP10 — Lv.{difficulty}
+                                    🏆 TOP30 — Lv.{difficulty}
                                 </h3>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.85em' }}>
-                                    {latestRankings.slice(0, 5).map((entry, idx) => { // show only top 5 to save space
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.85em', maxHeight: '300px', overflowY: 'auto', paddingRight: '5px' }}>
+                                    {latestRankings.slice(0, 30).map((entry, idx) => { // show up to top 30
                                         const isMe = entry.time === finalTime && entry.username === playerName;
                                         const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
                                         return (

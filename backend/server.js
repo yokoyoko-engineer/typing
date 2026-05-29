@@ -100,7 +100,7 @@ app.post('/api/rankings/:genre/:level', async (req, res) => {
   
   rankings[key].push({ username: safeName, time, date: new Date().toISOString() });
   rankings[key].sort((a, b) => a.time - b.time);
-  rankings[key] = rankings[key].slice(0, 10); // TOP 10を維持
+  rankings[key] = rankings[key].slice(0, 30); // TOP 30を維持
   
   await saveRankingsData(rankings);
   
@@ -140,7 +140,7 @@ app.get('/api/scores/top', async (req, res) => {
       FROM scores 
       GROUP BY user_id 
       ORDER BY score DESC 
-      LIMIT 10
+      LIMIT 30
     `);
     res.json(rows);
   } catch (err) {

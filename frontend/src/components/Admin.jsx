@@ -74,7 +74,7 @@ export default function Admin() {
 
   const fetchScores = async () => {
     if (!minUser || !maxUser) {
-      setError('ユーザ番号の範囲を指定してください。');
+      setError('社員番号の範囲を指定してください。');
       return;
     }
     
@@ -181,7 +181,7 @@ export default function Admin() {
         <h3 style={{ marginTop: 0 }}>スコア推移グラフ 検索</h3>
         <form onSubmit={handleSearch} style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
           <div>
-            <label style={{ marginRight: '10px' }}>Min ユーザ番号:</label>
+            <label style={{ marginRight: '10px' }}>Min 社員番号:</label>
             <input 
               type="number" 
               min="1" 
@@ -194,7 +194,7 @@ export default function Admin() {
             />
           </div>
           <div>
-            <label style={{ marginRight: '10px' }}>Max ユーザ番号:</label>
+            <label style={{ marginRight: '10px' }}>Max 社員番号:</label>
             <input 
               type="number" 
               min="1" 

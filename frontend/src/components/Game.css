@@ -87,6 +87,8 @@
 
 .ranking-preview-panel {
   width: 320px;
+  max-height: 500px;
+  overflow-y: auto;
   background: #f8f9fa;
   border: 1px solid #e0e0e0;
   border-radius: 12px;

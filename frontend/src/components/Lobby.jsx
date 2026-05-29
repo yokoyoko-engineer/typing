@@ -26,7 +26,7 @@ export default function Lobby({ socket, lobbies, onJoinRoom }) {
             max="9999"
             value={playerName} 
             onChange={(e) => setPlayerName(e.target.value.slice(0, 4))} 
-            placeholder="1〜4桁のユーザ番号"
+            placeholder="1〜4桁の社員番号"
             required 
           />
         </label>
