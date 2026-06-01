@@ -291,6 +291,7 @@ let tournamentState = {
 };
 
 let tournamentTimer = null;
+const tournamentLobbyPlayers = {}; // socketId -> playerName
 
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
@@ -317,7 +318,14 @@ io.on('connection', (socket) => {
       return;
     }
     socket.join('tournament_lobby');
+    tournamentLobbyPlayers[socket.id] = safeName;
+    io.emit('tournamentLobbyUpdate', Object.values(tournamentLobbyPlayers));
+    
     socket.emit('tournamentState', { status: tournamentState.status, endTime: tournamentState.endTime });
+  });
+
+  socket.on('adminGetLobby', () => {
+    socket.emit('tournamentLobbyUpdate', Object.values(tournamentLobbyPlayers));
   });
 
   socket.on('adminStartTournament', async () => {
@@ -504,8 +512,11 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    if (tournamentLobbyPlayers[socket.id]) {
+      delete tournamentLobbyPlayers[socket.id];
+      io.emit('tournamentLobbyUpdate', Object.values(tournamentLobbyPlayers));
+    }
     console.log(`User disconnected: ${socket.id}`);
-    // レート制限マップからクリーンアップ
     typingTimestamps.delete(socket.id);
     if (currentRoomId && rooms[currentRoomId]) {
       const room = rooms[currentRoomId];
