@@ -69,7 +69,7 @@ export default function Admin() {
     if (socket) {
       if (window.confirm('タイピングイベントを開始しますか？（待機中の全ユーザーの画面でカウントダウンが始まります）')) {
         socket.emit('adminStartTournament');
-        alert('イベント開始シグナルを送信しました。10分後に自動終了します。');
+        alert('イベント開始シグナルを送信しました。5分後に自動終了します。');
         setTimeout(fetchTournaments, 2000); // Wait a bit to fetch the newly created tournament
       }
     }
@@ -418,7 +418,7 @@ export default function Admin() {
           {/* 大会開催パネル */}
           <div style={{ background: '#fff3e0', padding: '20px', borderRadius: '10px', marginBottom: '30px', borderLeft: '5px solid #ff9800' }}>
             <h3 style={{ marginTop: 0, color: '#e65100' }}>イベント開催コントロール</h3>
-            <p style={{ color: '#666' }}>現在待機室にいるすべてのプレイヤーを対象にイベント（10分間）を開始します。</p>
+            <p style={{ color: '#666' }}>現在待機室にいるすべてのプレイヤーを対象にイベント（5分間）を開始します。</p>
             <button 
               onClick={handleStartTournament}
               style={{ padding: '15px 30px', fontSize: '1.2em', background: '#ff9800', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}

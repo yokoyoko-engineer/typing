@@ -307,7 +307,7 @@ io.on('connection', (socket) => {
     if (tournamentState.status === 'active') return;
     
     tournamentState.status = 'active';
-    tournamentState.endTime = Date.now() + 10 * 60 * 1000; // 10 minutes
+    tournamentState.endTime = Date.now() + 5 * 60 * 1000; // 5 minutes
     tournamentState.participants = {};
     
     // Create DB record
@@ -352,7 +352,7 @@ io.on('connection', (socket) => {
         tournamentState.participants = {};
       }, 5000);
       
-    }, 10 * 60 * 1000);
+    }, 5 * 60 * 1000); // 5 minutes
   });
 
   socket.on('tournamentUpdateScore', ({ playerName, score }) => {
