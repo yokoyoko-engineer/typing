@@ -187,6 +187,33 @@ app.get('/api/scores/admin', async (req, res) => {
   }
 });
 
+app.get('/api/tournaments', async (req, res) => {
+  try {
+    const db = await getDb();
+    const rows = await db.all(`SELECT * FROM tournaments ORDER BY id DESC`);
+    res.json(rows);
+  } catch (err) {
+    console.error("Error fetching tournaments:", err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/api/tournaments/:id/scores', async (req, res) => {
+  try {
+    const db = await getDb();
+    const rows = await db.all(`
+      SELECT user_id, score 
+      FROM tournament_scores 
+      WHERE tournament_id = ? 
+      ORDER BY score DESC
+    `, [req.params.id]);
+    res.json(rows);
+  } catch (err) {
+    console.error("Error fetching tournament scores:", err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // ヘルスチェック用
 app.get('/', (req, res) => {
   res.send('Server is running');
@@ -238,6 +265,16 @@ for (let i = 1; i <= 10; i++) {
   rooms[roomId] = new GameRoom(roomId);
 }
 
+// --- Tournament Management ---
+let tournamentState = {
+  status: 'waiting', // waiting, active, finished
+  tournamentId: null,
+  endTime: null,
+  participants: {} // userId -> maxScore
+};
+
+let tournamentTimer = null;
+
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
   let currentRoomId = null;
@@ -255,6 +292,85 @@ io.on('connection', (socket) => {
 
   // 接続時にロビー一覧を送信
   sendLobbiesState(socket);
+
+  socket.on('joinTournament', ({ playerName }) => {
+    const safeName = sanitizePlayerName(playerName);
+    if (!safeName) {
+      socket.emit('error', 'Invalid player name.');
+      return;
+    }
+    socket.join('tournament_lobby');
+    socket.emit('tournamentState', { status: tournamentState.status, endTime: tournamentState.endTime });
+  });
+
+  socket.on('adminStartTournament', async () => {
+    if (tournamentState.status === 'active') return;
+    
+    tournamentState.status = 'active';
+    tournamentState.endTime = Date.now() + 10 * 60 * 1000; // 10 minutes
+    tournamentState.participants = {};
+    
+    // Create DB record
+    try {
+      const db = await getDb();
+      const dateStr = new Date().toISOString().split('T')[0];
+      const row = await db.get(`SELECT COUNT(*) as count FROM tournaments WHERE date = ?`, [dateStr]);
+      const count = (row.count || 0) + 1;
+      const name = `${dateStr} 第${count}回大会`;
+      
+      const result = await db.run('INSERT INTO tournaments (name, date) VALUES (?, ?)', [name, dateStr]);
+      tournamentState.tournamentId = result.lastID;
+    } catch(err) {
+      console.error("Tournament creation error", err);
+    }
+
+    io.to('tournament_lobby').emit('tournamentStarted', { endTime: tournamentState.endTime });
+    
+    if (tournamentTimer) clearTimeout(tournamentTimer);
+    
+    tournamentTimer = setTimeout(async () => {
+      tournamentState.status = 'finished';
+      io.to('tournament_lobby').emit('tournamentFinished');
+      
+      // Save scores to DB
+      if (tournamentState.tournamentId) {
+        try {
+          const db2 = await getDb();
+          for (const [userId, score] of Object.entries(tournamentState.participants)) {
+            await db2.run('INSERT INTO tournament_scores (tournament_id, user_id, score) VALUES (?, ?, ?)', [tournamentState.tournamentId, userId, score]);
+          }
+        } catch (err) {
+          console.error("Error saving tournament scores", err);
+        }
+      }
+      
+      // Delay resetting state to give clients time to see final ranking
+      setTimeout(() => {
+        tournamentState.status = 'waiting';
+        tournamentState.tournamentId = null;
+        tournamentState.endTime = null;
+        tournamentState.participants = {};
+      }, 5000);
+      
+    }, 10 * 60 * 1000);
+  });
+
+  socket.on('tournamentUpdateScore', ({ playerName, score }) => {
+    const safeName = sanitizePlayerName(playerName);
+    if (!safeName || tournamentState.status !== 'active') return;
+    
+    const currentMax = tournamentState.participants[safeName] || 0;
+    if (score > currentMax) {
+      tournamentState.participants[safeName] = score;
+      
+      const sorted = Object.entries(tournamentState.participants)
+        .map(([user_id, s]) => ({ user_id, score: s }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 300);
+        
+      io.to('tournament_lobby').emit('tournamentLiveRanking', sorted);
+    }
+  });
 
   socket.on('joinRoom', ({ roomId, playerName }) => {
     // --- Security: バリデーション ---

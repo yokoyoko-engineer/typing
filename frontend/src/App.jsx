@@ -5,6 +5,7 @@ import Lobby from './components/Lobby'
 import Game from './components/Game'
 import Home from './components/Home'
 import CPUGame from './components/CPUGame'
+import Tournament from './components/Tournament'
 import Admin from './components/Admin'
 import './App.css'
 
@@ -66,6 +67,10 @@ function MainGame() {
 
       {gameMode === 'cpu' && (
         <CPUGame onBackToHome={() => setGameMode('home')} />
+      )}
+
+      {gameMode === 'tournament' && (
+        <Tournament socket={socket} onBackToHome={() => setGameMode('home')} />
       )}
 
       {gameMode === 'online' && (

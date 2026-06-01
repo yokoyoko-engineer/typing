@@ -31,7 +31,21 @@ export async function getDb() {
         user_id INTEGER NOT NULL,
         score REAL NOT NULL,
         play_date TEXT NOT NULL
-      )
+      );
+      
+      CREATE TABLE IF NOT EXISTS tournaments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        date TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS tournament_scores (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tournament_id INTEGER NOT NULL,
+        user_id TEXT NOT NULL,
+        score REAL NOT NULL,
+        FOREIGN KEY (tournament_id) REFERENCES tournaments(id)
+      );
     `);
     return db;
   });

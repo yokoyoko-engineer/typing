@@ -20,6 +20,14 @@ export default function Home({ onSelectMode }) {
                     🤖 CPU BATTLE
                     <span className="mode-desc">Practice against AI (10 Levels)</span>
                 </button>
+                <button
+                    className="action-btn mode-btn tournament-btn"
+                    onClick={() => onSelectMode('tournament')}
+                    style={{ background: '#ff9800' }}
+                >
+                    🏆 TOURNAMENT
+                    <span className="mode-desc">Join the typing tournament!</span>
+                </button>
             </div>
         </div>
     );
