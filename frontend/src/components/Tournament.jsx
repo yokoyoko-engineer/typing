@@ -10,10 +10,11 @@ const TOURNAMENT_GENRE = CATEGORIES.BUSINESS;
 export default function Tournament({ socket, onBackToHome }) {
     const [playerName, setPlayerName] = useState('');
     const [nameInput, setNameInput] = useState('');
-    const [gameState, setGameState] = useState('setup'); // setup, waiting, countdown, playing, finished
+    const [gameState, setGameState] = useState('setup'); // setup, waiting, countdown, playing, intermission, spectating, finished
     const [countdown, setCountdown] = useState(3);
     const [timeRemaining, setTimeRemaining] = useState(0);
     const [liveRanking, setLiveRanking] = useState([]);
+    const [lastResult, setLastResult] = useState(null);
     
     // Typing state
     const [playerInfo, setPlayerInfo] = useState({ hp: 1000, currentWord: null, typingState: null });
@@ -108,7 +109,7 @@ export default function Tournament({ socket, onBackToHome }) {
 
     // Global Tournament Timer
     useEffect(() => {
-        if (gameState === 'playing') {
+        if (gameState === 'playing' || gameState === 'intermission' || gameState === 'spectating') {
             const timer = setInterval(() => {
                 setTimeRemaining((prev) => {
                     if (prev <= 1) {
@@ -178,8 +179,11 @@ export default function Tournament({ socket, onBackToHome }) {
                         setTimeout(() => setDamageFlash(false), 300);
 
                         if (newPlayerHp <= 0) {
-                            // Player lost this round. Just restart a new battle immediately.
-                            setTimeout(startNewBattle, 1000);
+                            // Player lost this round.
+                            setLastResult({ status: 'lose', score: 0 });
+                            setTimeout(() => {
+                                setGameState(prev => (prev === 'playing' ? 'intermission' : prev));
+                            }, 1000);
                             return;
                         }
                     } else {
@@ -244,8 +248,10 @@ export default function Tournament({ socket, onBackToHome }) {
                             socket.emit('tournamentUpdateScore', { playerName, score: eScore });
                         }
                         
-                        // Restart new battle automatically
-                        setTimeout(startNewBattle, 1000);
+                        setLastResult({ status: 'win', score: eScore });
+                        setTimeout(() => {
+                            setGameState(prev => (prev === 'playing' ? 'intermission' : prev));
+                        }, 1000);
                     }
                 } else {
                     setPlayerInfo(prev => ({ ...prev, typingState: pSessionRef.current.state }));
@@ -336,7 +342,7 @@ export default function Tournament({ socket, onBackToHome }) {
                         </span>
                     </div>
 
-                    {gameState === 'playing' ? (
+                    {gameState === 'playing' && (
                         <>
                             <div className="players-hud" style={{ marginBottom: '30px' }}>
                                 {/* Player HUD */}
@@ -400,7 +406,48 @@ export default function Tournament({ socket, onBackToHome }) {
                                 )}
                             </div>
                         </>
-                    ) : (
+                    )}
+
+                    {gameState === 'intermission' && (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                            <h2 style={{ fontSize: '4em', margin: 0, color: lastResult?.status === 'win' ? '#4caf50' : '#e53935' }}>
+                                {lastResult?.status === 'win' ? 'VICTORY!' : 'DEFEATED...'}
+                            </h2>
+                            {lastResult?.status === 'win' && (
+                                <div style={{ fontSize: '1.5em', margin: '20px 0' }}>
+                                    今回のスコア: <span style={{ fontWeight: 'bold', color: '#5c6bc0', fontSize: '1.5em' }}>{lastResult.score}</span>
+                                </div>
+                            )}
+                            <div style={{ display: 'flex', gap: '20px', marginTop: '40px' }}>
+                                <button className="action-btn" onClick={() => {
+                                    setGameState('playing');
+                                    startNewBattle();
+                                }}>
+                                    もう一度挑戦する
+                                </button>
+                                <button className="action-btn" style={{ background: '#e0e0e0', color: '#333' }} onClick={() => {
+                                    setGameState('spectating');
+                                }}>
+                                    待機してランキングを見る
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {gameState === 'spectating' && (
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                            <h2 style={{ fontSize: '2.5em', color: '#5c6bc0' }}>観戦モード</h2>
+                            <p style={{ fontSize: '1.2em', color: '#666' }}>他のプレイヤーの進行を見守っています...</p>
+                            <button className="action-btn" style={{ marginTop: '40px' }} onClick={() => {
+                                setGameState('playing');
+                                startNewBattle();
+                            }}>
+                                もう一度挑戦する
+                            </button>
+                        </div>
+                    )}
+
+                    {gameState === 'finished' && (
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                             <h2 style={{ fontSize: '3em', color: '#2c3e50' }}>イベント終了！</h2>
                             <p style={{ fontSize: '1.2em' }}>最終ランキングをご確認ください</p>
