@@ -25,8 +25,8 @@ export default function Home({ onSelectMode }) {
                     onClick={() => onSelectMode('tournament')}
                     style={{ background: '#ff9800' }}
                 >
-                    🏆 TOURNAMENT
-                    <span className="mode-desc">Join the typing tournament!</span>
+                    🎉 EVENT BATTLE
+                    <span className="mode-desc">Join the massive typing event!</span>
                 </button>
             </div>
         </div>

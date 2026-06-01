@@ -267,8 +267,8 @@ export default function Tournament({ socket, onBackToHome }) {
     if (gameState === 'setup') {
         return (
             <div className="game-container">
-                <h2>タイピング大会モード</h2>
-                <p style={{ color: '#888', marginBottom: '20px' }}>社員番号を入力して大会に参加してください</p>
+                <h2>イベントモード（一斉バトル）</h2>
+                <p style={{ color: '#888', marginBottom: '20px' }}>社員番号を入力してイベントに参加してください</p>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', maxWidth: '400px', margin: '0 auto' }}>
                     <input
                         type="number"
@@ -303,7 +303,7 @@ export default function Tournament({ socket, onBackToHome }) {
         return (
             <div className="game-container">
                 <h2>待機中...</h2>
-                <p style={{ fontSize: '1.2em', color: '#5c6bc0' }}>管理者が大会を開始するのをお待ちください</p>
+                <p style={{ fontSize: '1.2em', color: '#5c6bc0' }}>管理者がイベントを開始するのをお待ちください</p>
                 <div style={{ marginTop: '50px' }} className="spinner"></div>
                 <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '40px', background: '#e0e0e0', color: '#2c3e50' }}>
                     退出する
@@ -330,7 +330,7 @@ export default function Tournament({ socket, onBackToHome }) {
                 {/* Main Battle Area */}
                 <div style={{ flex: 1, paddingRight: '20px', borderRight: '2px dashed #ddd', display: 'flex', flexDirection: 'column' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                        <span style={{ fontSize: '1.2em', fontWeight: 'bold', color: '#2c3e50' }}>大会モード: {TOURNAMENT_GENRE}</span>
+                        <span style={{ fontSize: '1.2em', fontWeight: 'bold', color: '#2c3e50' }}>イベントモード: {TOURNAMENT_GENRE}</span>
                         <span style={{ fontSize: '1.5em', fontWeight: 'bold', color: '#e53935' }}>
                             残り時間: {formatTime(timeRemaining)}
                         </span>
@@ -402,7 +402,7 @@ export default function Tournament({ socket, onBackToHome }) {
                         </>
                     ) : (
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                            <h2 style={{ fontSize: '3em', color: '#2c3e50' }}>大会終了！</h2>
+                            <h2 style={{ fontSize: '3em', color: '#2c3e50' }}>イベント終了！</h2>
                             <p style={{ fontSize: '1.2em' }}>最終ランキングをご確認ください</p>
                             <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '20px' }}>Homeへ戻る</button>
                         </div>

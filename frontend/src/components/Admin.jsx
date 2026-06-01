@@ -67,9 +67,9 @@ export default function Admin() {
 
   const handleStartTournament = () => {
     if (socket) {
-      if (window.confirm('タイピング大会を開始しますか？（待機中の全ユーザーの画面でカウントダウンが始まります）')) {
+      if (window.confirm('タイピングイベントを開始しますか？（待機中の全ユーザーの画面でカウントダウンが始まります）')) {
         socket.emit('adminStartTournament');
-        alert('大会開始シグナルを送信しました。10分後に自動終了します。');
+        alert('イベント開始シグナルを送信しました。10分後に自動終了します。');
         setTimeout(fetchTournaments, 2000); // Wait a bit to fetch the newly created tournament
       }
     }
@@ -225,7 +225,7 @@ export default function Admin() {
           onClick={() => setActiveTab('tournament')}
           style={{ padding: '10px 20px', fontSize: '1.1em', background: activeTab === 'tournament' ? '#ff9800' : '#eee', color: activeTab === 'tournament' ? '#fff' : '#333', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
         >
-          🏆 大会管理
+          🏆 イベント管理
         </button>
       </div>
 
@@ -417,22 +417,22 @@ export default function Admin() {
         <div>
           {/* 大会開催パネル */}
           <div style={{ background: '#fff3e0', padding: '20px', borderRadius: '10px', marginBottom: '30px', borderLeft: '5px solid #ff9800' }}>
-            <h3 style={{ marginTop: 0, color: '#e65100' }}>大会開催コントロール</h3>
-            <p style={{ color: '#666' }}>現在待機室にいるすべてのプレイヤーを対象に大会（10分間）を開始します。</p>
+            <h3 style={{ marginTop: 0, color: '#e65100' }}>イベント開催コントロール</h3>
+            <p style={{ color: '#666' }}>現在待機室にいるすべてのプレイヤーを対象にイベント（10分間）を開始します。</p>
             <button 
               onClick={handleStartTournament}
               style={{ padding: '15px 30px', fontSize: '1.2em', background: '#ff9800', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
             >
-              🚀 大会をスタートする
+              🚀 イベントをスタートする
             </button>
           </div>
 
           {/* 大会履歴パネル */}
           <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ marginTop: 0, color: '#2c3e50' }}>過去の大会履歴</h3>
+            <h3 style={{ marginTop: 0, color: '#2c3e50' }}>過去のイベント履歴</h3>
             
             <div style={{ marginBottom: '20px' }}>
-              <label style={{ marginRight: '10px', fontWeight: 'bold' }}>大会を選択:</label>
+              <label style={{ marginRight: '10px', fontWeight: 'bold' }}>イベントを選択:</label>
               <select 
                 value={selectedTournament} 
                 onChange={e => setSelectedTournament(e.target.value)}
@@ -470,7 +470,7 @@ export default function Admin() {
                     </tbody>
                   </table>
                 ) : (
-                  <p style={{ color: '#888' }}>この大会には記録がありません。</p>
+                  <p style={{ color: '#888' }}>このイベントには記録がありません。</p>
                 )}
               </div>
             )}
