@@ -214,6 +214,23 @@ app.get('/api/tournaments/:id/scores', async (req, res) => {
   }
 });
 
+app.get('/api/tournaments/legends', async (req, res) => {
+  try {
+    const db = await getDb();
+    const rows = await db.all(`
+      SELECT user_id, MAX(score) as score 
+      FROM tournament_scores 
+      GROUP BY user_id 
+      ORDER BY score DESC 
+      LIMIT 5
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error("Error fetching legends:", err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // ヘルスチェック用
 app.get('/', (req, res) => {
   res.send('Server is running');

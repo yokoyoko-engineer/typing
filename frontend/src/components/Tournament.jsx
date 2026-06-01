@@ -16,6 +16,12 @@ export default function Tournament({ socket, onBackToHome }) {
     const [liveRanking, setLiveRanking] = useState([]);
     const [lastResult, setLastResult] = useState(null);
     
+    // Past Tournaments State
+    const [pastTournaments, setPastTournaments] = useState([]);
+    const [selectedPastId, setSelectedPastId] = useState('');
+    const [pastScores, setPastScores] = useState([]);
+    const [globalLegends, setGlobalLegends] = useState([]);
+    
     // Typing state
     const [playerInfo, setPlayerInfo] = useState({ hp: 1000, currentWord: null, typingState: null });
     const [cpuInfo, setCpuInfo] = useState({ hp: 1000, currentWord: null, typingState: null });
@@ -122,6 +128,38 @@ export default function Tournament({ socket, onBackToHome }) {
             return () => clearInterval(timer);
         }
     }, [gameState]);
+
+    // Fetch past tournaments for setup screen
+    useEffect(() => {
+        if (gameState === 'setup') {
+            fetch('/api/tournaments')
+                .then(res => res.json())
+                .then(data => {
+                    const latest5 = data.slice(0, 5);
+                    setPastTournaments(latest5);
+                    if (latest5.length > 0) {
+                        setSelectedPastId(latest5[0].id.toString());
+                    }
+                })
+                .catch(err => console.error(err));
+                
+            fetch('/api/tournaments/legends')
+                .then(res => res.json())
+                .then(data => setGlobalLegends(data))
+                .catch(err => console.error(err));
+        }
+    }, [gameState]);
+
+    useEffect(() => {
+        if (selectedPastId) {
+            fetch(`/api/tournaments/${selectedPastId}/scores`)
+                .then(res => res.json())
+                .then(data => setPastScores(data))
+                .catch(err => console.error(err));
+        } else {
+            setPastScores([]);
+        }
+    }, [selectedPastId]);
 
     // Keep focus
     useEffect(() => {
@@ -272,35 +310,91 @@ export default function Tournament({ socket, onBackToHome }) {
 
     if (gameState === 'setup') {
         return (
-            <div className="game-container">
-                <h2>イベントモード（一斉バトル）</h2>
-                <p style={{ color: '#888', marginBottom: '20px' }}>社員番号を入力してイベントに参加してください</p>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', maxWidth: '400px', margin: '0 auto' }}>
-                    <input
-                        type="number"
-                        min="1"
-                        max="9999"
-                        value={nameInput}
-                        onChange={(e) => setNameInput(e.target.value.slice(0, 4))}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleJoin(); }}
-                        placeholder="社員番号 (1〜9999)"
-                        style={{
-                            width: '100%', padding: '15px 20px', fontSize: '1.3em',
-                            border: '2px solid #ddd', borderRadius: '10px', textAlign: 'center', outline: 'none'
-                        }}
-                    />
-                    <button
-                        className="action-btn"
-                        onClick={handleJoin}
-                        disabled={!/^[0-9]{1,4}$/.test(nameInput.trim())}
-                        style={{ width: '100%', height: '55px', fontSize: '1.2em' }}
-                    >
-                        待機室へ入る
+            <div className="game-container" style={{ display: 'flex', gap: '40px', maxWidth: '1000px', width: '90%' }}>
+                <div style={{ flex: 1 }}>
+                    <h2>イベントモード（一斉バトル）</h2>
+                    {globalLegends.length > 0 && (
+                        <div style={{ background: 'linear-gradient(135deg, #FFD700 0%, #FDB931 100%)', padding: '15px', borderRadius: '10px', marginBottom: '20px', color: '#000', boxShadow: '0 4px 15px rgba(255,215,0,0.4)', maxWidth: '400px', margin: '0 auto 20px auto' }}>
+                            <h3 style={{ margin: '0 0 10px 0', textAlign: 'center', fontSize: '1.2em', textShadow: '1px 1px 2px rgba(255,255,255,0.5)' }}>👑 オールタイム レジェンド TOP5</h3>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', background: 'rgba(255,255,255,0.5)', padding: '10px', borderRadius: '5px' }}>
+                                {globalLegends.map((l, i) => (
+                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', borderBottom: i < globalLegends.length - 1 ? '1px dashed rgba(0,0,0,0.1)' : 'none', paddingBottom: '3px' }}>
+                                        <span>{i+1}位: {l.user_id}</span>
+                                        <span>{l.score}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    <p style={{ color: '#888', marginBottom: '20px', textAlign: 'center' }}>社員番号を入力してイベントに参加してください</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', maxWidth: '400px', margin: '0 auto' }}>
+                        <input
+                            type="number"
+                            min="1"
+                            max="9999"
+                            value={nameInput}
+                            onChange={(e) => setNameInput(e.target.value.slice(0, 4))}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleJoin(); }}
+                            placeholder="社員番号 (1〜9999)"
+                            style={{
+                                width: '100%', padding: '15px 20px', fontSize: '1.3em',
+                                border: '2px solid #ddd', borderRadius: '10px', textAlign: 'center', outline: 'none'
+                            }}
+                        />
+                        <button
+                            className="action-btn"
+                            onClick={handleJoin}
+                            disabled={!/^[0-9]{1,4}$/.test(nameInput.trim())}
+                            style={{ width: '100%', height: '55px', fontSize: '1.2em' }}
+                        >
+                            待機室へ入る
+                        </button>
+                    </div>
+                    <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '40px', background: '#e0e0e0', color: '#2c3e50' }}>
+                        Back to Home
                     </button>
                 </div>
-                <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '40px', background: '#e0e0e0', color: '#2c3e50' }}>
-                    Back to Home
-                </button>
+                
+                <div style={{ flex: 1, background: '#f5f5f5', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                    <h3 style={{ marginTop: 0, color: '#2c3e50' }}>📜 過去5回の結果</h3>
+                    {pastTournaments.length > 0 ? (
+                        <>
+                            <select 
+                                value={selectedPastId} 
+                                onChange={(e) => setSelectedPastId(e.target.value)}
+                                style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '1.1em' }}
+                            >
+                                {pastTournaments.map(t => (
+                                    <option key={t.id} value={t.id}>{t.name} ({t.date})</option>
+                                ))}
+                            </select>
+                            <div style={{ maxHeight: '300px', overflowY: 'auto', background: '#fff', borderRadius: '5px', border: '1px solid #ddd' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                                    <thead style={{ position: 'sticky', top: 0, background: '#eee' }}>
+                                        <tr>
+                                            <th style={{ padding: '10px', borderBottom: '1px solid #ddd' }}>順位</th>
+                                            <th style={{ padding: '10px', borderBottom: '1px solid #ddd' }}>社員番号</th>
+                                            <th style={{ padding: '10px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>スコア</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {pastScores.map((row, idx) => (
+                                            <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
+                                                <td style={{ padding: '10px', fontWeight: 'bold', color: idx === 0 ? '#d4af37' : idx === 1 ? '#9e9e9e' : idx === 2 ? '#cd7f32' : '#555' }}>
+                                                    {idx + 1}
+                                                </td>
+                                                <td style={{ padding: '10px', fontWeight: 'bold', color: '#2c3e50' }}>{row.user_id}</td>
+                                                <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold', color: '#e8734a' }}>{row.score}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    ) : (
+                        <p style={{ color: '#888', textAlign: 'center', marginTop: '50px' }}>過去のイベント履歴がありません。</p>
+                    )}
+                </div>
             </div>
         );
     }
@@ -464,21 +558,30 @@ export default function Tournament({ socket, onBackToHome }) {
                         </h3>
                         <div style={{ flex: 1, overflowY: 'auto' }}>
                             {liveRanking.length > 0 ? (
-                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 5px' }}>
                                     <tbody>
                                         {liveRanking.map((entry, idx) => {
                                             const isMe = entry.user_id === playerName;
+                                            const legendThreshold = globalLegends.length >= 5 ? globalLegends[4].score : 0;
+                                            const isLegendBeat = entry.score > legendThreshold && entry.score > 0;
+                                            
                                             return (
                                                 <tr key={idx} style={{ 
-                                                    background: isMe ? '#e8eaf6' : (idx % 2 === 0 ? '#fff' : 'transparent'),
-                                                    borderBottom: '1px solid #ddd',
-                                                    fontWeight: isMe ? 'bold' : 'normal'
+                                                    background: isLegendBeat ? 'linear-gradient(90deg, #FFD700 0%, #FDB931 100%)' : (isMe ? '#e8eaf6' : '#fff'),
+                                                    fontWeight: isMe || isLegendBeat ? 'bold' : 'normal',
+                                                    boxShadow: isLegendBeat ? '0 0 10px rgba(255,215,0,0.8)' : '0 1px 3px rgba(0,0,0,0.1)',
+                                                    transform: isLegendBeat ? 'scale(1.02)' : 'none',
+                                                    transition: 'all 0.3s',
+                                                    borderRadius: '5px'
                                                 }}>
-                                                    <td style={{ padding: '8px 5px', width: '40px', color: idx < 3 ? '#e8734a' : '#888' }}>
+                                                    <td style={{ padding: '8px 5px', width: '40px', color: isLegendBeat ? '#000' : (idx < 3 ? '#e8734a' : '#888'), borderRadius: '5px 0 0 5px' }}>
                                                         {idx + 1}.
                                                     </td>
-                                                    <td style={{ padding: '8px 5px' }}>{entry.user_id}</td>
-                                                    <td style={{ padding: '8px 5px', textAlign: 'right', color: '#5c6bc0' }}>
+                                                    <td style={{ padding: '8px 5px', color: isLegendBeat ? '#000' : 'inherit' }}>
+                                                        {isLegendBeat && <span style={{marginRight: '5px'}}>👑</span>}
+                                                        {entry.user_id}
+                                                    </td>
+                                                    <td style={{ padding: '8px 5px', textAlign: 'right', color: isLegendBeat ? '#000' : '#5c6bc0', borderRadius: '0 5px 5px 0' }}>
                                                         {entry.score}
                                                     </td>
                                                 </tr>
