@@ -29,6 +29,7 @@ export default function Admin() {
   const [tournaments, setTournaments] = useState([]);
   const [selectedTournament, setSelectedTournament] = useState('');
   const [tournamentScores, setTournamentScores] = useState([]);
+  const [lobbyCount, setLobbyCount] = useState(0);
   const [lobbyPlayers, setLobbyPlayers] = useState([]);
   
   // Setup Socket for Admin
@@ -36,8 +37,9 @@ export default function Admin() {
     const newSocket = io();
     setSocket(newSocket);
     
-    newSocket.on('tournamentLobbyUpdate', (players) => {
-      setLobbyPlayers(players);
+    newSocket.on('tournamentLobbyUpdate', (data) => {
+      setLobbyCount(data.count);
+      setLobbyPlayers(data.players);
     });
     
     return () => newSocket.close();
@@ -431,11 +433,11 @@ export default function Admin() {
               <div style={{ flex: 1 }}>
                 <h4 style={{ margin: '0 0 10px 0', color: '#2c3e50' }}>現在の待機室</h4>
                 <div style={{ fontSize: '2em', fontWeight: 'bold', color: '#5c6bc0' }}>
-                  {lobbyPlayers.length} <span style={{ fontSize: '0.4em', color: '#666' }}>人</span>
+                  {lobbyCount} <span style={{ fontSize: '0.4em', color: '#666' }}>人</span>
                 </div>
               </div>
               <div style={{ flex: 2, background: '#f5f5f5', padding: '10px', borderRadius: '5px', maxHeight: '100px', overflowY: 'auto' }}>
-                <h5 style={{ margin: '0 0 5px 0', color: '#666' }}>参加者一覧</h5>
+                <h5 style={{ margin: '0 0 5px 0', color: '#666' }}>参加者一覧 {lobbyCount > lobbyPlayers.length ? `(最新 ${lobbyPlayers.length}件)` : ''}</h5>
                 {lobbyPlayers.length > 0 ? (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     {lobbyPlayers.map((p, idx) => (
@@ -453,11 +455,11 @@ export default function Admin() {
             <button 
               onClick={handleStartTournament}
               style={{ padding: '15px 30px', fontSize: '1.2em', background: '#ff9800', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
-              disabled={lobbyPlayers.length === 0}
+              disabled={lobbyCount === 0}
             >
               🚀 イベントをスタートする
             </button>
-            {lobbyPlayers.length === 0 && <p style={{ color: '#f44336', fontSize: '0.9em', marginTop: '10px' }}>参加者が0人のため開始できません</p>}
+            {lobbyCount === 0 && <p style={{ color: '#f44336', fontSize: '0.9em', marginTop: '10px' }}>参加者が0人のため開始できません</p>}
           </div>
 
           {/* 大会履歴パネル */}

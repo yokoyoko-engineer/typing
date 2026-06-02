@@ -61,10 +61,14 @@ async function getRankingsData() {
   }
 }
 
+let rankingsLock = Promise.resolve();
+
 async function saveRankingsData(data) {
   try {
     await fs.mkdir(path.dirname(RANKINGS_FILE), { recursive: true });
-    await fs.writeFile(RANKINGS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    const tempFile = RANKINGS_FILE + '.tmp';
+    await fs.writeFile(tempFile, JSON.stringify(data, null, 2), 'utf-8');
+    await fs.rename(tempFile, RANKINGS_FILE);
   } catch (err) {
     console.error("Error saving rankings file:", err);
   }
@@ -91,20 +95,30 @@ app.post('/api/rankings/:genre/:level', async (req, res) => {
     return res.status(400).json({ error: 'Invalid username' });
   }
 
-  const rankings = await getRankingsData();
-  const key = `${genre}_lv${level}`;
-  
-  if (!rankings[key]) {
-    rankings[key] = [];
-  }
-  
-  rankings[key].push({ username: safeName, time, date: new Date().toISOString() });
-  rankings[key].sort((a, b) => a.time - b.time);
-  rankings[key] = rankings[key].slice(0, 30); // TOP 30を維持
-  
-  await saveRankingsData(rankings);
-  
-  res.json(rankings[key]);
+  rankingsLock = rankingsLock.then(async () => {
+    try {
+      const rankings = await getRankingsData();
+      const key = `${genre}_lv${level}`;
+      
+      if (!rankings[key]) {
+        rankings[key] = [];
+      }
+      
+      rankings[key].push({ username: safeName, time, date: new Date().toISOString() });
+      rankings[key].sort((a, b) => a.time - b.time);
+      rankings[key] = rankings[key].slice(0, 30); // TOP 30を維持
+      
+      await saveRankingsData(rankings);
+      
+      res.json(rankings[key]);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  }).catch(e => {
+    console.error(e);
+    if (!res.headersSent) res.status(500).json({ error: 'Internal Server Error' });
+  });
 });
 
 // --- Score API Endpoints (SQLite) ---
@@ -319,13 +333,20 @@ io.on('connection', (socket) => {
     }
     socket.join('tournament_lobby');
     tournamentLobbyPlayers[socket.id] = safeName;
-    io.emit('tournamentLobbyUpdate', Object.values(tournamentLobbyPlayers));
+    io.to('admin_room').emit('tournamentLobbyUpdate', {
+      count: Object.keys(tournamentLobbyPlayers).length,
+      players: Object.values(tournamentLobbyPlayers).slice(0, 100)
+    });
     
     socket.emit('tournamentState', { status: tournamentState.status, endTime: tournamentState.endTime });
   });
 
   socket.on('adminGetLobby', () => {
-    socket.emit('tournamentLobbyUpdate', Object.values(tournamentLobbyPlayers));
+    socket.join('admin_room');
+    socket.emit('tournamentLobbyUpdate', {
+      count: Object.keys(tournamentLobbyPlayers).length,
+      players: Object.values(tournamentLobbyPlayers).slice(0, 100)
+    });
   });
 
   socket.on('adminStartTournament', async () => {
@@ -514,7 +535,10 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     if (tournamentLobbyPlayers[socket.id]) {
       delete tournamentLobbyPlayers[socket.id];
-      io.emit('tournamentLobbyUpdate', Object.values(tournamentLobbyPlayers));
+      io.to('admin_room').emit('tournamentLobbyUpdate', {
+        count: Object.keys(tournamentLobbyPlayers).length,
+        players: Object.values(tournamentLobbyPlayers).slice(0, 100)
+      });
     }
     console.log(`User disconnected: ${socket.id}`);
     typingTimestamps.delete(socket.id);

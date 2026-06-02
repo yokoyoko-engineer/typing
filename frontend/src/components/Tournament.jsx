@@ -315,7 +315,7 @@ export default function Tournament({ socket, onBackToHome }) {
                     <h2>イベントモード（一斉バトル）</h2>
                     {globalLegends.length > 0 && (
                         <div style={{ background: 'linear-gradient(135deg, #FFD700 0%, #FDB931 100%)', padding: '15px', borderRadius: '10px', marginBottom: '20px', color: '#000', boxShadow: '0 4px 15px rgba(255,215,0,0.4)', maxWidth: '400px', margin: '0 auto 20px auto' }}>
-                            <h3 style={{ margin: '0 0 10px 0', textAlign: 'center', fontSize: '1.2em', textShadow: '1px 1px 2px rgba(255,255,255,0.5)' }}>👑 オールタイム レジェンド TOP5</h3>
+                            <h3 style={{ margin: '0 0 10px 0', textAlign: 'center', fontSize: '1.2em', textShadow: '1px 1px 2px rgba(255,255,255,0.5)' }}>👑 歴代TOP5</h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', background: 'rgba(255,255,255,0.5)', padding: '10px', borderRadius: '5px' }}>
                                 {globalLegends.map((l, i) => (
                                     <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', borderBottom: i < globalLegends.length - 1 ? '1px dashed rgba(0,0,0,0.1)' : 'none', paddingBottom: '3px' }}>
@@ -556,7 +556,7 @@ export default function Tournament({ socket, onBackToHome }) {
                         <h3 style={{ margin: '0 0 15px 0', textAlign: 'center', color: '#2c3e50' }}>
                             {gameState === 'finished' ? '👑 最終ランキング' : '🔥 リアルタイムランキング'}
                         </h3>
-                        <div style={{ flex: 1, overflowY: 'auto' }}>
+                        <div style={{ flex: 1, overflowY: 'auto', maxHeight: '400px' }}>
                             {liveRanking.length > 0 ? (
                                 <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 5px' }}>
                                     <tbody>
