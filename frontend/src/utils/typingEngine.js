@@ -166,18 +166,6 @@ export class TypingSession {
             return { success: true, finishedWord: false };
         }
 
-        if (validOpts.length === 0 && this.typedNodePrefix === 'n' && this.nodes[this.currentIndex].includes('nn')) {
-            let needsNn = false;
-            if (this.currentIndex + 1 < this.nodes.length) {
-                let nextOpts = this.nodes[this.currentIndex + 1];
-                needsNn = nextOpts.some(o => ['a', 'i', 'u', 'e', 'o', 'y'].includes(o[0]));
-            }
-            if (!needsNn) {
-                this.currentIndex++;
-                this.typedNodePrefix = '';
-                return this.input(char);
-            }
-        }
 
         return { success: false, finishedWord: false };
     }
