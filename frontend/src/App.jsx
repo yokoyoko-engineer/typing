@@ -44,9 +44,9 @@ function MainGame() {
     setGameMode(mode)
   }
 
-  const handleJoinRoom = (roomId, playerName) => {
+  const handleJoinRoom = (roomId, playerName, jobType) => {
     if (socket) {
-      socket.emit('joinRoom', { roomId, playerName })
+      socket.emit('joinRoom', { roomId, playerName, jobType })
     }
   }
 

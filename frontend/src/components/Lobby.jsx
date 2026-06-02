@@ -3,10 +3,11 @@ import './Room.css';
 
 export default function Lobby({ socket, lobbies, onJoinRoom }) {
   const [playerName, setPlayerName] = useState('');
+  const [jobType, setJobType] = useState('CL');
 
   const handleJoin = (roomId) => {
     if (socket && playerName) {
-      onJoinRoom(roomId, playerName);
+      onJoinRoom(roomId, playerName, jobType);
     } else if (!playerName) {
       alert("Please enter a player name first!");
     }
@@ -17,7 +18,7 @@ export default function Lobby({ socket, lobbies, onJoinRoom }) {
   return (
     <div className="lobby-container">
       <h2>Select a Room</h2>
-      <div className="player-name-input">
+      <div className="player-name-input" style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
         <label>
           Your Name:
           <input 
@@ -29,6 +30,16 @@ export default function Lobby({ socket, lobbies, onJoinRoom }) {
             placeholder="1〜4桁の社員番号"
             required 
           />
+        </label>
+        <label>
+          Job Type:
+          <select value={jobType} onChange={(e) => setJobType(e.target.value)} style={{ marginLeft: '10px', padding: '5px' }}>
+            <option value="CL">CL</option>
+            <option value="JAVA">JAVA</option>
+            <option value="ML">ML</option>
+            <option value="FR">FR</option>
+            <option value="QA">QA</option>
+          </select>
         </label>
       </div>
       

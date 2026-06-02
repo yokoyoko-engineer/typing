@@ -128,7 +128,7 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
         <div className="players-list">
           {Object.values(roomState.players).map(p => (
             <div key={p.id} className={`player-card ${p.isReady ? 'ready' : ''} ${p.id === myId ? 'me' : ''}`}>
-              <span className="player-name">{p.name} {p.id === myId ? '(You)' : ''}</span>
+              <span className="player-name">{p.jobType ? `[${p.jobType}] ` : ''}{p.name} {p.id === myId ? '(You)' : ''}</span>
               <span className="player-status">{p.isReady ? 'READY' : 'WAITING'}</span>
             </div>
           ))}
@@ -174,7 +174,7 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
                 <div className="players-list" style={{ margin: 0 }}>
                   {Object.values(roomState.players).map(p => (
                     <div key={p.id} className={`player-card ${p.isWinner ? 'winner' : ''}`} style={{ padding: '10px' }}>
-                      <span style={{ fontSize: '0.9em' }}>{p.name}</span>
+                      <span style={{ fontSize: '0.9em' }}>{p.jobType ? `[${p.jobType}] ` : ''}{p.name}</span>
                       <span style={{ fontSize: '0.8em' }}>{p.isWinner ? 'Winner' : 'Defeated'}</span>
                     </div>
                   ))}
@@ -224,7 +224,7 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
         {Object.values(roomState.players).map(p => (
           <div key={p.id} className={`hud-card ${p.id === myId ? 'me' : ''} ${p.hp <= 0 ? 'dead' : ''}`}>
             <div className="hud-header">
-              <span>{p.name}</span>
+              <span>{p.jobType ? `[${p.jobType}] ` : ''}{p.name}</span>
               <span>{p.hp} HP</span>
             </div>
             <div className="hp-bar-container">

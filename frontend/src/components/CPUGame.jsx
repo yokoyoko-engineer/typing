@@ -23,6 +23,7 @@ const CPU_DIFFICULTY = {
 export default function CPUGame({ onBackToHome }) {
     const [playerName, setPlayerName] = useState('');
     const [nameInput, setNameInput] = useState('');
+    const [jobType, setJobType] = useState('CL');
     const [difficulty, setDifficulty] = useState(null);
     const [category, setCategory] = useState(null);
     const [genre, setGenre] = useState(null);
@@ -308,14 +309,14 @@ export default function CPUGame({ onBackToHome }) {
                         fetch('/api/scores', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ user_id: playerName, score: eScore })
+                            body: JSON.stringify({ user_id: playerName, score: eScore, jobType })
                         }).catch(err => console.error("Error saving score:", err));
 
                         // Save ranking to backend
                         fetch(`/api/rankings/${encodeURIComponent(genre)}/${difficulty}`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ username: playerName, time: roundedTime })
+                            body: JSON.stringify({ username: playerName, time: roundedTime, jobType })
                         })
                         .then(res => res.json())
                         .then(updated => {
@@ -374,6 +375,24 @@ export default function CPUGame({ onBackToHome }) {
                             onFocus={(e) => e.target.style.borderColor = '#5c6bc0'}
                             onBlur={(e) => e.target.style.borderColor = '#ddd'}
                         />
+                        <select
+                            value={jobType}
+                            onChange={(e) => setJobType(e.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '15px 20px',
+                                fontSize: '1.2em',
+                                border: '2px solid #ddd',
+                                borderRadius: '10px',
+                                outline: 'none'
+                            }}
+                        >
+                            <option value="CL">CL</option>
+                            <option value="JAVA">JAVA</option>
+                            <option value="ML">ML</option>
+                            <option value="FR">FR</option>
+                            <option value="QA">QA</option>
+                        </select>
                         <button
                             className="action-btn"
                             onClick={confirmName}
@@ -409,7 +428,7 @@ export default function CPUGame({ onBackToHome }) {
                                             border: '1px solid #eee',
                                         }}>
                                             <span style={{ minWidth: '35px', textAlign: 'center', fontSize: '1.2em' }}>{medal}</span>
-                                            <span style={{ flex: 1, textAlign: 'left', paddingLeft: '10px', color: '#2c3e50', fontWeight: 'bold' }}>ユーザ {entry.user_id}</span>
+                                            <span style={{ flex: 1, textAlign: 'left', paddingLeft: '10px', color: '#2c3e50', fontWeight: 'bold' }}>{entry.job_type ? `[${entry.job_type}] ` : ''}ユーザ {entry.user_id}</span>
                                             <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '80px', textAlign: 'right', fontSize: '1.1em' }}>{entry.score}</span>
                                         </div>
                                     );
@@ -547,7 +566,7 @@ export default function CPUGame({ onBackToHome }) {
                                             border: '1px solid #eee',
                                         }}>
                                             <span style={{ minWidth: '35px', textAlign: 'center' }}>{medal}</span>
-                                            <span style={{ flex: 1, textAlign: 'left', paddingLeft: '10px', color: '#2c3e50' }}>{entry.username}</span>
+                                            <span style={{ flex: 1, textAlign: 'left', paddingLeft: '10px', color: '#2c3e50' }}>{entry.jobType ? `[${entry.jobType}] ` : ''}{entry.username}</span>
                                             <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '80px', textAlign: 'right' }}>{entry.time}秒</span>
                                         </div>
                                     );

@@ -13,13 +13,14 @@ export class GameRoom {
     this.genre = genre;
   }
 
-  addPlayer(socketId, name) {
+  addPlayer(socketId, name, jobType) {
     if (Object.keys(this.players).length >= 4) {
       return false; // Room full
     }
     this.players[socketId] = {
       id: socketId,
       name: name || `Player ${Object.keys(this.players).length + 1}`,
+      jobType: jobType || 'CL',
       isReady: false,
       hp: 1000,
       currentWord: null,
@@ -134,6 +135,7 @@ export class GameRoom {
       serializedPlayers[id] = {
         id: p.id,
         name: p.name,
+        jobType: p.jobType,
         isReady: p.isReady,
         hp: p.hp,
         currentWord: p.currentWord,

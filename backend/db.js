@@ -47,6 +47,20 @@ export async function getDb() {
         FOREIGN KEY (tournament_id) REFERENCES tournaments(id)
       );
     `);
+    
+    // Add job_type column for backward compatibility
+    try {
+      await db.exec(`ALTER TABLE scores ADD COLUMN job_type TEXT DEFAULT ''`);
+    } catch (err) {
+      // Ignore error if column already exists
+    }
+
+    try {
+      await db.exec(`ALTER TABLE tournament_scores ADD COLUMN job_type TEXT DEFAULT ''`);
+    } catch (err) {
+      // Ignore error if column already exists
+    }
+
     return db;
   });
 

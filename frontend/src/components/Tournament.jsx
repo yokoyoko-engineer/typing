@@ -10,6 +10,7 @@ const TOURNAMENT_GENRE = CATEGORIES.BUSINESS;
 export default function Tournament({ socket, onBackToHome }) {
     const [playerName, setPlayerName] = useState('');
     const [nameInput, setNameInput] = useState('');
+    const [jobType, setJobType] = useState('CL');
     const [gameState, setGameState] = useState('setup'); // setup, waiting, countdown, playing, intermission, spectating, finished
     const [countdown, setCountdown] = useState(3);
     const [timeRemaining, setTimeRemaining] = useState(0);
@@ -93,7 +94,7 @@ export default function Tournament({ socket, onBackToHome }) {
         const trimmed = nameInput.trim();
         if (/^[0-9]{1,4}$/.test(trimmed)) {
             setPlayerName(trimmed);
-            socket.emit('joinTournament', { playerName: trimmed });
+            socket.emit('joinTournament', { playerName: trimmed, jobType });
             setGameState('waiting');
         } else {
             alert('社員番号は1〜4桁の数字で入力してください');
@@ -283,7 +284,7 @@ export default function Tournament({ socket, onBackToHome }) {
                         
                         if (eScore > highestScoreRef.current) {
                             highestScoreRef.current = eScore;
-                            socket.emit('tournamentUpdateScore', { playerName, score: eScore });
+                            socket.emit('tournamentUpdateScore', { playerName, score: eScore, jobType });
                         }
                         
                         setLastResult({ status: 'win', score: eScore });
@@ -341,6 +342,24 @@ export default function Tournament({ socket, onBackToHome }) {
                                 border: '2px solid #ddd', borderRadius: '10px', textAlign: 'center', outline: 'none'
                             }}
                         />
+                        <select
+                            value={jobType}
+                            onChange={(e) => setJobType(e.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '15px 20px',
+                                fontSize: '1.2em',
+                                border: '2px solid #ddd',
+                                borderRadius: '10px',
+                                outline: 'none'
+                            }}
+                        >
+                            <option value="CL">CL</option>
+                            <option value="JAVA">JAVA</option>
+                            <option value="ML">ML</option>
+                            <option value="FR">FR</option>
+                            <option value="QA">QA</option>
+                        </select>
                         <button
                             className="action-btn"
                             onClick={handleJoin}
@@ -579,7 +598,7 @@ export default function Tournament({ socket, onBackToHome }) {
                                                     </td>
                                                     <td style={{ padding: '8px 5px', color: isLegendBeat ? '#000' : 'inherit' }}>
                                                         {isLegendBeat && <span style={{marginRight: '5px'}}>👑</span>}
-                                                        {entry.user_id}
+                                                        {entry.jobType ? `[${entry.jobType}] ` : ''}{entry.user_id}
                                                     </td>
                                                     <td style={{ padding: '8px 5px', textAlign: 'right', color: isLegendBeat ? '#000' : '#5c6bc0', borderRadius: '0 5px 5px 0' }}>
                                                         {entry.score}

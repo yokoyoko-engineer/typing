@@ -84,7 +84,7 @@ app.get('/api/rankings/:genre/:level', async (req, res) => {
 
 app.post('/api/rankings/:genre/:level', async (req, res) => {
   const { genre, level } = req.params;
-  const { username, time } = req.body;
+  const { username, time, jobType } = req.body;
   
   if (!username || typeof time !== 'number') {
     return res.status(400).json({ error: 'Invalid input data' });
@@ -104,7 +104,7 @@ app.post('/api/rankings/:genre/:level', async (req, res) => {
         rankings[key] = [];
       }
       
-      rankings[key].push({ username: safeName, time, date: new Date().toISOString() });
+      rankings[key].push({ username: safeName, time, date: new Date().toISOString(), jobType: jobType || '' });
       rankings[key].sort((a, b) => a.time - b.time);
       rankings[key] = rankings[key].slice(0, 30); // TOP 30を維持
       
@@ -125,7 +125,7 @@ app.post('/api/rankings/:genre/:level', async (req, res) => {
 import { getDb } from './db.js';
 
 app.post('/api/scores', async (req, res) => {
-  const { user_id, score } = req.body;
+  const { user_id, score, jobType } = req.body;
   const safeId = sanitizePlayerName(user_id);
   
   if (!safeId || typeof score !== 'number') {
@@ -136,8 +136,8 @@ app.post('/api/scores', async (req, res) => {
     const db = await getDb();
     const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     await db.run(
-      'INSERT INTO scores (user_id, score, play_date) VALUES (?, ?, ?)',
-      [safeId, score, dateStr]
+      'INSERT INTO scores (user_id, score, play_date, job_type) VALUES (?, ?, ?, ?)',
+      [safeId, score, dateStr, jobType || '']
     );
     res.json({ success: true });
   } catch (err) {
@@ -150,7 +150,7 @@ app.get('/api/scores/top', async (req, res) => {
   try {
     const db = await getDb();
     const rows = await db.all(`
-      SELECT user_id, MAX(score) as score 
+      SELECT user_id, MAX(job_type) as job_type, MAX(score) as score 
       FROM scores 
       GROUP BY user_id 
       ORDER BY score DESC 
@@ -173,7 +173,7 @@ app.get('/api/scores/admin', async (req, res) => {
   try {
     const db = await getDb();
     let query = `
-      SELECT id, user_id, play_date as date, score 
+      SELECT id, user_id, job_type, play_date as date, score 
       FROM scores 
       WHERE user_id >= ? AND user_id <= ?
     `;
@@ -216,7 +216,7 @@ app.get('/api/tournaments/:id/scores', async (req, res) => {
   try {
     const db = await getDb();
     const rows = await db.all(`
-      SELECT user_id, score 
+      SELECT user_id, job_type, score 
       FROM tournament_scores 
       WHERE tournament_id = ? 
       ORDER BY score DESC
@@ -232,7 +232,7 @@ app.get('/api/tournaments/legends', async (req, res) => {
   try {
     const db = await getDb();
     const rows = await db.all(`
-      SELECT user_id, MAX(score) as score 
+      SELECT user_id, MAX(job_type) as job_type, MAX(score) as score 
       FROM tournament_scores 
       GROUP BY user_id 
       ORDER BY score DESC 
@@ -325,17 +325,17 @@ io.on('connection', (socket) => {
   // 接続時にロビー一覧を送信
   sendLobbiesState(socket);
 
-  socket.on('joinTournament', ({ playerName }) => {
+  socket.on('joinTournament', ({ playerName, jobType }) => {
     const safeName = sanitizePlayerName(playerName);
     if (!safeName) {
       socket.emit('error', 'Invalid player name.');
       return;
     }
     socket.join('tournament_lobby');
-    tournamentLobbyPlayers[socket.id] = safeName;
+    tournamentLobbyPlayers[socket.id] = { name: safeName, jobType: jobType || '' };
     io.to('admin_room').emit('tournamentLobbyUpdate', {
       count: Object.keys(tournamentLobbyPlayers).length,
-      players: Object.values(tournamentLobbyPlayers).slice(0, 100)
+      players: Object.values(tournamentLobbyPlayers).map(p => p.name).slice(0, 100)
     });
     
     socket.emit('tournamentState', { status: tournamentState.status, endTime: tournamentState.endTime });
@@ -345,7 +345,7 @@ io.on('connection', (socket) => {
     socket.join('admin_room');
     socket.emit('tournamentLobbyUpdate', {
       count: Object.keys(tournamentLobbyPlayers).length,
-      players: Object.values(tournamentLobbyPlayers).slice(0, 100)
+      players: Object.values(tournamentLobbyPlayers).map(p => p.name).slice(0, 100)
     });
   });
 
@@ -382,8 +382,8 @@ io.on('connection', (socket) => {
       if (tournamentState.tournamentId) {
         try {
           const db2 = await getDb();
-          for (const [userId, score] of Object.entries(tournamentState.participants)) {
-            await db2.run('INSERT INTO tournament_scores (tournament_id, user_id, score) VALUES (?, ?, ?)', [tournamentState.tournamentId, userId, score]);
+          for (const [userId, data] of Object.entries(tournamentState.participants)) {
+            await db2.run('INSERT INTO tournament_scores (tournament_id, user_id, score, job_type) VALUES (?, ?, ?, ?)', [tournamentState.tournamentId, userId, data.score, data.jobType || '']);
           }
         } catch (err) {
           console.error("Error saving tournament scores", err);
@@ -401,16 +401,16 @@ io.on('connection', (socket) => {
     }, 5 * 60 * 1000); // 5 minutes
   });
 
-  socket.on('tournamentUpdateScore', ({ playerName, score }) => {
+  socket.on('tournamentUpdateScore', ({ playerName, score, jobType }) => {
     const safeName = sanitizePlayerName(playerName);
     if (!safeName || tournamentState.status !== 'active') return;
     
-    const currentMax = tournamentState.participants[safeName] || 0;
+    const currentMax = tournamentState.participants[safeName]?.score || 0;
     if (score > currentMax) {
-      tournamentState.participants[safeName] = score;
+      tournamentState.participants[safeName] = { score, jobType: jobType || '' };
       
       const sorted = Object.entries(tournamentState.participants)
-        .map(([user_id, s]) => ({ user_id, score: s }))
+        .map(([user_id, data]) => ({ user_id, score: data.score, jobType: data.jobType }))
         .sort((a, b) => b.score - a.score)
         .slice(0, 300);
         
@@ -418,7 +418,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('joinRoom', ({ roomId, playerName }) => {
+  socket.on('joinRoom', ({ roomId, playerName, jobType }) => {
     // --- Security: バリデーション ---
     if (!isValidRoomId(roomId)) {
       socket.emit('error', 'Invalid room ID.');
@@ -439,7 +439,7 @@ io.on('connection', (socket) => {
     }
 
     const room = rooms[roomId];
-    if (room.addPlayer(socket.id, safeName)) {
+    if (room.addPlayer(socket.id, safeName, jobType)) {
       socket.join(roomId);
       currentRoomId = roomId;
       io.to(roomId).emit('roomState', room.getState());
@@ -537,7 +537,7 @@ io.on('connection', (socket) => {
       delete tournamentLobbyPlayers[socket.id];
       io.to('admin_room').emit('tournamentLobbyUpdate', {
         count: Object.keys(tournamentLobbyPlayers).length,
-        players: Object.values(tournamentLobbyPlayers).slice(0, 100)
+        players: Object.values(tournamentLobbyPlayers).map(p => p.name).slice(0, 100)
       });
     }
     console.log(`User disconnected: ${socket.id}`);
