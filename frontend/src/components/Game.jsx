@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { CATEGORIES, GENRES_BY_CATEGORY } from '../words';
+import { alignTextAndRuby } from '../utils/typingEngine';
 import './Game.css';
 
 export default function Game({ socket, roomState, myId, onLeaveRoom }) {
@@ -279,16 +280,33 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
               {(() => {
                 if (!me.currentWord.text) return null;
                 if (!me.typingState || !me.typingState.typedRuby) return <span style={{ color: '#2c3e50' }}>{me.currentWord.text}</span>;
-                const typedLen = me.typingState.typedRuby.length;
-                const totalLen = Math.max(1, typedLen + (me.typingState.targetRuby?.length || 0));
-                const ratio = typedLen / totalLen;
-                const coloredCount = Math.round(ratio * me.currentWord.text.length);
-                return (
-                  <>
-                    <span style={{ color: '#4caf50' }}>{me.currentWord.text.slice(0, coloredCount)}</span>
-                    <span style={{ color: '#2c3e50' }}>{me.currentWord.text.slice(coloredCount)}</span>
-                  </>
-                );
+                
+                const chunks = alignTextAndRuby(me.currentWord.text, me.currentWord.ruby);
+                let remainingTypedRuby = me.typingState.typedRuby.length;
+
+                return chunks.map((chunk, index) => {
+                  let chunkRubyLen = chunk.ruby.length;
+                  let chunkTypedRubyLen = Math.min(remainingTypedRuby, chunkRubyLen);
+                  remainingTypedRuby -= chunkTypedRubyLen;
+
+                  let coloredTextChars = 0;
+                  if (chunkRubyLen > 0) {
+                      let ratio = chunkTypedRubyLen / chunkRubyLen;
+                      coloredTextChars = Math.round(ratio * chunk.text.length);
+                  } else {
+                      coloredTextChars = remainingTypedRuby > 0 ? chunk.text.length : 0;
+                  }
+                  
+                  let greenText = chunk.text.substring(0, coloredTextChars);
+                  let blueText = chunk.text.substring(coloredTextChars);
+                  
+                  return (
+                      <React.Fragment key={index}>
+                          {greenText && <span style={{ color: '#4caf50' }}>{greenText}</span>}
+                          {blueText && <span style={{ color: '#2c3e50' }}>{blueText}</span>}
+                      </React.Fragment>
+                  );
+                });
               })()}
             </div>
           </div>

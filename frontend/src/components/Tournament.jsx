@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getRandomWord, CATEGORIES } from '../words';
-import { TypingSession } from '../utils/typingEngine';
+import { TypingSession, alignTextAndRuby } from '../utils/typingEngine';
 import './Game.css';
 
 // CPU Level 5 difficulty
@@ -509,16 +509,33 @@ export default function Tournament({ socket, onBackToHome }) {
                                                 {(() => {
                                                     if (!playerInfo.currentWord?.text) return null;
                                                     if (!playerInfo.typingState || !playerInfo.typingState.typedRuby) return <span style={{ color: '#2c3e50' }}>{playerInfo.currentWord.text}</span>;
-                                                    const typedLen = playerInfo.typingState.typedRuby.length;
-                                                    const totalLen = Math.max(1, typedLen + (playerInfo.typingState.targetRuby?.length || 0));
-                                                    const ratio = typedLen / totalLen;
-                                                    const coloredCount = Math.round(ratio * playerInfo.currentWord.text.length);
-                                                    return (
-                                                        <>
-                                                            <span style={{ color: '#4caf50' }}>{playerInfo.currentWord.text.slice(0, coloredCount)}</span>
-                                                            <span style={{ color: '#2c3e50' }}>{playerInfo.currentWord.text.slice(coloredCount)}</span>
-                                                        </>
-                                                    );
+                                                    
+                                                    const chunks = alignTextAndRuby(playerInfo.currentWord.text, playerInfo.currentWord.ruby);
+                                                    let remainingTypedRuby = playerInfo.typingState.typedRuby.length;
+
+                                                    return chunks.map((chunk, index) => {
+                                                      let chunkRubyLen = chunk.ruby.length;
+                                                      let chunkTypedRubyLen = Math.min(remainingTypedRuby, chunkRubyLen);
+                                                      remainingTypedRuby -= chunkTypedRubyLen;
+
+                                                      let coloredTextChars = 0;
+                                                      if (chunkRubyLen > 0) {
+                                                          let ratio = chunkTypedRubyLen / chunkRubyLen;
+                                                          coloredTextChars = Math.round(ratio * chunk.text.length);
+                                                      } else {
+                                                          coloredTextChars = remainingTypedRuby > 0 ? chunk.text.length : 0;
+                                                      }
+                                                      
+                                                      let greenText = chunk.text.substring(0, coloredTextChars);
+                                                      let blueText = chunk.text.substring(coloredTextChars);
+                                                      
+                                                      return (
+                                                          <React.Fragment key={index}>
+                                                              {greenText && <span style={{ color: '#4caf50' }}>{greenText}</span>}
+                                                              {blueText && <span style={{ color: '#2c3e50' }}>{blueText}</span>}
+                                                          </React.Fragment>
+                                                      );
+                                                    });
                                                 })()}
                                             </div>
                                         </div>

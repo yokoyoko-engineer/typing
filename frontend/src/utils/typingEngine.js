@@ -51,6 +51,59 @@ export const ROMAJI_MAP = {
     'ゔゃ': ['vya'], 'ゔゅ': ['vyu'], 'ゔょ': ['vyo']
 };
 
+export function alignTextAndRuby(text, ruby) {
+    if (!text || !ruby) return [];
+    let chunks = [];
+    let textChunks = [];
+    let currentType = null;
+    let currentStr = '';
+
+    const isHiragana = (char) => /^[\u3040-\u309F\u30FC]+$/.test(char);
+
+    for (let char of text) {
+        let type = isHiragana(char) ? 'H' : 'N';
+        if (type !== currentType) {
+            if (currentStr) textChunks.push({ type: currentType, text: currentStr });
+            currentType = type;
+            currentStr = char;
+        } else {
+            currentStr += char;
+        }
+    }
+    if (currentStr) textChunks.push({ type: currentType, text: currentStr });
+
+    let rubyIdx = 0;
+    for (let chunk of textChunks) {
+        if (chunk.type === 'H') {
+            let matchIdx = ruby.indexOf(chunk.text, rubyIdx);
+            if (matchIdx === -1) {
+                return [{ text, ruby }]; // Fallback
+            }
+            let prevRuby = ruby.substring(rubyIdx, matchIdx);
+            if (prevRuby && chunks.length > 0) {
+                let lastChunk = chunks[chunks.length - 1];
+                if (lastChunk.type === 'N') {
+                    lastChunk.ruby = prevRuby;
+                }
+            }
+            chunks.push({ type: 'H', text: chunk.text, ruby: chunk.text });
+            rubyIdx = matchIdx + chunk.text.length;
+        } else {
+            chunks.push({ type: 'N', text: chunk.text, ruby: '' });
+        }
+    }
+    
+    if (rubyIdx < ruby.length) {
+        if (chunks.length > 0) {
+            chunks[chunks.length - 1].ruby += ruby.substring(rubyIdx);
+        } else {
+            chunks.push({ type: 'N', text: '', ruby: ruby.substring(rubyIdx) });
+        }
+    }
+
+    return chunks;
+}
+
 export class TypingSession {
     constructor(ruby) {
         this.ruby = ruby;
