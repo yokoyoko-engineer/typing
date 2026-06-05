@@ -316,7 +316,7 @@ export default function CPUGame({ onBackToHome }) {
                         fetch(`/api/rankings/${encodeURIComponent(genre)}/${difficulty}`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ username: playerName, time: roundedTime, jobType })
+                            body: JSON.stringify({ username: playerName, time: roundedTime, jobType, score: eScore })
                         })
                         .then(res => res.json())
                         .then(updated => {
@@ -567,7 +567,7 @@ export default function CPUGame({ onBackToHome }) {
                                         }}>
                                             <span style={{ minWidth: '35px', textAlign: 'center' }}>{medal}</span>
                                             <span style={{ flex: 1, textAlign: 'left', paddingLeft: '10px', color: '#2c3e50' }}>{entry.jobType ? `[${entry.jobType}] ` : ''}{entry.username}</span>
-                                            <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '80px', textAlign: 'right' }}>{entry.time}秒</span>
+                                            <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '80px', textAlign: 'right' }}>{entry.time}秒 {entry.score ? `(★${entry.score})` : ''}</span>
                                         </div>
                                     );
                                 })}
@@ -656,7 +656,7 @@ export default function CPUGame({ onBackToHome }) {
                                             }}>
                                                 <span style={{ minWidth: '25px', textAlign: 'center' }}>{medal}</span>
                                                 <span style={{ flex: 1, textAlign: 'left', paddingLeft: '5px', color: '#2c3e50', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.username}</span>
-                                                <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '50px', textAlign: 'right' }}>{entry.time}s</span>
+                                                <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '50px', textAlign: 'right' }}>{entry.time}s {entry.score ? `(★${entry.score})` : ''}</span>
                                             </div>
                                         );
                                     })}
@@ -768,7 +768,12 @@ export default function CPUGame({ onBackToHome }) {
                                     </>
                                 ) : playerInfo.currentWord?.ruby}
                             </div>
-                            <div className="kanji" style={{ fontSize: '2em', fontWeight: 'bold', marginBottom: '15px', color: '#2c3e50' }}>{playerInfo.currentWord?.text}</div>
+                            <div className="kanji" style={{ 
+                                fontSize: '2em', fontWeight: 'bold', marginBottom: '15px', 
+                                background: `linear-gradient(to right, #4caf50 ${playerInfo.typingState ? (playerInfo.typingState.typedRuby.length / Math.max(1, playerInfo.typingState.typedRuby.length + playerInfo.typingState.targetRuby.length)) * 100 : 0}%, #2c3e50 ${playerInfo.typingState ? (playerInfo.typingState.typedRuby.length / Math.max(1, playerInfo.typingState.typedRuby.length + playerInfo.typingState.targetRuby.length)) * 100 : 0}%)`,
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent'
+                            }}>{playerInfo.currentWord?.text}</div>
                         </div>
                         <div className="target-word">
                             {playerInfo.typingState && (

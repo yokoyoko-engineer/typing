@@ -505,7 +505,12 @@ export default function Tournament({ socket, onBackToHome }) {
                                                     </>
                                                 ) : playerInfo.currentWord?.ruby}
                                             </div>
-                                            <div className="kanji" style={{ fontSize: '2.5em', fontWeight: 'bold', marginBottom: '15px', color: '#2c3e50' }}>{playerInfo.currentWord?.text}</div>
+                                            <div className="kanji" style={{ 
+                                                fontSize: '2.5em', fontWeight: 'bold', marginBottom: '15px', 
+                                                background: `linear-gradient(to right, #4caf50 ${playerInfo.typingState ? (playerInfo.typingState.typedRuby.length / Math.max(1, playerInfo.typingState.typedRuby.length + playerInfo.typingState.targetRuby.length)) * 100 : 0}%, #2c3e50 ${playerInfo.typingState ? (playerInfo.typingState.typedRuby.length / Math.max(1, playerInfo.typingState.typedRuby.length + playerInfo.typingState.targetRuby.length)) * 100 : 0}%)`,
+                                                WebkitBackgroundClip: 'text',
+                                                WebkitTextFillColor: 'transparent'
+                                            }}>{playerInfo.currentWord?.text}</div>
                                         </div>
                                         <div className="target-word" style={{ fontSize: '2em' }}>
                                             {playerInfo.typingState && (

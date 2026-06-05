@@ -84,7 +84,7 @@ app.get('/api/rankings/:genre/:level', async (req, res) => {
 
 app.post('/api/rankings/:genre/:level', async (req, res) => {
   const { genre, level } = req.params;
-  const { username, time, jobType } = req.body;
+  const { username, time, jobType, score } = req.body;
   
   if (!username || typeof time !== 'number') {
     return res.status(400).json({ error: 'Invalid input data' });
@@ -104,7 +104,7 @@ app.post('/api/rankings/:genre/:level', async (req, res) => {
         rankings[key] = [];
       }
       
-      rankings[key].push({ username: safeName, time, date: new Date().toISOString(), jobType: jobType || '' });
+      rankings[key].push({ username: safeName, time, date: new Date().toISOString(), jobType: jobType || '', score: score || 0 });
       rankings[key].sort((a, b) => a.time - b.time);
       rankings[key] = rankings[key].slice(0, 30); // TOP 30を維持
       

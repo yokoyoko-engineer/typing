@@ -275,7 +275,12 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
                 </>
               ) : me.currentWord.ruby}
             </div>
-            <div className="kanji" style={{ fontSize: '2em', fontWeight: 'bold', marginBottom: '15px', color: '#2c3e50' }}>{me.currentWord.text}</div>
+            <div className="kanji" style={{ 
+              fontSize: '2em', fontWeight: 'bold', marginBottom: '15px', 
+              background: `linear-gradient(to right, #4caf50 ${me.typingState ? (me.typingState.typedRuby.length / Math.max(1, me.typingState.typedRuby.length + me.typingState.targetRuby.length)) * 100 : 0}%, #2c3e50 ${me.typingState ? (me.typingState.typedRuby.length / Math.max(1, me.typingState.typedRuby.length + me.typingState.targetRuby.length)) * 100 : 0}%)`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>{me.currentWord.text}</div>
           </div>
           <div className="target-word">
             {me.typingState && (

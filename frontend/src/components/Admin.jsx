@@ -5,13 +5,18 @@ import { io } from 'socket.io-client';
 export default function Admin() {
   const [activeTab, setActiveTab] = useState('analysis'); // 'analysis' or 'tournament'
 
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
+
   // --- Analysis Tab State ---
-  const [minUser, setMinUser] = useState('');
-  const [maxUser, setMaxUser] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [minUser, setMinUser] = useState('1');
+  const [maxUser, setMaxUser] = useState('9999');
+  const [startDate, setStartDate] = useState(firstDay);
+  const [endDate, setEndDate] = useState(lastDay);
   const [jobType, setJobType] = useState('すべて');
   const [rawData, setRawData] = useState([]);
+  const [averageScores, setAverageScores] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [userLines, setUserLines] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -106,6 +111,9 @@ export default function Admin() {
     let bestGrowthUserData = null;
     const rankingArray = [];
 
+    const jobAverages = {};
+    const jobCounts = {};
+
     for (const uid in userGroups) {
       const scores = userGroups[uid];
       const maxScore = Math.max(...scores.map(s => s.score));
@@ -129,9 +137,22 @@ export default function Admin() {
       }
     }
 
+    rawData.forEach(row => {
+      const jt = row.job_type || '未設定';
+      if (!jobAverages[jt]) { jobAverages[jt] = 0; jobCounts[jt] = 0; }
+      jobAverages[jt] += row.score;
+      jobCounts[jt]++;
+    });
+
+    const averageArray = Object.keys(jobAverages).map(jt => ({
+      jobType: jt,
+      average: Math.round(jobAverages[jt] / jobCounts[jt])
+    })).sort((a, b) => b.average - a.average);
+
     setTopGrowthUser(bestGrowthUserData);
     setRanking(rankingArray.sort((a, b) => b.maxScore - a.maxScore)); 
     setRankingPage(1); 
+    setAverageScores(averageArray);
   }, [rawData]);
 
   const fetchScores = async () => {
@@ -181,6 +202,11 @@ export default function Admin() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // 初回マウント時にデフォルト検索を実行
+    fetchScores();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleUserSelect = (e) => {
     const userId = e.target.value;
@@ -391,6 +417,24 @@ export default function Admin() {
                         <button onClick={() => setRankingPage(p => Math.min(p + 1, Math.ceil(ranking.length / itemsPerPage)))} disabled={rankingPage === Math.ceil(ranking.length / itemsPerPage)} style={{ padding: '5px 15px', background: rankingPage === Math.ceil(ranking.length / itemsPerPage) ? '#e0e0e0' : '#5c6bc0', color: rankingPage === Math.ceil(ranking.length / itemsPerPage) ? '#9e9e9e' : '#fff', border: 'none', borderRadius: '5px', cursor: rankingPage === Math.ceil(ranking.length / itemsPerPage) ? 'not-allowed' : 'pointer' }}>次へ</button>
                       </div>
                     )}
+                  </div>
+                ) : (
+                  <p style={{ color: '#888', textAlign: 'center' }}>データがありません。</p>
+                )}
+              </div>
+
+              <div style={{ flex: '1 1 100%', background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#2c3e50', display: 'flex', alignItems: 'center' }}>
+                  <span style={{ fontSize: '1.2em', marginRight: '8px' }}>📊</span> 職種別 平均スコア
+                </h3>
+                {averageScores.length > 0 ? (
+                  <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                    {averageScores.map((item, idx) => (
+                      <div key={idx} style={{ flex: '1 1 120px', background: '#f8f9fa', padding: '15px', borderRadius: '8px', textAlign: 'center', borderBottom: '4px solid #ff9800' }}>
+                        <div style={{ fontSize: '0.9em', color: '#666', marginBottom: '5px' }}>{item.jobType}</div>
+                        <div style={{ fontSize: '1.8em', fontWeight: 'bold', color: '#2c3e50' }}>{item.average}</div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <p style={{ color: '#888', textAlign: 'center' }}>データがありません。</p>
