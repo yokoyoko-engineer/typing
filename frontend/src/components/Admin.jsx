@@ -2,6 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { io } from 'socket.io-client';
 
+const COHORT_202604 = {
+  CL: [3319, 5905, 5906, 5907, 5908, 5909, 5910, 5911, 5912, 5913, 5914, 5915, 5916, 5917, 5918, 5919, 5920, 5921, 5922, 5923, 5924, 5944, 5964, 5980, 5981],
+  JAVA: [5887, 5888, 5889, 5890, 5891, 5892, 5893, 5894, 5895, 5896, 5897, 5898, 5899, 5900, 5901, 5902, 5903, 5904, 5961],
+  ML: [5925, 5926, 5927, 5928, 5929, 5930, 5931, 5932, 5933, 5934, 5935, 5936, 5937, 5938, 5939, 5940, 5941, 5942, 5943, 5962, 5963],
+  QA: [5945, 5946, 5947, 5948, 5949, 5950, 5951, 5978, 5979, 5982],
+  FR: [5952, 5953, 5954, 5955, 5956, 5957, 5958, 5959, 5960]
+};
+
+const COHORT_MAP = {};
+Object.entries(COHORT_202604).forEach(([job, ids]) => {
+  ids.forEach(id => {
+    COHORT_MAP[id.toString()] = job;
+  });
+});
+
 export default function Admin() {
   const [activeTab, setActiveTab] = useState('analysis'); // 'analysis' or 'tournament'
 
@@ -14,6 +29,7 @@ export default function Admin() {
   const [maxUser, setMaxUser] = useState('9999');
   const [startDate, setStartDate] = useState(firstDay);
   const [endDate, setEndDate] = useState(lastDay);
+  const [cohort, setCohort] = useState('すべて');
   const [jobType, setJobType] = useState('すべて');
   const [rawData, setRawData] = useState([]);
   const [averageScores, setAverageScores] = useState([]);
@@ -169,11 +185,20 @@ export default function Admin() {
       let url = `/api/scores/admin?min_user=${minUser}&max_user=${maxUser}`;
       if (startDate) url += `&start_date=${startDate}`;
       if (endDate) url += `&end_date=${endDate}`;
-      if (jobType !== 'すべて') url += `&job_type=${jobType}`;
+      if (jobType !== 'すべて' && cohort !== '202604') url += `&job_type=${jobType}`;
       
       const res = await fetch(url);
       if (!res.ok) throw new Error('API Error');
-      const data = await res.json();
+      let data = await res.json();
+      
+      if (cohort === '202604') {
+        data = data.filter(row => COHORT_MAP[row.user_id.toString()] !== undefined);
+        data = data.map(row => ({ ...row, job_type: COHORT_MAP[row.user_id.toString()] }));
+        
+        if (jobType !== 'すべて') {
+          data = data.filter(row => row.job_type === jobType);
+        }
+      }
       
       setRawData(data); 
 
@@ -298,6 +323,16 @@ export default function Admin() {
                   type="date" value={endDate} onChange={e => setEndDate(e.target.value)} 
                   style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc' }}
                 />
+              </div>
+              <div>
+                <label style={{ marginRight: '10px', marginLeft: '10px' }}>入社時期:</label>
+                <select 
+                  value={cohort} onChange={e => setCohort(e.target.value)}
+                  style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc' }}
+                >
+                  <option value="すべて">すべて</option>
+                  <option value="202604">202604</option>
+                </select>
               </div>
               <div>
                 <label style={{ marginRight: '10px', marginLeft: '10px' }}>職種:</label>
