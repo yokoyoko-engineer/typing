@@ -275,12 +275,22 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
                 </>
               ) : me.currentWord.ruby}
             </div>
-            <div className="kanji" style={{ 
-              fontSize: '2em', fontWeight: 'bold', marginBottom: '15px', 
-              background: `linear-gradient(to right, #4caf50 ${me.typingState && me.typingState.typedRuby ? (me.typingState.typedRuby.length / Math.max(1, me.typingState.typedRuby.length + (me.typingState.targetRuby?.length || 0))) * 100 : 0}%, #2c3e50 ${me.typingState && me.typingState.typedRuby ? (me.typingState.typedRuby.length / Math.max(1, me.typingState.typedRuby.length + (me.typingState.targetRuby?.length || 0))) * 100 : 0}%)`,
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
-            }}>{me.currentWord.text}</div>
+            <div className="kanji" style={{ fontSize: '2em', fontWeight: 'bold', marginBottom: '15px' }}>
+              {(() => {
+                if (!me.currentWord.text) return null;
+                if (!me.typingState || !me.typingState.typedRuby) return <span style={{ color: '#2c3e50' }}>{me.currentWord.text}</span>;
+                const typedLen = me.typingState.typedRuby.length;
+                const totalLen = Math.max(1, typedLen + (me.typingState.targetRuby?.length || 0));
+                const ratio = typedLen / totalLen;
+                const coloredCount = Math.round(ratio * me.currentWord.text.length);
+                return (
+                  <>
+                    <span style={{ color: '#4caf50' }}>{me.currentWord.text.slice(0, coloredCount)}</span>
+                    <span style={{ color: '#2c3e50' }}>{me.currentWord.text.slice(coloredCount)}</span>
+                  </>
+                );
+              })()}
+            </div>
           </div>
           <div className="target-word">
             {me.typingState && (

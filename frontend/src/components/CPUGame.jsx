@@ -768,12 +768,22 @@ export default function CPUGame({ onBackToHome }) {
                                     </>
                                 ) : playerInfo.currentWord?.ruby}
                             </div>
-                            <div className="kanji" style={{ 
-                                fontSize: '2em', fontWeight: 'bold', marginBottom: '15px', 
-                                background: `linear-gradient(to right, #4caf50 ${playerInfo.typingState && playerInfo.typingState.typedRuby ? (playerInfo.typingState.typedRuby.length / Math.max(1, playerInfo.typingState.typedRuby.length + (playerInfo.typingState.targetRuby?.length || 0))) * 100 : 0}%, #2c3e50 ${playerInfo.typingState && playerInfo.typingState.typedRuby ? (playerInfo.typingState.typedRuby.length / Math.max(1, playerInfo.typingState.typedRuby.length + (playerInfo.typingState.targetRuby?.length || 0))) * 100 : 0}%)`,
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent'
-                            }}>{playerInfo.currentWord?.text}</div>
+                            <div className="kanji" style={{ fontSize: '2em', fontWeight: 'bold', marginBottom: '15px' }}>
+                                {(() => {
+                                    if (!playerInfo.currentWord?.text) return null;
+                                    if (!playerInfo.typingState || !playerInfo.typingState.typedRuby) return <span style={{ color: '#2c3e50' }}>{playerInfo.currentWord.text}</span>;
+                                    const typedLen = playerInfo.typingState.typedRuby.length;
+                                    const totalLen = Math.max(1, typedLen + (playerInfo.typingState.targetRuby?.length || 0));
+                                    const ratio = typedLen / totalLen;
+                                    const coloredCount = Math.round(ratio * playerInfo.currentWord.text.length);
+                                    return (
+                                        <>
+                                            <span style={{ color: '#4caf50' }}>{playerInfo.currentWord.text.slice(0, coloredCount)}</span>
+                                            <span style={{ color: '#2c3e50' }}>{playerInfo.currentWord.text.slice(coloredCount)}</span>
+                                        </>
+                                    );
+                                })()}
+                            </div>
                         </div>
                         <div className="target-word">
                             {playerInfo.typingState && (
