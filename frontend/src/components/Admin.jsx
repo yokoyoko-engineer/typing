@@ -320,6 +320,22 @@ export default function Admin() {
             {error && <p style={{ color: '#e53935', marginTop: '15px' }}>{error}</p>}
           </div>
 
+          {averageScores.length > 0 && (
+            <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', marginBottom: '20px' }}>
+              <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#2c3e50', display: 'flex', alignItems: 'center' }}>
+                <span style={{ fontSize: '1.2em', marginRight: '8px' }}>📊</span> 職種別 平均スコア
+              </h3>
+              <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                {averageScores.map((item, idx) => (
+                  <div key={idx} style={{ flex: '1 1 120px', background: '#f8f9fa', padding: '15px', borderRadius: '8px', textAlign: 'center', borderBottom: '4px solid #ff9800' }}>
+                    <div style={{ fontSize: '0.9em', color: '#666', marginBottom: '5px' }}>{item.jobType}</div>
+                    <div style={{ fontSize: '1.8em', fontWeight: 'bold', color: '#2c3e50' }}>{item.average}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div style={{ height: '400px', background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', marginBottom: '20px' }}>
             {loading ? (
               <p>Loading...</p>
@@ -417,24 +433,6 @@ export default function Admin() {
                         <button onClick={() => setRankingPage(p => Math.min(p + 1, Math.ceil(ranking.length / itemsPerPage)))} disabled={rankingPage === Math.ceil(ranking.length / itemsPerPage)} style={{ padding: '5px 15px', background: rankingPage === Math.ceil(ranking.length / itemsPerPage) ? '#e0e0e0' : '#5c6bc0', color: rankingPage === Math.ceil(ranking.length / itemsPerPage) ? '#9e9e9e' : '#fff', border: 'none', borderRadius: '5px', cursor: rankingPage === Math.ceil(ranking.length / itemsPerPage) ? 'not-allowed' : 'pointer' }}>次へ</button>
                       </div>
                     )}
-                  </div>
-                ) : (
-                  <p style={{ color: '#888', textAlign: 'center' }}>データがありません。</p>
-                )}
-              </div>
-
-              <div style={{ flex: '1 1 100%', background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-                <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#2c3e50', display: 'flex', alignItems: 'center' }}>
-                  <span style={{ fontSize: '1.2em', marginRight: '8px' }}>📊</span> 職種別 平均スコア
-                </h3>
-                {averageScores.length > 0 ? (
-                  <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-                    {averageScores.map((item, idx) => (
-                      <div key={idx} style={{ flex: '1 1 120px', background: '#f8f9fa', padding: '15px', borderRadius: '8px', textAlign: 'center', borderBottom: '4px solid #ff9800' }}>
-                        <div style={{ fontSize: '0.9em', color: '#666', marginBottom: '5px' }}>{item.jobType}</div>
-                        <div style={{ fontSize: '1.8em', fontWeight: 'bold', color: '#2c3e50' }}>{item.average}</div>
-                      </div>
-                    ))}
                   </div>
                 ) : (
                   <p style={{ color: '#888', textAlign: 'center' }}>データがありません。</p>
