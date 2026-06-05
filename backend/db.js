@@ -24,7 +24,9 @@ export async function getDb() {
   dbPromise = open({
     filename: dbPath,
     driver: sqlite3.Database
-  }).then(async (db) => {
+    }).then(async (db) => {
+    await db.exec(`PRAGMA journal_mode = WAL;`);
+    await db.exec(`PRAGMA busy_timeout = 5000;`);
     await db.exec(`
       CREATE TABLE IF NOT EXISTS scores (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
