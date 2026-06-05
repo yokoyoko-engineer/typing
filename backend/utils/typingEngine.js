@@ -104,7 +104,7 @@ export class TypingSession {
                 opts = [char];
             }
 
-            nodes.push(opts);
+            nodes.push({ opts, chars: ruby.substring(i, i + step) });
             i += step;
         }
         return nodes;
@@ -115,7 +115,7 @@ export class TypingSession {
         let res = '';
 
         // Handle current node
-        let currentOpts = this.nodes[this.currentIndex];
+        let currentOpts = this.nodes[this.currentIndex].opts;
         let prefix = overridePrefix !== null ? overridePrefix : this.typedNodePrefix;
 
         // Find best option matching what we typed so far
@@ -124,7 +124,7 @@ export class TypingSession {
 
         // Append rest
         for (let i = this.currentIndex + 1; i < this.nodes.length; i++) {
-            res += this.nodes[i][0];
+            res += this.nodes[i].opts[0];
         }
         return res;
     }
@@ -133,7 +133,7 @@ export class TypingSession {
         if (this.isFinished()) return null;
 
         let nextPrefix = this.typedNodePrefix + char;
-        let validOpts = this.nodes[this.currentIndex].filter(o => o.startsWith(nextPrefix));
+        let validOpts = this.nodes[this.currentIndex].opts.filter(o => o.startsWith(nextPrefix));
 
         if (validOpts.length > 0) {
             // Correct input
@@ -147,7 +147,7 @@ export class TypingSession {
                 // Handling 'n' vs 'nn'
                 if (nextPrefix === 'n' && validOpts.includes('nn')) {
                     if (this.currentIndex + 1 < this.nodes.length) {
-                        let nextOpts = this.nodes[this.currentIndex + 1];
+                        let nextOpts = this.nodes[this.currentIndex + 1].opts;
                         let needsNn = nextOpts.some(o => ['a', 'i', 'u', 'e', 'o', 'y'].includes(o[0]));
                         if (needsNn) {
                             shouldAdvance = false;
@@ -181,9 +181,21 @@ export class TypingSession {
 
     // Use property getters to easily fetch current mapped status
     get state() {
+        let typedRuby = '';
+        let targetRuby = '';
+        for (let i = 0; i < this.nodes.length; i++) {
+            if (i < this.currentIndex) {
+                typedRuby += this.nodes[i].chars;
+            } else {
+                targetRuby += this.nodes[i].chars;
+            }
+        }
+
         return {
             typedRomaji: this.completedRomaji,
             targetRomaji: this.remainingRomajiCache,
+            typedRuby: typedRuby,
+            targetRuby: targetRuby,
             isFinished: this.isFinished()
         };
     }

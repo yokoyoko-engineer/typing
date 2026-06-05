@@ -204,7 +204,7 @@ export default function Tournament({ socket, onBackToHome }) {
                         const damage = Math.round((currentCpu.currentWord.ruby.length * 2) * 2.4);
                         const newPlayerHp = Math.max(0, pState.hp - damage);
 
-                        const newWord = getRandomWord(TOURNAMENT_GENRE);
+                        const newWord = getRandomWord(TOURNAMENT_GENRE, currentCpu.currentWord);
                         cSessionRef.current = new TypingSession(newWord.ruby);
 
                         setPlayerInfo(prev => ({ ...prev, hp: newPlayerHp }));
@@ -258,7 +258,7 @@ export default function Tournament({ socket, onBackToHome }) {
                     const damage = Math.round((playerInfo.currentWord.ruby.length * 2) * 2.4);
                     const newCpuHp = Math.max(0, cpuInfo.hp - damage);
 
-                    const newWord = getRandomWord(TOURNAMENT_GENRE);
+                    const newWord = getRandomWord(TOURNAMENT_GENRE, playerInfo.currentWord);
                     pSessionRef.current = new TypingSession(newWord.ruby);
 
                     setCpuInfo(prev => ({ ...prev, hp: newCpuHp }));
@@ -497,7 +497,14 @@ export default function Tournament({ socket, onBackToHome }) {
                                 {playerInfo.hp > 0 && cpuInfo.hp > 0 ? (
                                     <>
                                         <div className="target-word-japanese">
-                                            <div className="ruby" style={{ fontSize: '0.9em', color: '#888', marginBottom: '5px' }}>{playerInfo.currentWord?.ruby}</div>
+                                            <div className="ruby" style={{ fontSize: '0.9em', color: '#888', marginBottom: '5px' }}>
+                                                {playerInfo.typingState ? (
+                                                    <>
+                                                        <span style={{ color: '#4caf50' }}>{playerInfo.typingState.typedRuby}</span>
+                                                        <span>{playerInfo.typingState.targetRuby}</span>
+                                                    </>
+                                                ) : playerInfo.currentWord?.ruby}
+                                            </div>
                                             <div className="kanji" style={{ fontSize: '2.5em', fontWeight: 'bold', marginBottom: '15px', color: '#2c3e50' }}>{playerInfo.currentWord?.text}</div>
                                         </div>
                                         <div className="target-word" style={{ fontSize: '2em' }}>

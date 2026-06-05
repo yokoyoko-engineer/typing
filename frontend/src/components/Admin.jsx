@@ -10,6 +10,7 @@ export default function Admin() {
   const [maxUser, setMaxUser] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [jobType, setJobType] = useState('すべて');
   const [rawData, setRawData] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [userLines, setUserLines] = useState([]);
@@ -147,6 +148,7 @@ export default function Admin() {
       let url = `/api/scores/admin?min_user=${minUser}&max_user=${maxUser}`;
       if (startDate) url += `&start_date=${startDate}`;
       if (endDate) url += `&end_date=${endDate}`;
+      if (jobType !== 'すべて') url += `&job_type=${jobType}`;
       
       const res = await fetch(url);
       if (!res.ok) throw new Error('API Error');
@@ -244,7 +246,7 @@ export default function Admin() {
         <div>
           <div style={{ background: '#f5f5f5', padding: '20px', borderRadius: '10px', marginBottom: '30px' }}>
             <h3 style={{ marginTop: 0 }}>スコア推移グラフ 検索</h3>
-            <form onSubmit={handleSearch} style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+            <form onSubmit={handleSearch} style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
               <div>
                 <label style={{ marginRight: '10px' }}>Min 社員番号:</label>
                 <input 
@@ -270,6 +272,20 @@ export default function Admin() {
                   type="date" value={endDate} onChange={e => setEndDate(e.target.value)} 
                   style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc' }}
                 />
+              </div>
+              <div>
+                <label style={{ marginRight: '10px', marginLeft: '10px' }}>職種:</label>
+                <select 
+                  value={jobType} onChange={e => setJobType(e.target.value)}
+                  style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc' }}
+                >
+                  <option value="すべて">すべて</option>
+                  <option value="CL">CL</option>
+                  <option value="JAVA">JAVA</option>
+                  <option value="ML">ML</option>
+                  <option value="FR">FR</option>
+                  <option value="QA">QA</option>
+                </select>
               </div>
               <button type="submit" style={{ padding: '8px 20px', background: '#5c6bc0', color: '#fff', border: 'none', borderRadius: '5px', cursor: 'pointer', marginLeft: '10px' }}>
                 検索

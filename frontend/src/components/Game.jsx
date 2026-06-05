@@ -5,12 +5,21 @@ import './Game.css';
 export default function Game({ socket, roomState, myId, onLeaveRoom }) {
   const [isReady, setIsReady] = useState(false);
   const [gameStarted, setGameStarted] = useState(roomState.status === 'playing');
+  const [countdown, setCountdown] = useState(roomState.status === 'starting' ? 3 : null);
   const [damageFlash, setDamageFlash] = useState(false);
   const [isMiss, setIsMiss] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
-    const handleGameStarted = () => setGameStarted(true);
+    const handleGameCountdown = (count) => {
+      setCountdown(count);
+      setGameStarted(false);
+    };
+
+    const handleGameStarted = () => {
+      setCountdown(null);
+      setGameStarted(true);
+    };
     const handleTakingDamage = ({ from, damage }) => {
       // 自分が受けたダメージの場合エフェクトを再生
       // 実際には HP の減衰などで判断するが、今回は全員に分散ダメージのため全体的に被弾エフェクトを入れる
@@ -28,6 +37,8 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
       // 待機状態に戻ったらリセット
       setGameStarted(false);
       setIsReady(false);
+    } else if (roomState.status === 'starting') {
+      setGameStarted(false);
     }
 
     const handleTypingResult = ({ success }) => {
@@ -38,11 +49,13 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
       }
     };
 
+    socket.on('gameCountdown', handleGameCountdown);
     socket.on('gameStarted', handleGameStarted);
     socket.on('takingDamage', handleTakingDamage);
     socket.on('typingResult', handleTypingResult);
 
     return () => {
+      socket.off('gameCountdown', handleGameCountdown);
       socket.off('gameStarted', handleGameStarted);
       socket.off('takingDamage', handleTakingDamage);
       socket.off('typingResult', handleTypingResult);
@@ -80,7 +93,7 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
   if (!me) return null;
 
   // Render waiting room
-  if (!gameStarted || roomState.status === 'waiting') {
+  if (roomState.status === 'waiting') {
     const currentGenre = roomState.genre || '';
     const currentCategory = Object.keys(GENRES_BY_CATEGORY).find(cat => GENRES_BY_CATEGORY[cat].includes(currentGenre)) || '';
 
@@ -217,6 +230,17 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
     );
   }
 
+  // Render Countdown Screen
+  if (roomState.status === 'starting' || countdown !== null) {
+    return (
+      <div className="game-container battle-screen">
+        <h1 style={{ fontSize: '8em', textAlign: 'center', marginTop: '20vh' }}>
+          {countdown !== null ? countdown : 3}
+        </h1>
+      </div>
+    );
+  }
+
   // Render Battle Screen
   return (
     <div className={`game-container battle-screen ${damageFlash ? 'flash-damage' : ''}`} onKeyDown={handleKeyDown} tabIndex="0" ref={inputRef}>
@@ -243,7 +267,14 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
       {me.hp > 0 ? (
         <div className="typing-area">
           <div className="target-word-japanese">
-            <div className="ruby" style={{ fontSize: '0.9em', color: '#888', marginBottom: '5px' }}>{me.currentWord.ruby}</div>
+            <div className="ruby" style={{ fontSize: '0.9em', color: '#888', marginBottom: '5px' }}>
+              {me.typingState ? (
+                <>
+                  <span style={{ color: '#4caf50' }}>{me.typingState.typedRuby}</span>
+                  <span>{me.typingState.targetRuby}</span>
+                </>
+              ) : me.currentWord.ruby}
+            </div>
             <div className="kanji" style={{ fontSize: '2em', fontWeight: 'bold', marginBottom: '15px', color: '#2c3e50' }}>{me.currentWord.text}</div>
           </div>
           <div className="target-word">

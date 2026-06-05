@@ -164,7 +164,7 @@ app.get('/api/scores/top', async (req, res) => {
 });
 
 app.get('/api/scores/admin', async (req, res) => {
-  const { min_user, max_user, start_date, end_date } = req.query;
+  const { min_user, max_user, start_date, end_date, job_type } = req.query;
   
   if (!min_user || !max_user) {
     return res.status(400).json({ error: 'Missing range parameters' });
@@ -186,6 +186,10 @@ app.get('/api/scores/admin', async (req, res) => {
     if (end_date) {
       query += ` AND play_date <= ?`;
       params.push(end_date);
+    }
+    if (job_type) {
+      query += ` AND job_type = ?`;
+      params.push(job_type);
     }
 
     query += `
@@ -484,10 +488,23 @@ io.on('connection', (socket) => {
   socket.on('startGame', () => {
     if (currentRoomId && rooms[currentRoomId]) {
       const room = rooms[currentRoomId];
-      if (room.canStart()) {
-        room.startGame();
+      if (room.canStart() && room.status !== 'starting') {
+        room.status = 'starting';
         io.to(currentRoomId).emit('roomState', room.getState());
-        io.to(currentRoomId).emit('gameStarted');
+        io.to(currentRoomId).emit('gameCountdown', 3);
+
+        let count = 3;
+        const interval = setInterval(() => {
+          count--;
+          if (count > 0) {
+            io.to(currentRoomId).emit('gameCountdown', count);
+          } else {
+            clearInterval(interval);
+            room.startGame();
+            io.to(currentRoomId).emit('roomState', room.getState());
+            io.to(currentRoomId).emit('gameStarted');
+          }
+        }, 1000);
       }
     }
   });

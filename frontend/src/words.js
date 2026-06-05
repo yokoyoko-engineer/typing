@@ -146,8 +146,16 @@ export const GENRES_BY_CATEGORY = {
 
 export const ALL_WORDS = Object.values(WORDS_BY_GENRE).flat();
 
-export function getRandomWord(genre = null) {
+export function getRandomWord(genre = null, prevWord = null) {
   const pool = genre && WORDS_BY_GENRE[genre] ? WORDS_BY_GENRE[genre] : ALL_WORDS;
-  const index = Math.floor(Math.random() * pool.length);
-  return pool[index];
+  if (!pool || pool.length === 0) return null;
+  if (pool.length === 1) return pool[0];
+
+  let word;
+  do {
+    const index = Math.floor(Math.random() * pool.length);
+    word = pool[index];
+  } while (prevWord && word.text === prevWord.text);
+  
+  return word;
 }

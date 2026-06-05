@@ -91,7 +91,7 @@ export class GameRoom {
         // or we could use the fully typed length, but ruby length is safe enough. Let's say ruby = 2 romaji chars
         const damage = Math.round((player.currentWord.ruby.length * 2) * 2.4);
 
-        const newWord = getRandomWord(this.genre);
+        const newWord = getRandomWord(this.genre, player.currentWord);
         player.currentWord = newWord;
         player.typingSession = new TypingSession(newWord.ruby);
 
