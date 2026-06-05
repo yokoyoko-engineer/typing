@@ -770,7 +770,7 @@ export default function CPUGame({ onBackToHome }) {
                             </div>
                             <div className="kanji" style={{ 
                                 fontSize: '2em', fontWeight: 'bold', marginBottom: '15px', 
-                                background: `linear-gradient(to right, #4caf50 ${playerInfo.typingState ? (playerInfo.typingState.typedRuby.length / Math.max(1, playerInfo.typingState.typedRuby.length + playerInfo.typingState.targetRuby.length)) * 100 : 0}%, #2c3e50 ${playerInfo.typingState ? (playerInfo.typingState.typedRuby.length / Math.max(1, playerInfo.typingState.typedRuby.length + playerInfo.typingState.targetRuby.length)) * 100 : 0}%)`,
+                                background: `linear-gradient(to right, #4caf50 ${playerInfo.typingState && playerInfo.typingState.typedRuby ? (playerInfo.typingState.typedRuby.length / Math.max(1, playerInfo.typingState.typedRuby.length + (playerInfo.typingState.targetRuby?.length || 0))) * 100 : 0}%, #2c3e50 ${playerInfo.typingState && playerInfo.typingState.typedRuby ? (playerInfo.typingState.typedRuby.length / Math.max(1, playerInfo.typingState.typedRuby.length + (playerInfo.typingState.targetRuby?.length || 0))) * 100 : 0}%)`,
                                 WebkitBackgroundClip: 'text',
                                 WebkitTextFillColor: 'transparent'
                             }}>{playerInfo.currentWord?.text}</div>
