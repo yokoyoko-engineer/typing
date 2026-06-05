@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import { CATEGORIES } from './words.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -297,7 +298,9 @@ const rooms = {};
 // 固定10ルームを初期化
 for (let i = 1; i <= 10; i++) {
   const roomId = i.toString();
-  rooms[roomId] = new GameRoom(roomId);
+  const room = new GameRoom(roomId);
+  room.setGenre(CATEGORIES.BUSINESS);
+  rooms[roomId] = room;
 }
 
 // --- Tournament Management ---

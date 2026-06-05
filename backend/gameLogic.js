@@ -61,9 +61,10 @@ export class GameRoom {
     this.status = 'playing';
     Object.values(this.players).forEach(p => {
       p.hp = 1000;
-      const word = getRandomWord(this.genre);
+      p.usedWords = new Set();
+      const word = getRandomWord(this.genre, p.usedWords);
       p.currentWord = word;
-      p.typingSession = new TypingSession(word.ruby);
+      p.typingSession = new TypingSession(word.ruby, word.text);
       p.isWinner = false;
       p.stats = { missCount: 0, keyMisses: {}, keyLatencies: {}, lastKeyTime: null };
     });
@@ -91,9 +92,9 @@ export class GameRoom {
         // or we could use the fully typed length, but ruby length is safe enough. Let's say ruby = 2 romaji chars
         const damage = Math.round((player.currentWord.ruby.length * 2) * 2.4);
 
-        const newWord = getRandomWord(this.genre, player.currentWord);
+        const newWord = getRandomWord(this.genre, player.usedWords);
         player.currentWord = newWord;
-        player.typingSession = new TypingSession(newWord.ruby);
+        player.typingSession = new TypingSession(newWord.ruby, newWord.text);
 
         // Calculate damage to other players
         const otherPlayers = Object.values(this.players).filter(p => p.id !== socketId && p.hp > 0);

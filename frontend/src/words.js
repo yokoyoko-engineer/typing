@@ -146,16 +146,27 @@ export const GENRES_BY_CATEGORY = {
 
 export const ALL_WORDS = Object.values(WORDS_BY_GENRE).flat();
 
-export function getRandomWord(genre = null, prevWord = null) {
+export function getRandomWord(genre = null, prevOrUsedWords = null) {
   const pool = genre && WORDS_BY_GENRE[genre] ? WORDS_BY_GENRE[genre] : ALL_WORDS;
   if (!pool || pool.length === 0) return null;
   if (pool.length === 1) return pool[0];
 
   let word;
-  do {
-    const index = Math.floor(Math.random() * pool.length);
-    word = pool[index];
-  } while (prevWord && word.text === prevWord.text);
+  if (prevOrUsedWords instanceof Set) {
+    if (prevOrUsedWords.size >= pool.length) {
+      prevOrUsedWords.clear();
+    }
+    do {
+      const index = Math.floor(Math.random() * pool.length);
+      word = pool[index];
+    } while (prevOrUsedWords.has(word.text));
+    prevOrUsedWords.add(word.text);
+  } else {
+    do {
+      const index = Math.floor(Math.random() * pool.length);
+      word = pool[index];
+    } while (prevOrUsedWords && word.text === prevOrUsedWords.text);
+  }
   
   return word;
 }

@@ -16,6 +16,7 @@ export default function Tournament({ socket, onBackToHome }) {
     const [timeRemaining, setTimeRemaining] = useState(0);
     const [liveRanking, setLiveRanking] = useState([]);
     const [lastResult, setLastResult] = useState(null);
+    const usedWordsRef = useRef(new Set());
     
     // Past Tournaments State
     const [pastTournaments, setPastTournaments] = useState([]);
@@ -69,6 +70,7 @@ export default function Tournament({ socket, onBackToHome }) {
             if (gameState === 'waiting') {
                 const remainingMs = data.endTime - Date.now();
                 setTimeRemaining(Math.max(0, Math.ceil(remainingMs / 1000)));
+                usedWordsRef.current = new Set();
                 setGameState('countdown');
                 setCountdown(3);
             }
@@ -170,11 +172,11 @@ export default function Tournament({ socket, onBackToHome }) {
     }, [gameState, playerInfo]);
 
     const startNewBattle = () => {
-        const pWord = getRandomWord(TOURNAMENT_GENRE);
-        const cWord = getRandomWord(TOURNAMENT_GENRE);
+        const pWord = getRandomWord(TOURNAMENT_GENRE, usedWordsRef.current);
+        const cWord = getRandomWord(TOURNAMENT_GENRE, usedWordsRef.current);
         
-        pSessionRef.current = new TypingSession(pWord.ruby);
-        cSessionRef.current = new TypingSession(cWord.ruby);
+        pSessionRef.current = new TypingSession(pWord.ruby, pWord.text);
+        cSessionRef.current = new TypingSession(cWord.ruby, cWord.text);
         
         playerStatsRef.current = { missCount: 0, totalCorrect: 0 };
         currentBattleStartRef.current = Date.now();
@@ -201,11 +203,11 @@ export default function Tournament({ socket, onBackToHome }) {
 
                 if (res && res.success) {
                     if (res.finishedWord) {
+                        const newWord = getRandomWord(TOURNAMENT_GENRE, usedWordsRef.current);
                         const damage = Math.round((currentCpu.currentWord.ruby.length * 2) * 2.4);
                         const newPlayerHp = Math.max(0, pState.hp - damage);
 
-                        const newWord = getRandomWord(TOURNAMENT_GENRE, currentCpu.currentWord);
-                        cSessionRef.current = new TypingSession(newWord.ruby);
+                        cSessionRef.current = new TypingSession(newWord.ruby, newWord.text);
 
                         setPlayerInfo(prev => ({ ...prev, hp: newPlayerHp }));
                         setCpuInfo(prev => ({
@@ -255,11 +257,11 @@ export default function Tournament({ socket, onBackToHome }) {
                 stats.totalCorrect++;
                 setIsMiss(false);
                 if (res.finishedWord) {
+                    const newWord = getRandomWord(TOURNAMENT_GENRE, usedWordsRef.current);
                     const damage = Math.round((playerInfo.currentWord.ruby.length * 2) * 2.4);
                     const newCpuHp = Math.max(0, cpuInfo.hp - damage);
 
-                    const newWord = getRandomWord(TOURNAMENT_GENRE, playerInfo.currentWord);
-                    pSessionRef.current = new TypingSession(newWord.ruby);
+                    pSessionRef.current = new TypingSession(newWord.ruby, newWord.text);
 
                     setCpuInfo(prev => ({ ...prev, hp: newCpuHp }));
                     setPlayerInfo(prev => ({

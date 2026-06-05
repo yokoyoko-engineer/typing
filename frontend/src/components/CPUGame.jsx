@@ -30,6 +30,7 @@ export default function CPUGame({ onBackToHome }) {
     const [gameState, setGameState] = useState('select'); // select, countdown, playing, finished
     const [selectionStep, setSelectionStep] = useState('username'); // username, category, genre, difficulty
     const [countdown, setCountdown] = useState(3);
+    const usedWordsRef = useRef(new Set());
     const [damageFlash, setDamageFlash] = useState(false);
     const [isMiss, setIsMiss] = useState(false);
     const [previewLevel, setPreviewLevel] = useState(1);
@@ -149,11 +150,12 @@ export default function CPUGame({ onBackToHome }) {
         setGameState('countdown');
         setCountdown(3);
         setFinalTime(null);
+        usedWordsRef.current = new Set();
 
-        const pWord = getRandomWord(genre);
-        const cWord = getRandomWord(genre);
-        pSessionRef.current = new TypingSession(pWord.ruby);
-        cSessionRef.current = new TypingSession(cWord.ruby);
+        const pWord = getRandomWord(genre, usedWordsRef.current);
+        const cWord = getRandomWord(genre, usedWordsRef.current);
+        pSessionRef.current = new TypingSession(pWord.ruby, pWord.text);
+        cSessionRef.current = new TypingSession(cWord.ruby, cWord.text);
         playerStatsRef.current = { missCount: 0, keyMisses: {}, keyLatencies: {}, lastKeyTime: null, totalCorrect: 0 };
 
         setPlayerInfo({ hp: 1000, currentWord: pWord, typingState: pSessionRef.current.state });
@@ -209,11 +211,11 @@ export default function CPUGame({ onBackToHome }) {
 
                 if (res && res.success) {
                     if (res.finishedWord) {
+                        const newWord = getRandomWord(genre, usedWordsRef.current);
                         const damage = Math.round((currentCpu.currentWord.ruby.length * 2) * 2.4);
                         const newPlayerHp = Math.max(0, pState.hp - damage);
 
-                        const newWord = getRandomWord(genre, currentCpu.currentWord);
-                        cSessionRef.current = new TypingSession(newWord.ruby);
+                        cSessionRef.current = new TypingSession(newWord.ruby, newWord.text);
 
                         setPlayerInfo(prev => ({ ...prev, hp: newPlayerHp }));
                         setCpuInfo(prev => ({
@@ -271,11 +273,11 @@ export default function CPUGame({ onBackToHome }) {
                 stats.lastKeyTime = now;
                 setIsMiss(false);
                 if (res.finishedWord) {
+                    const newWord = getRandomWord(genre, usedWordsRef.current);
                     const damage = Math.round((playerInfo.currentWord.ruby.length * 2) * 2.4);
                     const newCpuHp = Math.max(0, cpuInfo.hp - damage);
 
-                    const newWord = getRandomWord(genre, playerInfo.currentWord);
-                    pSessionRef.current = new TypingSession(newWord.ruby);
+                    pSessionRef.current = new TypingSession(newWord.ruby, newWord.text);
 
                     setCpuInfo(prev => ({ ...prev, hp: newCpuHp }));
                     setPlayerInfo(prev => ({
@@ -544,16 +546,19 @@ export default function CPUGame({ onBackToHome }) {
                                 )
                             })}
                         </div>
+                        <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '30px', background: '#e0e0e0', color: '#2c3e50', width: '100%' }}>
+                            Back to Home
+                        </button>
                     </div>
 
-                    {/* Right: Ranking TOP30 preview */}
+                    {/* Right: Ranking TOP10 preview */}
                     <div className="ranking-preview-panel">
                         <h3 style={{ margin: '0 0 15px', color: '#2c3e50', fontSize: '1.1em', textAlign: 'center' }}>
-                            🏆 ランキング TOP30 — Lv.{previewLevel}
+                            🏆 ランキング TOP10 — Lv.{previewLevel}
                         </h3>
                         {previewRankings.length > 0 ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                {previewRankings.map((entry, idx) => {
+                                {previewRankings.slice(0, 10).map((entry, idx) => {
                                     const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
                                     return (
                                         <div key={idx} className="ranking-row" style={{
@@ -567,7 +572,12 @@ export default function CPUGame({ onBackToHome }) {
                                         }}>
                                             <span style={{ minWidth: '35px', textAlign: 'center' }}>{medal}</span>
                                             <span style={{ flex: 1, textAlign: 'left', paddingLeft: '10px', color: '#2c3e50' }}>{entry.jobType ? `[${entry.jobType}] ` : ''}{entry.username}</span>
-                                            <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '80px', textAlign: 'right' }}>{entry.time}秒 {entry.score ? `(★${entry.score})` : ''}</span>
+                                            <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '90px', textAlign: 'right' }}>
+                                                {entry.time}s 
+                                                <span style={{ color: '#5c6bc0', fontSize: '0.9em', marginLeft: '5px' }}>
+                                                    {entry.score !== undefined ? `★${entry.score}` : ''}
+                                                </span>
+                                            </span>
                                         </div>
                                     );
                                 })}
@@ -581,10 +591,6 @@ export default function CPUGame({ onBackToHome }) {
                         )}
                     </div>
                 </div>
-
-                <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '30px', background: '#e0e0e0', color: '#2c3e50' }}>
-                    Back to Home
-                </button>
             </div>
         );
     }

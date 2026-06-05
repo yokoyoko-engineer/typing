@@ -51,9 +51,27 @@ export const ROMAJI_MAP = {
     'ゔゃ': ['vya'], 'ゔゅ': ['vyu'], 'ゔょ': ['vyo']
 };
 
+const NUMBER_MAP = {
+    '0': ['ぜろ', 'れい', 'まる'],
+    '1': ['いち'],
+    '2': ['に'],
+    '3': ['さん'],
+    '4': ['よん', 'し'],
+    '5': ['ご'],
+    '6': ['ろく'],
+    '7': ['なな', 'しち'],
+    '8': ['はち'],
+    '9': ['きゅう', 'く'],
+    '10': ['じゅう'],
+    '100': ['ひゃく'],
+    '1000': ['せん']
+};
+
 export class TypingSession {
-    constructor(ruby) {
+    constructor(ruby, text = null) {
         this.ruby = ruby;
+        this.text = text;
+        this.numberOptions = this._extractNumberOptions(text);
         this.nodes = this._buildNodes(ruby);
         this.currentIndex = 0;
         this.typedNodePrefix = '';
@@ -63,22 +81,74 @@ export class TypingSession {
         this.remainingRomajiCache = this._calcRemaining();
     }
 
-    _buildNodes(ruby) {
+    _extractNumberOptions(text) {
+        if (!text) return null;
+        const opts = {};
+        let hasNum = false;
+        for (const [digit, rubies] of Object.entries(NUMBER_MAP)) {
+            if (text.includes(digit)) {
+                hasNum = true;
+                for (const rubyStr of rubies) {
+                    if (!opts[rubyStr]) opts[rubyStr] = [];
+                    opts[rubyStr].push(digit);
+                }
+            }
+        }
+        return hasNum ? opts : null;
+    }
+
+    _getRomajiCombos(rubyStr) {
+        let subNodes = this._buildNodes(rubyStr, true);
+        let paths = [''];
+        for (let node of subNodes) {
+            let newPaths = [];
+            for (let p of paths) {
+                for (let o of node.opts) {
+                    newPaths.push(p + o);
+                }
+            }
+            paths = newPaths;
+        }
+        return paths;
+    }
+
+    _buildNodes(ruby, ignoreNumbers = false) {
         let nodes = [];
         let i = 0;
         while (i < ruby.length) {
             let char = ruby[i];
-            let nextChar = ruby[i + 1];
+            let nextChar = ruby[i + 1] || '';
+            let nextNextChar = ruby[i + 2] || '';
 
             let opts = [];
             let step = 1;
+
+            if (!ignoreNumbers && this.numberOptions) {
+                let matchedNum = false;
+                for (let len = 3; len >= 1; len--) {
+                    if (i + len > ruby.length) continue;
+                    let slice = ruby.substring(i, i + len);
+                    if (this.numberOptions[slice]) {
+                        step = len;
+                        let combos = this._getRomajiCombos(slice);
+                        opts = [...this.numberOptions[slice], ...combos];
+                        matchedNum = true;
+                        break;
+                    }
+                }
+                if (matchedNum) {
+                    nodes.push({ opts, chars: ruby.substring(i, i + step) });
+                    i += step;
+                    continue;
+                }
+            }
 
             // 1. Check for sokuon doubling (っ + consonant)
             if (char === 'っ' && nextChar && nextChar !== 'っ') {
                 let baseOpts = [...ROMAJI_MAP['っ']]; // fallback ltu, xtu
 
-                let nextOpts = ROMAJI_MAP[nextChar + (ruby[i + 2] || '')]
-                    ? ROMAJI_MAP[nextChar + (ruby[i + 2] || '')]
+                let nextOpts = ROMAJI_MAP[nextChar + nextNextChar]
+                    ? ROMAJI_MAP[nextChar + nextNextChar]
                     : (ROMAJI_MAP[nextChar] ? ROMAJI_MAP[nextChar] : []);
 
                 let consonants = [];
