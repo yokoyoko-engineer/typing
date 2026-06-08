@@ -502,7 +502,7 @@ export default function Tournament({ socket, onBackToHome }) {
                                             <div className="ruby" style={{ fontSize: '0.9em', color: '#888', marginBottom: '5px' }}>
                                                 {playerInfo.typingState ? (
                                                     <>
-                                                        <span style={{ color: '#4caf50' }}>{playerInfo.typingState.typedRuby}</span>
+                                                        <span style={{ color: '#ff9800' }}>{playerInfo.typingState.typedRuby}</span>
                                                         <span>{playerInfo.typingState.targetRuby}</span>
                                                     </>
                                                 ) : playerInfo.currentWord?.ruby}
@@ -533,7 +533,7 @@ export default function Tournament({ socket, onBackToHome }) {
                                                       
                                                       return (
                                                           <React.Fragment key={index}>
-                                                              {greenText && <span style={{ color: '#4caf50' }}>{greenText}</span>}
+                                                              {greenText && <span style={{ color: '#ff9800' }}>{greenText}</span>}
                                                               {blueText && <span style={{ color: '#2c3e50' }}>{blueText}</span>}
                                                           </React.Fragment>
                                                       );
@@ -544,7 +544,7 @@ export default function Tournament({ socket, onBackToHome }) {
                                         <div className="target-word" style={{ fontSize: '2em' }}>
                                             {playerInfo.typingState && (
                                                 <>
-                                                    <span className="char typed" style={{ color: '#4caf50' }}>{playerInfo.typingState.typedRomaji}</span>
+                                                    <span className="char typed" style={{ color: '#ff9800' }}>{playerInfo.typingState.typedRomaji}</span>
                                                     {playerInfo.typingState.targetRomaji.length > 0 && (
                                                         <span className={`char ${isMiss ? 'miss' : 'current'}`}>{playerInfo.typingState.targetRomaji[0]}</span>
                                                     )}

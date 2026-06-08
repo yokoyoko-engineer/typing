@@ -271,7 +271,7 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
             <div className="ruby" style={{ fontSize: '0.9em', color: '#888', marginBottom: '5px' }}>
               {me.typingState ? (
                 <>
-                  <span style={{ color: '#4caf50' }}>{me.typingState.typedRuby}</span>
+                  <span style={{ color: '#ff9800' }}>{me.typingState.typedRuby}</span>
                   <span>{me.typingState.targetRuby}</span>
                 </>
               ) : me.currentWord.ruby}
@@ -302,7 +302,7 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
                   
                   return (
                       <React.Fragment key={index}>
-                          {greenText && <span style={{ color: '#4caf50' }}>{greenText}</span>}
+                          {greenText && <span style={{ color: '#ff9800' }}>{greenText}</span>}
                           {blueText && <span style={{ color: '#2c3e50' }}>{blueText}</span>}
                       </React.Fragment>
                   );
@@ -313,7 +313,7 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
           <div className="target-word">
             {me.typingState && (
               <>
-                <span className="char typed" style={{ color: '#4caf50' }}>{me.typingState.typedRomaji}</span>
+                <span className="char typed" style={{ color: '#ff9800' }}>{me.typingState.typedRomaji}</span>
                 {me.typingState.targetRomaji.length > 0 && (
                   <span className={`char ${isMiss ? 'miss' : 'current'}`}>{me.typingState.targetRomaji[0]}</span>
                 )}
