@@ -430,7 +430,7 @@ export default function CPUGame({ onBackToHome }) {
                                             border: '1px solid #eee',
                                         }}>
                                             <span style={{ minWidth: '35px', textAlign: 'center', fontSize: '1.2em' }}>{medal}</span>
-                                            <span style={{ flex: 1, textAlign: 'left', paddingLeft: '10px', color: '#2c3e50', fontWeight: 'bold' }}>{entry.job_type ? `[${entry.job_type}] ` : ''}ユーザ {entry.user_id}</span>
+                                            <span style={{ flex: 1, textAlign: 'left', paddingLeft: '10px', color: '#2c3e50', fontWeight: 'bold' }}>{entry.job_type ? `[${entry.job_type}] ` : ''}{entry.user_id}</span>
                                             <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '80px', textAlign: 'right', fontSize: '1.1em' }}>{entry.score}</span>
                                         </div>
                                     );
