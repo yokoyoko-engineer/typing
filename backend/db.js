@@ -48,6 +48,13 @@ export async function getDb() {
         score REAL NOT NULL,
         FOREIGN KEY (tournament_id) REFERENCES tournaments(id)
       );
+
+      CREATE INDEX IF NOT EXISTS idx_scores_user_id ON scores(user_id);
+      CREATE INDEX IF NOT EXISTS idx_scores_score ON scores(score);
+      CREATE INDEX IF NOT EXISTS idx_scores_play_date ON scores(play_date);
+      CREATE INDEX IF NOT EXISTS idx_tournament_scores_tid ON tournament_scores(tournament_id);
+      CREATE INDEX IF NOT EXISTS idx_tournament_scores_user_id ON tournament_scores(user_id);
+      CREATE INDEX IF NOT EXISTS idx_tournament_scores_score ON tournament_scores(score);
     `);
     
     // Add job_type column for backward compatibility

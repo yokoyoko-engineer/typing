@@ -49,13 +49,18 @@ const io = new Server(server, {
 // --- ランキング永続化ロジック ---
 const RANKINGS_FILE = path.join(__dirname, 'data', 'rankings.json');
 
+let rankingsCache = null;
+
 async function getRankingsData() {
+  if (rankingsCache) return rankingsCache;
   try {
     const data = await fs.readFile(RANKINGS_FILE, 'utf-8');
-    return JSON.parse(data);
+    rankingsCache = JSON.parse(data);
+    return rankingsCache;
   } catch (err) {
     if (err.code === 'ENOENT') {
-      return {}; // ファイルがない場合は空オブジェクトを返す
+      rankingsCache = {};
+      return rankingsCache; // ファイルがない場合は空オブジェクトを返す
     }
     console.error("Error reading rankings file:", err);
     return {};
@@ -66,6 +71,7 @@ let rankingsLock = Promise.resolve();
 
 async function saveRankingsData(data) {
   try {
+    rankingsCache = data;
     await fs.mkdir(path.dirname(RANKINGS_FILE), { recursive: true });
     const tempFile = RANKINGS_FILE + '.tmp';
     await fs.writeFile(tempFile, JSON.stringify(data, null, 2), 'utf-8');
