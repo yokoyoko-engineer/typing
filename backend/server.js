@@ -240,7 +240,7 @@ app.get('/api/tournaments/:id/scores', async (req, res) => {
 });
 
 app.get('/api/tournaments/scores/admin', async (req, res) => {
-  const { min_user, max_user, start_date, end_date, job_type } = req.query;
+  const { min_user, max_user, start_date, end_date, job_type, tournament_id } = req.query;
   
   if (!min_user || !max_user) {
     return res.status(400).json({ error: 'Missing range parameters' });
@@ -274,6 +274,10 @@ app.get('/api/tournaments/scores/admin', async (req, res) => {
     if (job_type) {
       query += ` AND ts.job_type = ?`;
       params.push(job_type);
+    }
+    if (tournament_id && tournament_id !== 'all') {
+      query += ` AND ts.tournament_id = ?`;
+      params.push(tournament_id);
     }
 
     query += ` ORDER BY t.id ASC, ts.score DESC`;

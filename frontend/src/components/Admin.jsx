@@ -69,6 +69,8 @@ export default function Admin() {
   const [tEndDate, setTEndDate] = useState(lastDay);
   const [tCohort, setTCohort] = useState('すべて');
   const [tJobType, setTJobType] = useState('すべて');
+  const [tSearchTournamentId, setTSearchTournamentId] = useState('all');
+  const [tDisplayAverageTournamentId, setTDisplayAverageTournamentId] = useState('all');
   const [tRawData, setTRawData] = useState([]);
   const [tAverageScores, setTAverageScores] = useState([]);
   const [tChartData, setTChartData] = useState([]);
@@ -153,6 +155,7 @@ export default function Admin() {
       if (tStartDate) url += `&start_date=${tStartDate}`;
       if (tEndDate) url += `&end_date=${tEndDate}`;
       if (tJobType !== 'すべて' && tCohort !== '202604') url += `&job_type=${tJobType}`;
+      if (tSearchTournamentId !== 'all') url += `&tournament_id=${tSearchTournamentId}`;
       
       const res = await fetch(url);
       if (!res.ok) throw new Error('API Error');
@@ -235,7 +238,6 @@ export default function Admin() {
     if (tRawData.length === 0) {
       setTTopGrowthUser(null);
       setTRanking([]);
-      setTAverageScores([]);
       return;
     }
 
@@ -249,9 +251,6 @@ export default function Admin() {
     let bestGrowth = -Infinity;
     let bestGrowthUserData = null;
     const rankingArray = [];
-
-    const jobAverages = {};
-    const jobCounts = {};
 
     for (const uid in userGroups) {
       const scores = userGroups[uid];
@@ -276,7 +275,25 @@ export default function Admin() {
       }
     }
 
-    tRawData.forEach(row => {
+    setTTopGrowthUser(bestGrowthUserData);
+    setTRanking(rankingArray.sort((a, b) => b.maxScore - a.maxScore)); 
+    setTRankingPage(1); 
+  }, [tRawData]);
+
+  useEffect(() => {
+    if (tRawData.length === 0) {
+      setTAverageScores([]);
+      return;
+    }
+
+    let averageSourceData = tRawData;
+    if (tDisplayAverageTournamentId !== 'all') {
+      averageSourceData = tRawData.filter(row => row.tournament_id.toString() === tDisplayAverageTournamentId);
+    }
+
+    const jobAverages = {};
+    const jobCounts = {};
+    averageSourceData.forEach(row => {
       const jt = row.job_type || '未設定';
       if (!jobAverages[jt]) { jobAverages[jt] = 0; jobCounts[jt] = 0; }
       jobAverages[jt] += row.score;
@@ -288,11 +305,8 @@ export default function Admin() {
       average: Math.round(jobAverages[jt] / jobCounts[jt])
     })).sort((a, b) => b.average - a.average);
 
-    setTTopGrowthUser(bestGrowthUserData);
-    setTRanking(rankingArray.sort((a, b) => b.maxScore - a.maxScore)); 
-    setTRankingPage(1); 
     setTAverageScores(averageArray);
-  }, [tRawData]);
+  }, [tRawData, tDisplayAverageTournamentId]);
 
   const handleTUserSelect = (e) => {
     const userId = e.target.value;
@@ -601,7 +615,7 @@ export default function Admin() {
                 <LineChart data={chartData} margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
-                  <YAxis label={{ value: 'スコア', angle: -90, position: 'insideLeft' }} />
+                  <YAxis label={{ value: 'スコア', angle: -90, position: 'insideLeft' }} domain={[0, 'auto']} ticks={[0, 100, 200, 300, 400, 500, 600, 700, 800]} />
                   <Tooltip />
                   <Legend />
                   {userLines.map((userId, index) => {
@@ -885,6 +899,18 @@ export default function Admin() {
                     <option value="QA">QA</option>
                   </select>
                 </div>
+                <div>
+                  <label style={{ marginRight: '10px', marginLeft: '10px' }}>大会:</label>
+                  <select 
+                    value={tSearchTournamentId} onChange={e => setTSearchTournamentId(e.target.value)}
+                    style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc', minWidth: '150px' }}
+                  >
+                    <option value="all">すべて</option>
+                    {tournaments.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
                 <button type="submit" style={{ padding: '8px 20px', background: '#ff9800', color: '#fff', border: 'none', borderRadius: '5px', cursor: 'pointer', marginLeft: '10px', fontWeight: 'bold' }}>
                   検索
                 </button>
@@ -894,9 +920,26 @@ export default function Admin() {
 
             {tAverageScores.length > 0 && (
               <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #eee', marginBottom: '20px' }}>
-                <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#2c3e50', display: 'flex', alignItems: 'center' }}>
-                  <span style={{ fontSize: '1.2em', marginRight: '8px' }}>📊</span> 職種別 平均スコア (イベント)
-                </h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
+                  <h4 style={{ margin: 0, color: '#2c3e50', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ fontSize: '1.2em', marginRight: '8px' }}>📊</span> 職種別 平均スコア (イベント)
+                  </h4>
+                  {tRawData.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontWeight: 'bold', fontSize: '0.9em', color: '#555' }}>表示大会:</span>
+                      <select 
+                        value={tDisplayAverageTournamentId} 
+                        onChange={e => setTDisplayAverageTournamentId(e.target.value)}
+                        style={{ padding: '6px 10px', borderRadius: '5px', border: '1px solid #ccc', background: '#fff' }}
+                      >
+                        <option value="all">全表示対象の平均</option>
+                        {Array.from(new Map(tRawData.map(item => [item.tournament_id, item.tournament_name])).entries()).map(([id, name]) => (
+                          <option key={id} value={id.toString()}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
                 <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
                   {tAverageScores.map((item, idx) => (
                     <div key={idx} style={{ flex: '1 1 120px', background: '#f8f9fa', padding: '15px', borderRadius: '8px', textAlign: 'center', borderBottom: '4px solid #ff9800' }}>
@@ -917,7 +960,7 @@ export default function Admin() {
                   <LineChart data={tChartData} margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
-                    <YAxis label={{ value: 'スコア', angle: -90, position: 'insideLeft' }} />
+                    <YAxis label={{ value: 'スコア', angle: -90, position: 'insideLeft' }} domain={[0, 'auto']} ticks={[0, 100, 200, 300, 400, 500, 600, 700, 800]} />
                     <Tooltip />
                     <Legend />
                     {/* Job Average Lines */}
