@@ -53,6 +53,27 @@ export default function Admin() {
   const [tournamentScores, setTournamentScores] = useState([]);
   const [lobbyCount, setLobbyCount] = useState(0);
   const [lobbyPlayers, setLobbyPlayers] = useState([]);
+
+  // --- Tournament Analysis State ---
+  const [tMinUser, setTMinUser] = useState('1');
+  const [tMaxUser, setTMaxUser] = useState('9999');
+  const [tStartDate, setTStartDate] = useState(firstDay);
+  const [tEndDate, setTEndDate] = useState(lastDay);
+  const [tCohort, setTCohort] = useState('すべて');
+  const [tJobType, setTJobType] = useState('すべて');
+  const [tRawData, setTRawData] = useState([]);
+  const [tAverageScores, setTAverageScores] = useState([]);
+  const [tChartData, setTChartData] = useState([]);
+  const [tUserLines, setTUserLines] = useState([]);
+  const [tLoading, setTLoading] = useState(false);
+  const [tError, setTError] = useState(null);
+  
+  const [tSelectedUser, setTSelectedUser] = useState('');
+  const [tAnalysis, setTAnalysis] = useState(null);
+
+  const [tTopGrowthUser, setTTopGrowthUser] = useState(null);
+  const [tRanking, setTRanking] = useState([]);
+  const [tRankingPage, setTRankingPage] = useState(1);
   
   // Setup Socket for Admin
   useEffect(() => {
@@ -106,6 +127,170 @@ export default function Admin() {
         setTimeout(fetchTournaments, 2000); // Wait a bit to fetch the newly created tournament
       }
     }
+  };
+
+  // --- Tournament Analysis Logic ---
+  const fetchTournamentScores = async () => {
+    if (!tMinUser || !tMaxUser) {
+      setTError('社員番号の範囲を指定してください。');
+      return;
+    }
+    
+    setTLoading(true);
+    setTError(null);
+    setTSelectedUser('');
+    setTAnalysis(null);
+    try {
+      let url = `/api/tournaments/scores/admin?min_user=${tMinUser}&max_user=${tMaxUser}`;
+      if (tStartDate) url += `&start_date=${tStartDate}`;
+      if (tEndDate) url += `&end_date=${tEndDate}`;
+      if (tJobType !== 'すべて' && tCohort !== '202604') url += `&job_type=${tJobType}`;
+      
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('API Error');
+      let data = await res.json();
+      
+      if (tCohort === '202604') {
+        data = data.filter(row => COHORT_MAP[row.user_id.toString()] !== undefined);
+        data = data.map(row => ({ ...row, job_type: COHORT_MAP[row.user_id.toString()] }));
+        
+        if (tJobType !== 'すべて') {
+          data = data.filter(row => row.job_type === tJobType);
+        }
+      }
+      
+      setTRawData(data); 
+
+      const formattedData = {};
+      const users = new Set();
+      
+      data.forEach(row => {
+        const uid = row.user_id.toString();
+        users.add(uid);
+        const key = row.tournament_name || `大会 #${row.tournament_id}`;
+        if (!formattedData[key]) {
+          formattedData[key] = { name: key, date: row.tournament_date, id: row.tournament_id };
+        }
+        if (formattedData[key][uid] === undefined || row.score > formattedData[key][uid]) {
+          formattedData[key][uid] = row.score;
+        }
+      });
+      
+      const sortedData = Object.values(formattedData).sort((a, b) => a.id - b.id);
+      setTChartData(sortedData);
+      setTUserLines(Array.from(users).sort());
+      
+    } catch (err) {
+      console.error(err);
+      setTError('データの取得に失敗しました。');
+    } finally {
+      setTLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'tournament') {
+      fetchTournamentScores();
+    }
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (tRawData.length === 0) {
+      setTTopGrowthUser(null);
+      setTRanking([]);
+      setTAverageScores([]);
+      return;
+    }
+
+    const userGroups = {};
+    tRawData.forEach(row => {
+      const uid = row.user_id.toString();
+      if (!userGroups[uid]) userGroups[uid] = [];
+      userGroups[uid].push(row);
+    });
+
+    let bestGrowth = -Infinity;
+    let bestGrowthUserData = null;
+    const rankingArray = [];
+
+    const jobAverages = {};
+    const jobCounts = {};
+
+    for (const uid in userGroups) {
+      const scores = userGroups[uid];
+      const maxScore = Math.max(...scores.map(s => s.score));
+      rankingArray.push({ userId: uid, maxScore });
+
+      if (scores.length > 0) {
+        const first = scores[0].score;
+        const last = scores[scores.length - 1].score;
+        const growth = last - first;
+        if (growth > bestGrowth) {
+          bestGrowth = growth;
+          bestGrowthUserData = {
+            userId: uid,
+            growth,
+            firstDate: scores[0].tournament_name,
+            lastDate: scores[scores.length - 1].tournament_name,
+            firstScore: first,
+            lastScore: last
+          };
+        }
+      }
+    }
+
+    tRawData.forEach(row => {
+      const jt = row.job_type || '未設定';
+      if (!jobAverages[jt]) { jobAverages[jt] = 0; jobCounts[jt] = 0; }
+      jobAverages[jt] += row.score;
+      jobCounts[jt]++;
+    });
+
+    const averageArray = Object.keys(jobAverages).map(jt => ({
+      jobType: jt,
+      average: Math.round(jobAverages[jt] / jobCounts[jt])
+    })).sort((a, b) => b.average - a.average);
+
+    setTTopGrowthUser(bestGrowthUserData);
+    setTRanking(rankingArray.sort((a, b) => b.maxScore - a.maxScore)); 
+    setTRankingPage(1); 
+    setTAverageScores(averageArray);
+  }, [tRawData]);
+
+  const handleTUserSelect = (e) => {
+    const userId = e.target.value;
+    setTSelectedUser(userId);
+    
+    if (!userId || tRawData.length === 0) {
+      setTAnalysis(null);
+      return;
+    }
+
+    const userScores = tRawData.filter(d => d.user_id.toString() === userId);
+
+    if (userScores.length > 0) {
+      const firstPlay = userScores[0];
+      const lastPlay = userScores[userScores.length - 1];
+      const maxScore = Math.max(...userScores.map(s => s.score));
+      const growth = lastPlay.score - firstPlay.score;
+
+      setTAnalysis({
+        firstDate: firstPlay.tournament_name,
+        lastDate: lastPlay.tournament_name,
+        firstScore: firstPlay.score,
+        lastScore: lastPlay.score,
+        maxScore,
+        growth,
+        count: userScores.length
+      });
+    } else {
+      setTAnalysis(null);
+    }
+  };
+
+  const handleTSearch = (e) => {
+    e.preventDefault();
+    fetchTournamentScores();
   };
 
   // --- Analysis Logic ---
@@ -599,6 +784,234 @@ export default function Admin() {
                   </table>
                 ) : (
                   <p style={{ color: '#888' }}>このイベントには記録がありません。</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* イベントスコア分析パネル */}
+          <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', marginTop: '30px' }}>
+            <h3 style={{ marginTop: 0, color: '#2c3e50', display: 'flex', alignItems: 'center' }}>
+              <span style={{ fontSize: '1.2em', marginRight: '8px' }}>📈</span> イベントスコア推移分析
+            </h3>
+            
+            <div style={{ background: '#f5f5f5', padding: '20px', borderRadius: '10px', marginBottom: '30px' }}>
+              <h4 style={{ marginTop: 0, marginBottom: '15px' }}>過去大会スコア 検索</h4>
+              <form onSubmit={handleTSearch} style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div>
+                  <label style={{ marginRight: '10px' }}>Min 社員番号:</label>
+                  <input 
+                    type="number" min="1" max="9999" value={tMinUser} onChange={e => setTMinUser(e.target.value)} 
+                    placeholder="例: 5000" style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc' }} required
+                  />
+                </div>
+                <div>
+                  <label style={{ marginRight: '10px' }}>Max 社員番号:</label>
+                  <input 
+                    type="number" min="1" max="9999" value={tMaxUser} onChange={e => setTMaxUser(e.target.value)} 
+                    placeholder="例: 5100" style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc', width: '100px' }} required
+                  />
+                </div>
+                <div>
+                  <label style={{ marginRight: '10px', marginLeft: '10px' }}>期間:</label>
+                  <input 
+                    type="date" value={tStartDate} onChange={e => setTStartDate(e.target.value)} 
+                    style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc' }}
+                  />
+                  <span style={{ margin: '0 10px' }}>〜</span>
+                  <input 
+                    type="date" value={tEndDate} onChange={e => setTEndDate(e.target.value)} 
+                    style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ marginRight: '10px', marginLeft: '10px' }}>入社時期:</label>
+                  <select 
+                    value={tCohort} onChange={e => setTCohort(e.target.value)}
+                    style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc' }}
+                  >
+                    <option value="すべて">すべて</option>
+                    <option value="202604">202604</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ marginRight: '10px', marginLeft: '10px' }}>職種:</label>
+                  <select 
+                    value={tJobType} onChange={e => setTJobType(e.target.value)}
+                    style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc' }}
+                  >
+                    <option value="すべて">すべて</option>
+                    <option value="CL">CL</option>
+                    <option value="JAVA">JAVA</option>
+                    <option value="ML">ML</option>
+                    <option value="FR">FR</option>
+                    <option value="QA">QA</option>
+                  </select>
+                </div>
+                <button type="submit" style={{ padding: '8px 20px', background: '#ff9800', color: '#fff', border: 'none', borderRadius: '5px', cursor: 'pointer', marginLeft: '10px', fontWeight: 'bold' }}>
+                  検索
+                </button>
+              </form>
+              {tError && <p style={{ color: '#e53935', marginTop: '15px' }}>{tError}</p>}
+            </div>
+
+            {tAverageScores.length > 0 && (
+              <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #eee', marginBottom: '20px' }}>
+                <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#2c3e50', display: 'flex', alignItems: 'center' }}>
+                  <span style={{ fontSize: '1.2em', marginRight: '8px' }}>📊</span> 職種別 平均スコア (イベント)
+                </h4>
+                <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                  {tAverageScores.map((item, idx) => (
+                    <div key={idx} style={{ flex: '1 1 120px', background: '#f8f9fa', padding: '15px', borderRadius: '8px', textAlign: 'center', borderBottom: '4px solid #ff9800' }}>
+                      <div style={{ fontSize: '0.9em', color: '#666', marginBottom: '5px' }}>{item.jobType}</div>
+                      <div style={{ fontSize: '1.8em', fontWeight: 'bold', color: '#2c3e50' }}>{item.average}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{ height: '400px', background: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #eee', marginBottom: '20px' }}>
+              <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#2c3e50' }}>大会ごとのスコア推移</h4>
+              {tLoading ? (
+                <p>Loading...</p>
+              ) : tChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="90%">
+                  <LineChart data={tChartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis label={{ value: 'スコア', angle: -90, position: 'insideLeft' }} />
+                    <Tooltip />
+                    <Legend />
+                    {tUserLines.map((userId, index) => {
+                      const isSelected = tSelectedUser === userId;
+                      const strokeOpacity = tSelectedUser ? (isSelected ? 1 : 0.2) : 1;
+                      const strokeWidth = isSelected ? 3 : 1;
+                      return (
+                        <Line 
+                          key={userId} type="monotone" dataKey={userId} name={`ユーザ ${userId}`}
+                          stroke={getColor(index)} strokeOpacity={strokeOpacity} strokeWidth={strokeWidth}
+                          activeDot={{ r: 8 }} connectNulls
+                        />
+                      )
+                    })}
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <p style={{ textAlign: 'center', marginTop: '120px', color: '#888' }}>データがありません。条件を指定して検索してください。</p>
+              )}
+            </div>
+
+            {tRawData.length > 0 && (
+              <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 40%', background: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #eee' }}>
+                  <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#2c3e50', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ fontSize: '1.2em', marginRight: '8px' }}>🚀</span> 最もスコアが伸びたユーザ (イベント)
+                  </h4>
+                  {tTopGrowthUser && tTopGrowthUser.growth > 0 ? (
+                    <div style={{ textAlign: 'center', background: '#f0f4f8', padding: '20px', borderRadius: '10px' }}>
+                      <div style={{ fontSize: '2em', fontWeight: 'bold', color: '#ff9800', marginBottom: '10px' }}>ユーザ {tTopGrowthUser.userId}</div>
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontSize: '0.8em', color: '#888' }}>初回 ({tTopGrowthUser.firstDate})</div>
+                          <div style={{ fontSize: '1.2em', fontWeight: 'bold', color: '#2c3e50' }}>{tTopGrowthUser.firstScore}</div>
+                        </div>
+                        <div style={{ fontSize: '1.5em', color: '#ccc' }}>→</div>
+                        <div>
+                          <div style={{ fontSize: '0.8em', color: '#888' }}>最新 ({tTopGrowthUser.lastDate})</div>
+                          <div style={{ fontSize: '1.2em', fontWeight: 'bold', color: '#2c3e50' }}>{tTopGrowthUser.lastScore}</div>
+                        </div>
+                      </div>
+                      <div style={{ marginTop: '15px', display: 'inline-block', background: '#e8f5e9', color: '#2e7d32', padding: '5px 15px', borderRadius: '20px', fontWeight: 'bold', fontSize: '1.2em' }}>
+                        +{tTopGrowthUser.growth} UP!!
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{ color: '#888', textAlign: 'center' }}>スコアが伸びたユーザがいません。</p>
+                  )}
+                </div>
+
+                <div style={{ flex: '1 1 40%', background: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #eee' }}>
+                  <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#2c3e50', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ fontSize: '1.2em', marginRight: '8px' }}>👑</span> 最高スコアランキング (イベント)
+                  </h4>
+                  {tRanking.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                      <div style={{ maxHeight: '250px', overflowY: 'auto', flex: 1 }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                          <thead style={{ position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+                            <tr style={{ borderBottom: '2px solid #eee' }}>
+                              <th style={{ padding: '8px', color: '#888' }}>順位</th>
+                              <th style={{ padding: '8px', color: '#888' }}>ユーザ</th>
+                              <th style={{ padding: '8px', color: '#888', textAlign: 'right' }}>スコア</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {tRanking.slice((tRankingPage - 1) * itemsPerPage, tRankingPage * itemsPerPage).map((r, index) => {
+                              const globalIndex = (tRankingPage - 1) * itemsPerPage + index;
+                              return (
+                                <tr key={r.userId} style={{ borderBottom: '1px solid #eee', background: globalIndex === 0 ? '#fffdf0' : 'transparent' }}>
+                                  <td style={{ padding: '8px', fontWeight: 'bold', color: globalIndex === 0 ? '#d4af37' : globalIndex === 1 ? '#9e9e9e' : globalIndex === 2 ? '#cd7f32' : '#ff9800' }}>
+                                    {globalIndex + 1}
+                                  </td>
+                                  <td style={{ padding: '8px', fontWeight: 'bold', color: '#2c3e50' }}>{r.userId}</td>
+                                  <td style={{ padding: '8px', textAlign: 'right', fontWeight: 'bold', color: '#e8734a' }}>{r.maxScore}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      {tRanking.length > itemsPerPage && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px', paddingTop: '10px', borderTop: '1px solid #eee' }}>
+                          <button onClick={() => setTRankingPage(p => Math.max(p - 1, 1))} disabled={tRankingPage === 1} style={{ padding: '5px 15px', background: tRankingPage === 1 ? '#e0e0e0' : '#ff9800', color: tRankingPage === 1 ? '#9e9e9e' : '#fff', border: 'none', borderRadius: '5px', cursor: tRankingPage === 1 ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>前へ</button>
+                          <span style={{ color: '#666', fontSize: '0.9em' }}>{tRankingPage} / {Math.ceil(tRanking.length / itemsPerPage)} ページ ({tRanking.length}件)</span>
+                          <button onClick={() => setTRankingPage(p => Math.min(p + 1, Math.ceil(tRanking.length / itemsPerPage)))} disabled={tRankingPage === Math.ceil(tRanking.length / itemsPerPage)} style={{ padding: '5px 15px', background: tRankingPage === Math.ceil(tRanking.length / itemsPerPage) ? '#e0e0e0' : '#ff9800', color: tRankingPage === Math.ceil(tRanking.length / itemsPerPage) ? '#9e9e9e' : '#fff', border: 'none', borderRadius: '5px', cursor: tRankingPage === Math.ceil(tRanking.length / itemsPerPage) ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>次へ</button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p style={{ color: '#888', textAlign: 'center' }}>データがありません。</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {tUserLines.length > 0 && (
+              <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #eee' }}>
+                <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#2c3e50' }}>ユーザー成長分析 (イベント)</h4>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ marginRight: '10px', fontWeight: 'bold' }}>分析対象ユーザーを選択:</label>
+                  <select value={tSelectedUser} onChange={handleTUserSelect} style={{ padding: '8px 12px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '1em' }}>
+                    <option value="">-- 選択してください --</option>
+                    {tUserLines.map(u => <option key={u} value={u}>ユーザ {u}</option>)}
+                  </select>
+                </div>
+                {tAnalysis ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
+                    <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #5c6bc0' }}>
+                      <div style={{ color: '#666', fontSize: '0.9em', marginBottom: '5px' }}>初回大会 ({tAnalysis.firstDate})</div>
+                      <div style={{ fontSize: '1.5em', fontWeight: 'bold', color: '#2c3e50' }}>{tAnalysis.firstScore}</div>
+                    </div>
+                    <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #4caf50' }}>
+                      <div style={{ color: '#666', fontSize: '0.9em', marginBottom: '5px' }}>最新大会 ({tAnalysis.lastDate})</div>
+                      <div style={{ fontSize: '1.5em', fontWeight: 'bold', color: '#2c3e50' }}>{tAnalysis.lastScore}</div>
+                    </div>
+                    <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #ff9800' }}>
+                      <div style={{ color: '#666', fontSize: '0.9em', marginBottom: '5px' }}>期間内最高スコア</div>
+                      <div style={{ fontSize: '1.5em', fontWeight: 'bold', color: '#2c3e50' }}>{tAnalysis.maxScore}</div>
+                    </div>
+                    <div style={{ background: tAnalysis.growth >= 0 ? '#e8f5e9' : '#ffebee', padding: '15px', borderRadius: '8px', borderLeft: `4px solid ${tAnalysis.growth >= 0 ? '#4caf50' : '#f44336'}` }}>
+                      <div style={{ color: '#666', fontSize: '0.9em', marginBottom: '5px' }}>スコア成長量</div>
+                      <div style={{ fontSize: '1.5em', fontWeight: 'bold', color: tAnalysis.growth >= 0 ? '#2e7d32' : '#c62828' }}>
+                        {tAnalysis.growth > 0 ? '+' : ''}{tAnalysis.growth}
+                      </div>
+                    </div>
+                  </div>
+                ) : tSelectedUser ? (
+                  <p style={{ color: '#888' }}>このユーザーのデータは期間内にありません。</p>
+                ) : (
+                  <p style={{ color: '#888' }}>ユーザーを選択すると、詳細な分析データが表示されます。</p>
                 )}
               </div>
             )}

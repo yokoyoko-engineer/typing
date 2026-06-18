@@ -239,6 +239,53 @@ app.get('/api/tournaments/:id/scores', async (req, res) => {
   }
 });
 
+app.get('/api/tournaments/scores/admin', async (req, res) => {
+  const { min_user, max_user, start_date, end_date, job_type } = req.query;
+  
+  if (!min_user || !max_user) {
+    return res.status(400).json({ error: 'Missing range parameters' });
+  }
+
+  try {
+    const db = await getDb();
+    let query = `
+      SELECT 
+        ts.id, 
+        ts.tournament_id, 
+        t.name as tournament_name, 
+        t.date as tournament_date, 
+        ts.user_id, 
+        ts.job_type, 
+        ts.score 
+      FROM tournament_scores ts
+      JOIN tournaments t ON ts.tournament_id = t.id
+      WHERE CAST(ts.user_id AS INTEGER) >= ? AND CAST(ts.user_id AS INTEGER) <= ?
+    `;
+    const params = [min_user, max_user];
+
+    if (start_date) {
+      query += ` AND t.date >= ?`;
+      params.push(start_date);
+    }
+    if (end_date) {
+      query += ` AND t.date <= ?`;
+      params.push(end_date);
+    }
+    if (job_type) {
+      query += ` AND ts.job_type = ?`;
+      params.push(job_type);
+    }
+
+    query += ` ORDER BY t.id ASC, ts.score DESC`;
+
+    const rows = await db.all(query, params);
+    res.json(rows);
+  } catch (err) {
+    console.error("Error fetching tournament scores for admin:", err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 app.get('/api/tournaments/legends', async (req, res) => {
   try {
     const db = await getDb();
