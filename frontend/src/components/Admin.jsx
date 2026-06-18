@@ -17,6 +17,14 @@ Object.entries(COHORT_202604).forEach(([job, ids]) => {
   });
 });
 
+const JOB_COLORS = {
+  CL: '#ff9800',
+  JAVA: '#2196f3',
+  ML: '#4caf50',
+  FR: '#e91e63',
+  QA: '#9c27b0'
+};
+
 export default function Admin() {
   const [activeTab, setActiveTab] = useState('analysis'); // 'analysis' or 'tournament'
 
@@ -161,19 +169,48 @@ export default function Admin() {
       
       setTRawData(data); 
 
+      // Group by tournament first
+      const tournamentGroups = {};
+      data.forEach(row => {
+        const key = row.tournament_name || `大会 #${row.tournament_id}`;
+        if (!tournamentGroups[key]) {
+          tournamentGroups[key] = [];
+        }
+        tournamentGroups[key].push(row);
+      });
+
       const formattedData = {};
       const users = new Set();
       
-      data.forEach(row => {
-        const uid = row.user_id.toString();
-        users.add(uid);
-        const key = row.tournament_name || `大会 #${row.tournament_id}`;
-        if (!formattedData[key]) {
-          formattedData[key] = { name: key, date: row.tournament_date, id: row.tournament_id };
-        }
-        if (formattedData[key][uid] === undefined || row.score > formattedData[key][uid]) {
-          formattedData[key][uid] = row.score;
-        }
+      Object.entries(tournamentGroups).forEach(([key, rows]) => {
+        const firstRow = rows[0];
+        formattedData[key] = { 
+          name: key, 
+          date: firstRow.tournament_date, 
+          id: firstRow.tournament_id 
+        };
+
+        // User scores
+        rows.forEach(row => {
+          const uid = row.user_id.toString();
+          users.add(uid);
+          if (formattedData[key][uid] === undefined || row.score > formattedData[key][uid]) {
+            formattedData[key][uid] = row.score;
+          }
+        });
+
+        // Job type average scores for this tournament
+        const jobScores = {};
+        rows.forEach(row => {
+          const jt = row.job_type || '未設定';
+          if (!jobScores[jt]) jobScores[jt] = [];
+          jobScores[jt].push(row.score);
+        });
+
+        Object.entries(jobScores).forEach(([jt, scores]) => {
+          const sum = scores.reduce((sumVal, s) => sumVal + s, 0);
+          formattedData[key][jt + '平均'] = Math.round(sum / scores.length);
+        });
       });
       
       const sortedData = Object.values(formattedData).sort((a, b) => a.id - b.id);
@@ -561,7 +598,7 @@ export default function Admin() {
               <p>Loading...</p>
             ) : chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <LineChart data={chartData} margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis label={{ value: 'スコア', angle: -90, position: 'insideLeft' }} />
@@ -877,21 +914,36 @@ export default function Admin() {
                 <p>Loading...</p>
               ) : tChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="90%">
-                  <LineChart data={tChartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <LineChart data={tChartData} margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis label={{ value: 'スコア', angle: -90, position: 'insideLeft' }} />
                     <Tooltip />
                     <Legend />
+                    {/* Job Average Lines */}
+                    {['CL', 'JAVA', 'ML', 'FR', 'QA'].map((job) => (
+                      <Line 
+                        key={`${job}平均`} 
+                        type="monotone" 
+                        dataKey={`${job}平均`} 
+                        name={`${job}平均`}
+                        stroke={JOB_COLORS[job] || '#9e9e9e'} 
+                        strokeDasharray="5 5" 
+                        strokeWidth={3}
+                        dot={{ r: 4 }} 
+                        connectNulls
+                      />
+                    ))}
+                    {/* Individual User Lines */}
                     {tUserLines.map((userId, index) => {
                       const isSelected = tSelectedUser === userId;
-                      const strokeOpacity = tSelectedUser ? (isSelected ? 1 : 0.2) : 1;
+                      const strokeOpacity = tSelectedUser ? (isSelected ? 1 : 0.05) : 0.3;
                       const strokeWidth = isSelected ? 3 : 1;
                       return (
                         <Line 
                           key={userId} type="monotone" dataKey={userId} name={`ユーザ ${userId}`}
                           stroke={getColor(index)} strokeOpacity={strokeOpacity} strokeWidth={strokeWidth}
-                          activeDot={{ r: 8 }} connectNulls
+                          dot={isSelected ? { r: 6 } : false} activeDot={{ r: 8 }} connectNulls
                         />
                       )
                     })}
