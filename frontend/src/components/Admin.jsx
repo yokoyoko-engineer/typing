@@ -607,7 +607,7 @@ export default function Admin() {
             </div>
           )}
 
-          <div style={{ height: '400px', background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', marginBottom: '20px' }}>
+          <div style={{ height: '500px', background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', marginBottom: '20px' }}>
             {loading ? (
               <p>Loading...</p>
             ) : chartData.length > 0 ? (
@@ -622,11 +622,12 @@ export default function Admin() {
                     const isSelected = selectedUser === userId;
                     const strokeOpacity = selectedUser ? (isSelected ? 1 : 0.2) : 1;
                     const strokeWidth = isSelected ? 3 : 1;
+                    const legendType = selectedUser ? (isSelected ? 'line' : 'none') : (userLines.length > 10 ? 'none' : 'line');
                     return (
                       <Line 
                         key={userId} type="monotone" dataKey={userId} name={`ユーザ ${userId}`}
                         stroke={getColor(index)} strokeOpacity={strokeOpacity} strokeWidth={strokeWidth}
-                        activeDot={{ r: 8 }} connectNulls
+                        activeDot={{ r: 8 }} connectNulls legendType={legendType}
                       />
                     )
                   })}
@@ -951,12 +952,12 @@ export default function Admin() {
               </div>
             )}
 
-            <div style={{ height: '400px', background: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #eee', marginBottom: '20px' }}>
+            <div style={{ height: '500px', background: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #eee', marginBottom: '20px' }}>
               <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#2c3e50' }}>大会ごとのスコア推移</h4>
               {tLoading ? (
                 <p>Loading...</p>
               ) : tChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="90%">
+                <ResponsiveContainer width="100%" height="95%">
                   <LineChart data={tChartData} margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
@@ -987,6 +988,7 @@ export default function Admin() {
                           key={userId} type="monotone" dataKey={userId} name={`ユーザ ${userId}`}
                           stroke={getColor(index)} strokeOpacity={strokeOpacity} strokeWidth={strokeWidth}
                           dot={isSelected ? { r: 6 } : false} activeDot={{ r: 8 }} connectNulls
+                          legendType="none"
                         />
                       )
                     })}
