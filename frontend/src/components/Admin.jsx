@@ -69,7 +69,8 @@ export default function Admin() {
   const [tEndDate, setTEndDate] = useState(lastDay);
   const [tCohort, setTCohort] = useState('すべて');
   const [tJobType, setTJobType] = useState('すべて');
-  const [tSearchTournamentId, setTSearchTournamentId] = useState('all');
+  const [tSearchStartTournamentId, setTSearchStartTournamentId] = useState('all');
+  const [tSearchEndTournamentId, setTSearchEndTournamentId] = useState('all');
   const [tDisplayAverageTournamentId, setTDisplayAverageTournamentId] = useState('all');
   const [tRawData, setTRawData] = useState([]);
   const [tAverageScores, setTAverageScores] = useState([]);
@@ -155,7 +156,8 @@ export default function Admin() {
       if (tStartDate) url += `&start_date=${tStartDate}`;
       if (tEndDate) url += `&end_date=${tEndDate}`;
       if (tJobType !== 'すべて' && tCohort !== '202604') url += `&job_type=${tJobType}`;
-      if (tSearchTournamentId !== 'all') url += `&tournament_id=${tSearchTournamentId}`;
+      if (tSearchStartTournamentId !== 'all') url += `&start_tournament_id=${tSearchStartTournamentId}`;
+      if (tSearchEndTournamentId !== 'all') url += `&end_tournament_id=${tSearchEndTournamentId}`;
       
       const res = await fetch(url);
       if (!res.ok) throw new Error('API Error');
@@ -901,12 +903,24 @@ export default function Admin() {
                   </select>
                 </div>
                 <div>
-                  <label style={{ marginRight: '10px', marginLeft: '10px' }}>大会:</label>
+                  <label style={{ marginRight: '10px', marginLeft: '10px' }}>開始大会:</label>
                   <select 
-                    value={tSearchTournamentId} onChange={e => setTSearchTournamentId(e.target.value)}
+                    value={tSearchStartTournamentId} onChange={e => setTSearchStartTournamentId(e.target.value)}
                     style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc', minWidth: '150px' }}
                   >
-                    <option value="all">すべて</option>
+                    <option value="all">すべて(最初)</option>
+                    {tournaments.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ marginRight: '10px', marginLeft: '10px' }}>終了大会:</label>
+                  <select 
+                    value={tSearchEndTournamentId} onChange={e => setTSearchEndTournamentId(e.target.value)}
+                    style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc', minWidth: '150px' }}
+                  >
+                    <option value="all">すべて(最新)</option>
                     {tournaments.map(t => (
                       <option key={t.id} value={t.id}>{t.name}</option>
                     ))}
