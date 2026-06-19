@@ -790,7 +790,7 @@ export default function CPUGame({ onBackToHome }) {
                                       let coloredTextChars = 0;
                                       if (chunkRubyLen > 0) {
                                           let ratio = chunkTypedRubyLen / chunkRubyLen;
-                                          coloredTextChars = Math.round(ratio * chunk.text.length);
+                                          coloredTextChars = Math.floor(ratio * chunk.text.length);
                                       } else {
                                           coloredTextChars = remainingTypedRuby > 0 ? chunk.text.length : 0;
                                       }
