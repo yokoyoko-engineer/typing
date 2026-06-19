@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { io } from 'socket.io-client';
 
 const COHORT_202604 = {
@@ -594,17 +594,57 @@ export default function Admin() {
           </div>
 
           {averageScores.length > 0 && (
-            <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', marginBottom: '20px' }}>
-              <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#2c3e50', display: 'flex', alignItems: 'center' }}>
-                <span style={{ fontSize: '1.2em', marginRight: '8px' }}>📊</span> 職種別 平均スコア
-              </h3>
-              <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-                {averageScores.map((item, idx) => (
-                  <div key={idx} style={{ flex: '1 1 120px', background: '#f8f9fa', padding: '15px', borderRadius: '8px', textAlign: 'center', borderBottom: '4px solid #ff9800' }}>
-                    <div style={{ fontSize: '0.9em', color: '#666', marginBottom: '5px' }}>{item.jobType}</div>
-                    <div style={{ fontSize: '1.8em', fontWeight: 'bold', color: '#2c3e50' }}>{item.average}</div>
+            <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
+              {/* 職種別 平均スコア */}
+              <div style={{ flex: '2 1 500px', background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#2c3e50', display: 'flex', alignItems: 'center' }}>
+                  <span style={{ fontSize: '1.2em', marginRight: '8px' }}>📊</span> 職種別 平均スコア
+                </h3>
+                <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                  {averageScores.map((item, idx) => (
+                    <div key={idx} style={{ flex: '1 1 120px', background: '#f8f9fa', padding: '15px', borderRadius: '8px', textAlign: 'center', borderBottom: '4px solid #ff9800' }}>
+                      <div style={{ fontSize: '0.9em', color: '#666', marginBottom: '5px' }}>{item.jobType}</div>
+                      <div style={{ fontSize: '1.8em', fontWeight: 'bold', color: '#2c3e50' }}>{item.average}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 一般オフィスワーク基準 (209) 達成状況 */}
+              <div style={{ flex: '1 1 300px', background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#2c3e50', display: 'flex', alignItems: 'center' }}>
+                  <span style={{ fontSize: '1.2em', marginRight: '8px' }}>🎯</span> オフィスワーク基準 (スコア 209) 達成状況
+                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.85em', color: '#666', marginBottom: '3px' }}>達成者</div>
+                    <div style={{ fontSize: '1.8em', fontWeight: 'bold', color: '#4caf50' }}>
+                      {ranking.filter(u => u.maxScore >= 209).length} <span style={{ fontSize: '0.5em', fontWeight: 'normal', color: '#666' }}>人</span>
+                    </div>
                   </div>
-                ))}
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.85em', color: '#666', marginBottom: '3px' }}>未達成者</div>
+                    <div style={{ fontSize: '1.8em', fontWeight: 'bold', color: '#e53935' }}>
+                      {ranking.filter(u => u.maxScore < 209).length} <span style={{ fontSize: '0.5em', fontWeight: 'normal', color: '#666' }}>人</span>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.85em', color: '#666', marginBottom: '3px' }}>達成率</div>
+                    <div style={{ fontSize: '1.8em', fontWeight: 'bold', color: '#5c6bc0' }}>
+                      {ranking.length > 0 ? Math.round((ranking.filter(u => u.maxScore >= 209).length / ranking.length) * 100) : 0} <span style={{ fontSize: '0.5em', fontWeight: 'normal', color: '#666' }}>%</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div style={{ marginTop: '15px' }}>
+                  <div style={{ background: '#e8e8e8', height: '10px', borderRadius: '5px', overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${ranking.length > 0 ? (ranking.filter(u => u.maxScore >= 209).length / ranking.length) * 100 : 0}%`,
+                      backgroundColor: '#4caf50',
+                      height: '100%'
+                    }}></div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -618,6 +658,7 @@ export default function Admin() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis label={{ value: 'スコア', angle: -90, position: 'insideLeft' }} domain={[0, 'auto']} ticks={[0, 100, 200, 300, 400, 500, 600, 700, 800]} />
+                  <ReferenceLine y={209} stroke="#e53935" strokeWidth={2} strokeDasharray="3 3" label={{ value: 'オフィス基準 (209)', fill: '#e53935', position: 'top' }} />
                   <Tooltip />
                   <Legend />
                   {userLines.map((userId, index) => {
@@ -934,34 +975,74 @@ export default function Admin() {
             </div>
 
             {tAverageScores.length > 0 && (
-              <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #eee', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
-                  <h4 style={{ margin: 0, color: '#2c3e50', display: 'flex', alignItems: 'center' }}>
-                    <span style={{ fontSize: '1.2em', marginRight: '8px' }}>📊</span> 職種別 平均スコア (イベント)
-                  </h4>
-                  {tRawData.length > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontWeight: 'bold', fontSize: '0.9em', color: '#555' }}>表示大会:</span>
-                      <select 
-                        value={tDisplayAverageTournamentId} 
-                        onChange={e => setTDisplayAverageTournamentId(e.target.value)}
-                        style={{ padding: '6px 10px', borderRadius: '5px', border: '1px solid #ccc', background: '#fff' }}
-                      >
-                        <option value="all">全表示対象の平均</option>
-                        {Array.from(new Map(tRawData.map(item => [item.tournament_id, item.tournament_name])).entries()).map(([id, name]) => (
-                          <option key={id} value={id.toString()}>{name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
+              <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                {/* 職種別 平均スコア */}
+                <div style={{ flex: '2 1 500px', background: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #eee' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
+                    <h4 style={{ margin: 0, color: '#2c3e50', display: 'flex', alignItems: 'center' }}>
+                      <span style={{ fontSize: '1.2em', marginRight: '8px' }}>📊</span> 職種別 平均スコア (イベント)
+                    </h4>
+                    {tRawData.length > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '0.9em', color: '#555' }}>表示大会:</span>
+                        <select 
+                          value={tDisplayAverageTournamentId} 
+                          onChange={e => setTDisplayAverageTournamentId(e.target.value)}
+                          style={{ padding: '6px 10px', borderRadius: '5px', border: '1px solid #ccc', background: '#fff' }}
+                        >
+                          <option value="all">全表示対象の平均</option>
+                          {Array.from(new Map(tRawData.map(item => [item.tournament_id, item.tournament_name])).entries()).map(([id, name]) => (
+                            <option key={id} value={id.toString()}>{name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                    {tAverageScores.map((item, idx) => (
+                      <div key={idx} style={{ flex: '1 1 120px', background: '#f8f9fa', padding: '15px', borderRadius: '8px', textAlign: 'center', borderBottom: '4px solid #ff9800' }}>
+                        <div style={{ fontSize: '0.9em', color: '#666', marginBottom: '5px' }}>{item.jobType}</div>
+                        <div style={{ fontSize: '1.8em', fontWeight: 'bold', color: '#2c3e50' }}>{item.average}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-                  {tAverageScores.map((item, idx) => (
-                    <div key={idx} style={{ flex: '1 1 120px', background: '#f8f9fa', padding: '15px', borderRadius: '8px', textAlign: 'center', borderBottom: '4px solid #ff9800' }}>
-                      <div style={{ fontSize: '0.9em', color: '#666', marginBottom: '5px' }}>{item.jobType}</div>
-                      <div style={{ fontSize: '1.8em', fontWeight: 'bold', color: '#2c3e50' }}>{item.average}</div>
+
+                {/* 一般オフィスワーク基準 (209) 達成状況 */}
+                <div style={{ flex: '1 1 300px', background: '#fff', padding: '20px', borderRadius: '10px', border: '1px solid #eee', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#2c3e50', display: 'flex', alignItems: 'center' }}>
+                    <span style={{ fontSize: '1.2em', marginRight: '8px' }}>🎯</span> オフィスワーク基準 (スコア 209) 達成状況
+                  </h4>
+                  <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '0.85em', color: '#666', marginBottom: '3px' }}>達成者</div>
+                      <div style={{ fontSize: '1.8em', fontWeight: 'bold', color: '#4caf50' }}>
+                        {tRanking.filter(u => u.maxScore >= 209).length} <span style={{ fontSize: '0.5em', fontWeight: 'normal', color: '#666' }}>人</span>
+                      </div>
                     </div>
-                  ))}
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '0.85em', color: '#666', marginBottom: '3px' }}>未達成者</div>
+                      <div style={{ fontSize: '1.8em', fontWeight: 'bold', color: '#e53935' }}>
+                        {tRanking.filter(u => u.maxScore < 209).length} <span style={{ fontSize: '0.5em', fontWeight: 'normal', color: '#666' }}>人</span>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '0.85em', color: '#666', marginBottom: '3px' }}>達成率</div>
+                      <div style={{ fontSize: '1.8em', fontWeight: 'bold', color: '#5c6bc0' }}>
+                        {tRanking.length > 0 ? Math.round((tRanking.filter(u => u.maxScore >= 209).length / tRanking.length) * 100) : 0} <span style={{ fontSize: '0.5em', fontWeight: 'normal', color: '#666' }}>%</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div style={{ marginTop: '15px' }}>
+                    <div style={{ background: '#e8e8e8', height: '10px', borderRadius: '5px', overflow: 'hidden' }}>
+                      <div style={{
+                        width: `${tRanking.length > 0 ? (tRanking.filter(u => u.maxScore >= 209).length / tRanking.length) * 100 : 0}%`,
+                        backgroundColor: '#4caf50',
+                        height: '100%'
+                      }}></div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -976,6 +1057,7 @@ export default function Admin() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" />
                     <YAxis label={{ value: 'スコア', angle: -90, position: 'insideLeft' }} domain={[0, 'auto']} ticks={[0, 100, 200, 300, 400, 500, 600, 700, 800]} />
+                    <ReferenceLine y={209} stroke="#e53935" strokeWidth={2} strokeDasharray="3 3" label={{ value: 'オフィス基準 (209)', fill: '#e53935', position: 'top' }} />
                     <Tooltip />
                     <Legend />
                     {/* Job Average Lines */}
