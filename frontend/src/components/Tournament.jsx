@@ -3,14 +3,25 @@ import { getRandomWord, CATEGORIES } from '../words';
 import { TypingSession, alignTextAndRuby } from '../utils/typingEngine';
 import './Game.css';
 
-// CPU Level 5 difficulty
-const CPU_DIFFICULTY_MS = 285;
+const CPU_DIFFICULTY_MAP = {
+    1: 400,
+    2: 363,
+    3: 333,
+    4: 307,
+    5: 285,
+    6: 266,
+    7: 244,
+    8: 222,
+    9: 200,
+    10: 158
+};
 const TOURNAMENT_GENRE = CATEGORIES.BUSINESS;
 
 export default function Tournament({ socket, onBackToHome }) {
     const [playerName, setPlayerName] = useState('');
     const [nameInput, setNameInput] = useState('');
     const [jobType, setJobType] = useState('CL');
+    const [cpuLevel, setCpuLevel] = useState(5);
     const [gameState, setGameState] = useState('setup'); // setup, waiting, countdown, playing, intermission, spectating, finished
     const [countdown, setCountdown] = useState(3);
     const [timeRemaining, setTimeRemaining] = useState(0);
@@ -52,6 +63,9 @@ export default function Tournament({ socket, onBackToHome }) {
         if (!socket) return;
 
         socket.on('tournamentState', (state) => {
+            if (state.cpuLevel) {
+                setCpuLevel(state.cpuLevel);
+            }
             if (state.status === 'active' && gameState === 'waiting') {
                 const remainingMs = state.endTime - Date.now();
                 if (remainingMs > 0) {
@@ -67,6 +81,9 @@ export default function Tournament({ socket, onBackToHome }) {
         });
 
         socket.on('tournamentStarted', (data) => {
+            if (data.cpuLevel) {
+                setCpuLevel(data.cpuLevel);
+            }
             if (gameState === 'waiting') {
                 const remainingMs = data.endTime - Date.now();
                 setTimeRemaining(Math.max(0, Math.ceil(remainingMs / 1000)));
@@ -188,7 +205,7 @@ export default function Tournament({ socket, onBackToHome }) {
     // CPU Logic
     useEffect(() => {
         if (gameState === 'playing') {
-            const msPerKey = CPU_DIFFICULTY_MS;
+            const msPerKey = CPU_DIFFICULTY_MAP[cpuLevel] || 285;
 
             const typeNextChar = () => {
                 if (gameState !== 'playing') return;
@@ -242,7 +259,7 @@ export default function Tournament({ socket, onBackToHome }) {
                 if (cpuIntervalRef.current) clearTimeout(cpuIntervalRef.current);
             };
         }
-    }, [gameState]);
+    }, [gameState, cpuLevel]);
 
     // Player Typing Logic
     const handleKeyDown = (e) => {

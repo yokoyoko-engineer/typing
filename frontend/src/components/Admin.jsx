@@ -61,6 +61,16 @@ export default function Admin() {
   const [tournamentScores, setTournamentScores] = useState([]);
   const [lobbyCount, setLobbyCount] = useState(0);
   const [lobbyPlayers, setLobbyPlayers] = useState([]);
+  const [adminCpuLevel, setAdminCpuLevel] = useState(5);
+  const [compareTourneyA, setCompareTourneyA] = useState('');
+  const [compareTourneyB, setCompareTourneyB] = useState('');
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareError, setCompareError] = useState(null);
+  const [comparisonResults, setComparisonResults] = useState([]);
+  const [compareSearchUser, setCompareSearchUser] = useState('');
+  const [compareJobType, setCompareJobType] = useState('すべて');
+  const [compareSortField, setCompareSortField] = useState('user_id');
+  const [compareSortOrder, setCompareSortOrder] = useState('asc');
 
   // --- Tournament Analysis State ---
   const [tMinUser, setTMinUser] = useState('1');
@@ -132,11 +142,91 @@ export default function Admin() {
 
   const handleStartTournament = () => {
     if (socket) {
-      if (window.confirm('タイピングイベントを開始しますか？（待機中の全ユーザーの画面でカウントダウンが始まります）')) {
-        socket.emit('adminStartTournament');
-        alert('イベント開始シグナルを送信しました。5分後に自動終了します。');
+      if (window.confirm(`CPUレベル ${adminCpuLevel} でタイピングイベントを開始しますか？（待機中の全ユーザーの画面でカウントダウンが始まります）`)) {
+        socket.emit('adminStartTournament', { cpuLevel: adminCpuLevel });
+        alert(`イベント開始シグナル（CPUレベル ${adminCpuLevel}）を送信しました。5分後に自動終了します。`);
         setTimeout(fetchTournaments, 2000); // Wait a bit to fetch the newly created tournament
       }
+    }
+  };
+
+  const handleCompareTournaments = async () => {
+    if (!compareTourneyA || !compareTourneyB) {
+      setCompareError('比較する2つの大会を選択してください。');
+      return;
+    }
+    if (compareTourneyA.toString() === compareTourneyB.toString()) {
+      setCompareError('異なる大会を選択してください。');
+      return;
+    }
+    
+    setCompareLoading(true);
+    setCompareError(null);
+    setComparisonResults([]);
+    
+    try {
+      const [resA, resB] = await Promise.all([
+        fetch(`/api/tournaments/${compareTourneyA}/scores`),
+        fetch(`/api/tournaments/${compareTourneyB}/scores`)
+      ]);
+      
+      if (!resA.ok || !resB.ok) {
+        throw new Error('スコアデータの取得に失敗しました。');
+      }
+      
+      const scoresA = await resA.json();
+      const scoresB = await resB.json();
+      
+      const userMap = {};
+      
+      scoresA.forEach(s => {
+        const uid = s.user_id;
+        userMap[uid] = {
+          user_id: uid,
+          job_type: s.job_type || COHORT_MAP[uid] || '',
+          scoreA: s.score,
+          scoreB: null
+        };
+      });
+      
+      scoresB.forEach(s => {
+        const uid = s.user_id;
+        if (userMap[uid]) {
+          userMap[uid].scoreB = s.score;
+          if (!userMap[uid].job_type && s.job_type) {
+            userMap[uid].job_type = s.job_type;
+          }
+        } else {
+          userMap[uid] = {
+            user_id: uid,
+            job_type: s.job_type || COHORT_MAP[uid] || '',
+            scoreA: null,
+            scoreB: s.score
+          };
+        }
+      });
+      
+      const merged = Object.values(userMap).map(u => {
+        let diff = null;
+        if (u.scoreA !== null && u.scoreB !== null) {
+          diff = u.scoreB - u.scoreA;
+        } else if (u.scoreA === null && u.scoreB !== null) {
+          diff = u.scoreB;
+        } else if (u.scoreA !== null && u.scoreB === null) {
+          diff = -u.scoreA;
+        }
+        return {
+          ...u,
+          diff
+        };
+      });
+      
+      setComparisonResults(merged);
+    } catch (err) {
+      console.error(err);
+      setCompareError(err.message || 'エラーが発生しました。');
+    } finally {
+      setCompareLoading(false);
     }
   };
 
@@ -824,6 +914,25 @@ export default function Admin() {
                 )}
               </div>
             </div>
+            <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <label style={{ fontWeight: 'bold', color: '#2c3e50' }}>CPUレベルを選択 (大会中のCPU強さ):</label>
+              <select
+                value={adminCpuLevel}
+                onChange={e => setAdminCpuLevel(parseInt(e.target.value, 10))}
+                style={{ padding: '10px', borderRadius: '5px', border: '1px solid #ccc', minWidth: '180px', fontWeight: 'bold' }}
+              >
+                <option value="1">レベル1 (C)</option>
+                <option value="2">レベル2 (C+)</option>
+                <option value="3">レベル3 (B-)</option>
+                <option value="4">レベル4 (B)</option>
+                <option value="5">レベル5 (B+) 【デフォルト】</option>
+                <option value="6">レベル6 (A-)</option>
+                <option value="7">レベル7 (A)</option>
+                <option value="8">レベル8 (A+)</option>
+                <option value="9">レベル9 (S)</option>
+                <option value="10">レベル10 (Fast)</option>
+              </select>
+            </div>
             <p style={{ color: '#666' }}>現在待機室にいるすべてのプレイヤーを対象にイベント（5分間）を開始します。</p>
             <button 
               onClick={handleStartTournament}
@@ -880,6 +989,310 @@ export default function Admin() {
                 ) : (
                   <p style={{ color: '#888' }}>このイベントには記録がありません。</p>
                 )}
+              </div>
+            )}
+          </div>
+
+          {/* 大会間スコア比較パネル */}
+          <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', marginTop: '30px' }}>
+            <h3 style={{ marginTop: 0, color: '#2c3e50', display: 'flex', alignItems: 'center' }}>
+              <span style={{ fontSize: '1.2em', marginRight: '8px' }}>⚖️</span> 大会間スコア比較
+            </h3>
+            <p style={{ color: '#666', fontSize: '0.9em' }}>2つの大会を選択し、社員番号ごとのスコアの変化や全体傾向を比較・分析できます。</p>
+            
+            <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap', background: '#f5f5f5', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
+              <div>
+                <label style={{ marginRight: '10px', fontWeight: 'bold' }}>大会A (基準):</label>
+                <select 
+                  value={compareTourneyA} 
+                  onChange={e => setCompareTourneyA(e.target.value)}
+                  style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc', minWidth: '220px' }}
+                >
+                  <option value="">-- 大会Aを選択 --</option>
+                  {tournaments.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div style={{ fontSize: '1.2em', color: '#888' }}>↔</div>
+              
+              <div>
+                <label style={{ marginRight: '10px', fontWeight: 'bold' }}>大会B (比較先):</label>
+                <select 
+                  value={compareTourneyB} 
+                  onChange={e => setCompareTourneyB(e.target.value)}
+                  style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc', minWidth: '220px' }}
+                >
+                  <option value="">-- 大会Bを選択 --</option>
+                  {tournaments.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <button 
+                onClick={handleCompareTournaments}
+                disabled={compareLoading || !compareTourneyA || !compareTourneyB}
+                style={{ 
+                  padding: '8px 20px', 
+                  background: '#5c6bc0', 
+                  color: '#fff', 
+                  border: 'none', 
+                  borderRadius: '5px', 
+                  cursor: (compareLoading || !compareTourneyA || !compareTourneyB) ? 'not-allowed' : 'pointer', 
+                  fontWeight: 'bold',
+                  opacity: (compareLoading || !compareTourneyA || !compareTourneyB) ? 0.7 : 1
+                }}
+              >
+                {compareLoading ? '比較中...' : '比較する'}
+              </button>
+            </div>
+            
+            {compareError && (
+              <div style={{ color: '#e53935', background: '#ffebee', padding: '10px', borderRadius: '5px', marginBottom: '20px' }}>
+                ⚠️ {compareError}
+              </div>
+            )}
+            
+            {comparisonResults.length > 0 && (
+              <div>
+                {/* 比較サマリーカード */}
+                <div style={{ display: 'flex', gap: '20px', marginBottom: '25px', flexWrap: 'wrap' }}>
+                  {/* 大会Aの概要 */}
+                  <div style={{ flex: '1 1 200px', background: '#f8f9fa', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #9e9e9e' }}>
+                    <div style={{ fontWeight: 'bold', color: '#555', marginBottom: '8px', fontSize: '0.9em' }}>
+                      大会A: {tournaments.find(t => t.id.toString() === compareTourneyA.toString())?.name || ''}
+                    </div>
+                    <div style={{ fontSize: '0.85em', color: '#666' }}>参加人数: <strong>{comparisonResults.filter(r => r.scoreA !== null).length}</strong> 人</div>
+                    <div style={{ fontSize: '0.85em', color: '#666', marginTop: '4px' }}>
+                      平均スコア: <strong>
+                        {(() => {
+                          const valid = comparisonResults.filter(r => r.scoreA !== null);
+                          return valid.length > 0 ? Math.round(valid.reduce((acc, r) => acc + r.scoreA, 0) / valid.length) : 0;
+                        })()}
+                      </strong>
+                    </div>
+                    <div style={{ fontSize: '0.85em', color: '#666', marginTop: '4px' }}>
+                      基準(209)達成率: <strong>
+                        {(() => {
+                          const valid = comparisonResults.filter(r => r.scoreA !== null);
+                          const met = valid.filter(r => r.scoreA >= 209);
+                          return valid.length > 0 ? Math.round((met.length / valid.length) * 100) : 0;
+                        })()}%
+                      </strong> ({comparisonResults.filter(r => r.scoreA >= 209).length}人)
+                    </div>
+                  </div>
+                  
+                  {/* 大会Bの概要 */}
+                  <div style={{ flex: '1 1 200px', background: '#f8f9fa', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #5c6bc0' }}>
+                    <div style={{ fontWeight: 'bold', color: '#555', marginBottom: '8px', fontSize: '0.9em' }}>
+                      大会B: {tournaments.find(t => t.id.toString() === compareTourneyB.toString())?.name || ''}
+                    </div>
+                    <div style={{ fontSize: '0.85em', color: '#666' }}>参加人数: <strong>{comparisonResults.filter(r => r.scoreB !== null).length}</strong> 人</div>
+                    <div style={{ fontSize: '0.85em', color: '#666', marginTop: '4px' }}>
+                      平均スコア: <strong>
+                        {(() => {
+                          const valid = comparisonResults.filter(r => r.scoreB !== null);
+                          return valid.length > 0 ? Math.round(valid.reduce((acc, r) => acc + r.scoreB, 0) / valid.length) : 0;
+                        })()}
+                      </strong>
+                    </div>
+                    <div style={{ fontSize: '0.85em', color: '#666', marginTop: '4px' }}>
+                      基準(209)達成率: <strong>
+                        {(() => {
+                          const valid = comparisonResults.filter(r => r.scoreB !== null);
+                          const met = valid.filter(r => r.scoreB >= 209);
+                          return valid.length > 0 ? Math.round((met.length / valid.length) * 100) : 0;
+                        })()}%
+                      </strong> ({comparisonResults.filter(r => r.scoreB >= 209).length}人)
+                    </div>
+                  </div>
+                  
+                  {/* スコア増減・成長傾向 */}
+                  <div style={{ flex: '1 1 250px', background: '#e8f5e9', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #4caf50' }}>
+                    <div style={{ fontWeight: 'bold', color: '#2e7d32', marginBottom: '8px', fontSize: '0.9em' }}>📈 スコア変化サマリー (大会A → 大会B)</div>
+                    {(() => {
+                      const both = comparisonResults.filter(r => r.scoreA !== null && r.scoreB !== null);
+                      const up = both.filter(r => r.diff > 0).length;
+                      const down = both.filter(r => r.diff < 0).length;
+                      const same = both.filter(r => r.diff === 0).length;
+                      const newPlayers = comparisonResults.filter(r => r.scoreA === null && r.scoreB !== null).length;
+                      const quitPlayers = comparisonResults.filter(r => r.scoreA !== null && r.scoreB === null).length;
+                      
+                      return (
+                        <div style={{ fontSize: '0.85em', color: '#333' }}>
+                          <div>両大会に参加: <strong>{both.length}</strong> 人</div>
+                          <div style={{ marginTop: '4px' }}>
+                            ├ 向上: <strong style={{ color: '#2e7d32' }}>{up}</strong> 人 / 
+                            低下: <strong style={{ color: '#c62828' }}>{down}</strong> 人 / 
+                            変化なし: <strong>{same}</strong> 人
+                          </div>
+                          <div style={{ marginTop: '4px' }}>
+                            新規参加（Bのみ）: <strong>{newPlayers}</strong> 人 / 
+                            不参加（Aのみ）: <strong>{quitPlayers}</strong> 人
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* フィルター・検索バー */}
+                <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', background: '#fafafa', padding: '10px', borderRadius: '5px', border: '1px solid #eee' }}>
+                  <div>
+                    <label style={{ marginRight: '8px', fontSize: '0.9em' }}>社員番号検索:</label>
+                    <input 
+                      type="text" 
+                      placeholder="社員番号を入力..." 
+                      value={compareSearchUser}
+                      onChange={e => setCompareSearchUser(e.target.value)}
+                      style={{ padding: '6px 10px', borderRadius: '4px', border: '1px solid #ccc', width: '150px', fontSize: '0.9em' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ marginRight: '8px', fontSize: '0.9em' }}>職種で絞り込み:</label>
+                    <select 
+                      value={compareJobType}
+                      onChange={e => setCompareJobType(e.target.value)}
+                      style={{ padding: '6px 10px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.9em' }}
+                    >
+                      <option value="すべて">すべて</option>
+                      <option value="CL">CL</option>
+                      <option value="JAVA">JAVA</option>
+                      <option value="ML">ML</option>
+                      <option value="FR">FR</option>
+                      <option value="QA">QA</option>
+                    </select>
+                  </div>
+                  <div style={{ color: '#888', fontSize: '0.85em', marginLeft: 'auto' }}>
+                    該当件数: {
+                      comparisonResults.filter(r => {
+                        const matchUser = r.user_id.toString().includes(compareSearchUser);
+                        const matchJob = compareJobType === 'すべて' || r.job_type === compareJobType;
+                        return matchUser && matchJob;
+                      }).length
+                    } 件
+                  </div>
+                </div>
+
+                {/* スコア比較詳細テーブル */}
+                <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid #eee', borderRadius: '8px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead style={{ position: 'sticky', top: 0, background: '#f5f5f5', zIndex: 1 }}>
+                      <tr style={{ borderBottom: '2px solid #ddd' }}>
+                        <th 
+                          onClick={() => {
+                            const isAsc = compareSortField === 'user_id' && compareSortOrder === 'asc';
+                            setCompareSortField('user_id');
+                            setCompareSortOrder(isAsc ? 'desc' : 'asc');
+                          }}
+                          style={{ padding: '12px', borderBottom: '2px solid #ddd', cursor: 'pointer', userSelect: 'none' }}
+                        >
+                          社員番号 {compareSortField === 'user_id' ? (compareSortOrder === 'asc' ? '▲' : '▼') : ''}
+                        </th>
+                        <th style={{ padding: '12px', borderBottom: '2px solid #ddd' }}>職種</th>
+                        <th 
+                          onClick={() => {
+                            const isAsc = compareSortField === 'scoreA' && compareSortOrder === 'asc';
+                            setCompareSortField('scoreA');
+                            setCompareSortOrder(isAsc ? 'desc' : 'asc');
+                          }}
+                          style={{ padding: '12px', borderBottom: '2px solid #ddd', textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
+                        >
+                          大会A スコア {compareSortField === 'scoreA' ? (compareSortOrder === 'asc' ? '▲' : '▼') : ''}
+                        </th>
+                        <th 
+                          onClick={() => {
+                            const isAsc = compareSortField === 'scoreB' && compareSortOrder === 'asc';
+                            setCompareSortField('scoreB');
+                            setCompareSortOrder(isAsc ? 'desc' : 'asc');
+                          }}
+                          style={{ padding: '12px', borderBottom: '2px solid #ddd', textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
+                        >
+                          大会B スコア {compareSortField === 'scoreB' ? (compareSortOrder === 'asc' ? '▲' : '▼') : ''}
+                        </th>
+                        <th 
+                          onClick={() => {
+                            const isAsc = compareSortField === 'diff' && compareSortOrder === 'asc';
+                            setCompareSortField('diff');
+                            setCompareSortOrder(isAsc ? 'desc' : 'asc');
+                          }}
+                          style={{ padding: '12px', borderBottom: '2px solid #ddd', textAlign: 'right', cursor: 'pointer', userSelect: 'none' }}
+                        >
+                          スコア差分 {compareSortField === 'diff' ? (compareSortOrder === 'asc' ? '▲' : '▼') : ''}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        let list = comparisonResults.filter(r => {
+                          const matchUser = r.user_id.toString().includes(compareSearchUser);
+                          const matchJob = compareJobType === 'すべて' || r.job_type === compareJobType;
+                          return matchUser && matchJob;
+                        });
+                        
+                        list.sort((a, b) => {
+                          let valA, valB;
+                          if (compareSortField === 'user_id') {
+                            valA = parseInt(a.user_id, 10) || 0;
+                            valB = parseInt(b.user_id, 10) || 0;
+                          } else if (compareSortField === 'scoreA') {
+                            valA = a.scoreA === null ? -9999 : a.scoreA;
+                            valB = b.scoreA === null ? -9999 : b.scoreA;
+                          } else if (compareSortField === 'scoreB') {
+                            valA = a.scoreB === null ? -9999 : a.scoreB;
+                            valB = b.scoreB === null ? -9999 : b.scoreB;
+                          } else if (compareSortField === 'diff') {
+                            valA = a.diff === null ? -9999 : a.diff;
+                            valB = b.diff === null ? -9999 : b.diff;
+                          }
+                          
+                          if (valA < valB) return compareSortOrder === 'asc' ? -1 : 1;
+                          if (valA > valB) return compareSortOrder === 'asc' ? 1 : -1;
+                          return 0;
+                        });
+                        
+                        return list.map((row, idx) => {
+                          let diffElement = null;
+                          if (row.scoreA !== null && row.scoreB !== null) {
+                            if (row.diff > 0) {
+                              diffElement = <span style={{ color: '#2e7d32', fontWeight: 'bold' }}>+{row.diff}</span>;
+                            } else if (row.diff < 0) {
+                              diffElement = <span style={{ color: '#c62828', fontWeight: 'bold' }}>{row.diff}</span>;
+                            } else {
+                              diffElement = <span style={{ color: '#777' }}>0</span>;
+                            }
+                          } else if (row.scoreA === null && row.scoreB !== null) {
+                            diffElement = <span style={{ color: '#1565c0', fontStyle: 'italic', fontSize: '0.85em' }}>Bのみ参加</span>;
+                          } else if (row.scoreA !== null && row.scoreB === null) {
+                            diffElement = <span style={{ color: '#e65100', fontStyle: 'italic', fontSize: '0.85em' }}>Aのみ参加</span>;
+                          }
+                          
+                          return (
+                            <tr key={idx} style={{ borderBottom: '1px solid #eee', background: idx % 2 === 0 ? '#fff' : '#fcfcfc' }}>
+                              <td style={{ padding: '10px 12px', fontWeight: 'bold', color: '#2c3e50' }}>{row.user_id}</td>
+                              <td style={{ padding: '10px 12px' }}>
+                                <span style={{ background: JOB_COLORS[row.job_type] || '#eee', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '0.8em', fontWeight: 'bold' }}>
+                                  {row.job_type || 'N/A'}
+                                </span>
+                              </td>
+                              <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: row.scoreA >= 209 ? 'bold' : 'normal', color: row.scoreA >= 209 ? '#2e7d32' : '#333' }}>
+                                {row.scoreA !== null ? row.scoreA : '-'}
+                              </td>
+                              <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: row.scoreB >= 209 ? 'bold' : 'normal', color: row.scoreB >= 209 ? '#2e7d32' : '#333' }}>
+                                {row.scoreB !== null ? row.scoreB : '-'}
+                              </td>
+                              <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                                {diffElement}
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>

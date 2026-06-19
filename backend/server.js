@@ -369,6 +369,7 @@ let tournamentState = {
   status: 'waiting', // waiting, active, finished
   tournamentId: null,
   endTime: null,
+  cpuLevel: 5,
   participants: {} // userId -> maxScore
 };
 
@@ -406,7 +407,7 @@ io.on('connection', (socket) => {
       players: Object.values(tournamentLobbyPlayers).map(p => p.name).slice(0, 100)
     });
     
-    socket.emit('tournamentState', { status: tournamentState.status, endTime: tournamentState.endTime });
+    socket.emit('tournamentState', { status: tournamentState.status, endTime: tournamentState.endTime, cpuLevel: tournamentState.cpuLevel });
   });
 
   socket.on('adminGetLobby', () => {
@@ -417,11 +418,14 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('adminStartTournament', async () => {
+  socket.on('adminStartTournament', async (data) => {
     if (tournamentState.status === 'active') return;
+    
+    const requestedCpuLevel = (data && data.cpuLevel) ? parseInt(data.cpuLevel, 10) : 5;
     
     tournamentState.status = 'active';
     tournamentState.endTime = Date.now() + 5 * 60 * 1000; // 5 minutes
+    tournamentState.cpuLevel = requestedCpuLevel;
     tournamentState.participants = {};
     
     // Create DB record
@@ -438,7 +442,7 @@ io.on('connection', (socket) => {
       console.error("Tournament creation error", err);
     }
 
-    io.to('tournament_lobby').emit('tournamentStarted', { endTime: tournamentState.endTime });
+    io.to('tournament_lobby').emit('tournamentStarted', { endTime: tournamentState.endTime, cpuLevel: tournamentState.cpuLevel });
     
     if (tournamentTimer) clearTimeout(tournamentTimer);
     
@@ -463,6 +467,7 @@ io.on('connection', (socket) => {
         tournamentState.status = 'waiting';
         tournamentState.tournamentId = null;
         tournamentState.endTime = null;
+        tournamentState.cpuLevel = 5;
         tournamentState.participants = {};
       }, 5000);
       
