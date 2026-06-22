@@ -361,10 +361,6 @@ function TournamentBattle({
                             <div className={`hud-card me ${playerInfo.hp <= 0 ? 'dead' : ''}`}>
                                 <div className="hud-header">
                                     <span>{playerName}</span>
-                                    <span>{playerInfo.hp} HP</span>
-                                </div>
-                                <div className="hp-bar-container">
-                                    <div className="hp-bar" style={{ width: `${Math.max(0, playerInfo.hp) / 10}%`, backgroundColor: '#4caf50' }}></div>
                                 </div>
                                 <div className="progress-container" style={{ marginTop: '8px', background: '#e8e8e8', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
                                     <div className="progress-bar" style={{
@@ -378,10 +374,6 @@ function TournamentBattle({
                             <div className={`hud-card ${cpuInfo.hp <= 0 ? 'dead' : ''}`}>
                                 <div className="hud-header">
                                     <span>CPU (Lv.5)</span>
-                                    <span>{cpuInfo.hp} HP</span>
-                                </div>
-                                <div className="hp-bar-container">
-                                    <div className="hp-bar" style={{ width: `${Math.max(0, cpuInfo.hp) / 10}%`, backgroundColor: '#f44336' }}></div>
                                 </div>
                                 <div className="progress-container" style={{ marginTop: '8px', background: '#e8e8e8', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
                                     <div className="progress-bar" style={{
