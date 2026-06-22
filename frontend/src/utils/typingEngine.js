@@ -219,6 +219,18 @@ export function alignTextAndRuby(text, ruby) {
 }
 
 
+const NA_LINE_FIRST_CHARS = new Set(['な', 'に', 'ぬ', 'ね', 'の', 'ナ', 'ニ', 'ヌ', 'ネ', 'ノ']);
+const A_YA_CHARS = new Set([
+    'あ', 'い', 'う', 'え', 'お',
+    'ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ',
+    'や', 'ゆ', 'よ',
+    'ゃ', 'ゅ', 'ょ',
+    'ア', 'イ', 'ウ', 'エ', 'オ',
+    'ァ', 'ィ', 'ゥ', 'ェ', 'ォ',
+    'ヤ', 'ユ', 'ヨ',
+    'ャ', 'ュ', 'ョ'
+]);
+
 const NUMBER_MAP = {
     '0': ['ぜろ', 'れい', 'まる'],
     '1': ['いち'],
@@ -328,12 +340,45 @@ export class TypingSession {
                 
                 opts = [...consonants, ...baseOpts];
             }
+            // 1.5 ん + な行の複合ノード化
+            else if (char === 'ん' && nextChar && NA_LINE_FIRST_CHARS.has(nextChar)) {
+                let naChars = nextChar;
+                let naOpts = [];
+                let naStep = 1;
+
+                if (nextNextChar && ROMAJI_MAP[nextChar + nextNextChar]) {
+                    naChars = nextChar + nextNextChar;
+                    naOpts = [...ROMAJI_MAP[naChars]];
+                    naStep = 2;
+                } else if (ROMAJI_MAP[nextChar]) {
+                    naOpts = [...ROMAJI_MAP[nextChar]];
+                }
+
+                if (naOpts.length > 0) {
+                    let combinedOpts = [];
+                    for (let opt of naOpts) {
+                        combinedOpts.push('n' + opt);
+                        combinedOpts.push('nn' + opt);
+                        combinedOpts.push("n'" + opt);
+                    }
+                    nodes.push({ opts: combinedOpts, chars: char + naChars });
+                    i += 1 + naStep;
+                    continue;
+                }
+            }
             // 2. Check for yoon (2 chars combined)
             else if (nextChar && ROMAJI_MAP[char + nextChar]) {
                 opts = [...ROMAJI_MAP[char + nextChar]];
                 step = 2; // consumed 2 chars
             }
             // 3. Single char
+            else if (char === 'ん') {
+                if (nextChar && A_YA_CHARS.has(nextChar)) {
+                    opts = ['nn', "n'"];
+                } else {
+                    opts = ['nn', 'n', "n'"];
+                }
+            }
             else if (ROMAJI_MAP[char]) {
                 opts = [...ROMAJI_MAP[char]];
             }
@@ -363,9 +408,9 @@ export class TypingSession {
         // Append rest
         for (let i = this.currentIndex + 1; i < this.nodes.length; i++) {
             if (this.nodes[i].chars === 'ん') {
-                if (this.currentIndex + 1 < this.nodes.length) {
-                    let nextOpts = this.nodes[this.currentIndex + 1].opts;
-                    let needsNn = nextOpts.some(o => ['a', 'i', 'u', 'e', 'o', 'y'].includes(o[0]));
+                if (i + 1 < this.nodes.length) {
+                    let nextOpts = this.nodes[i + 1].opts;
+                    let needsNn = nextOpts.some(o => ['a', 'i', 'u', 'e', 'o', 'y', 'n'].includes(o[0]));
                     res += needsNn ? 'nn' : 'n';
                 } else {
                     res += 'n';
@@ -380,8 +425,9 @@ export class TypingSession {
     input(char) {
         if (this.isFinished()) return null;
 
+        let currentNode = this.nodes[this.currentIndex];
         let nextPrefix = this.typedNodePrefix + char;
-        let validOpts = this.nodes[this.currentIndex].opts.filter(o => o.startsWith(nextPrefix));
+        let validOpts = currentNode.opts.filter(o => o.startsWith(nextPrefix));
 
         if (validOpts.length > 0) {
             // Correct input
@@ -414,6 +460,29 @@ export class TypingSession {
             return { success: true, finishedWord: false };
         }
 
+        // Special handling for 'n' followed by non-vowel/non-y/non-n consonant.
+        // If current node is 'ん', we have already typed 'n' (typedNodePrefix === 'n'),
+        // and the next char doesn't match any option of 'ん' (e.g. 'k' in 'kankei'),
+        // and the next node is NOT an "a/na/ya" line node,
+        // and the typed char is a valid start for the next node:
+        // then we auto-complete 'ん' with a single 'n' and apply the char to the next node.
+        if (currentNode.chars === 'ん' && this.typedNodePrefix === 'n') {
+            const nextNode = this.nodes[this.currentIndex + 1];
+            if (nextNode) {
+                const firstChar = nextNode.chars[0];
+                const isAnaya = A_YA_CHARS.has(firstChar) || NA_LINE_FIRST_CHARS.has(firstChar);
+                if (!isAnaya) {
+                    const nextValidOpts = nextNode.opts.filter(o => o.startsWith(char));
+                    if (nextValidOpts.length > 0) {
+                        // Advance 'ん' node
+                        this.currentIndex++;
+                        this.typedNodePrefix = '';
+                        // Process the char for the next node
+                        return this.input(char);
+                    }
+                }
+            }
+        }
 
         return { success: false, finishedWord: false };
     }

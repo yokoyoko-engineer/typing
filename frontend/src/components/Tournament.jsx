@@ -17,30 +17,96 @@ const CPU_DIFFICULTY_MAP = {
 };
 const TOURNAMENT_GENRE = CATEGORIES.BUSINESS;
 
-export default function Tournament({ socket, onBackToHome }) {
-    const [playerName, setPlayerName] = useState('');
-    const [nameInput, setNameInput] = useState('');
-    const [jobType, setJobType] = useState('CL');
-    const [cpuLevel, setCpuLevel] = useState(5);
-    const [gameState, setGameState] = useState('setup'); // setup, waiting, countdown, playing, intermission, spectating, finished
-    const [countdown, setCountdown] = useState(3);
-    const [timeRemaining, setTimeRemaining] = useState(0);
+// 1. Live Ranking Component (Optimized to update independently)
+function TournamentRanking({ socket, playerName, jobType, globalLegends, highestScore }) {
     const [liveRanking, setLiveRanking] = useState([]);
-    const [lastResult, setLastResult] = useState(null);
-    const usedWordsRef = useRef(new Set());
-    
-    // Past Tournaments State
-    const [pastTournaments, setPastTournaments] = useState([]);
-    const [selectedPastId, setSelectedPastId] = useState('');
-    const [pastScores, setPastScores] = useState([]);
-    const [globalLegends, setGlobalLegends] = useState([]);
-    
-    // Typing state
+
+    useEffect(() => {
+        if (!socket) return;
+
+        socket.on('tournamentLiveRanking', (ranking) => {
+            setLiveRanking(ranking);
+        });
+
+        return () => {
+            socket.off('tournamentLiveRanking');
+        };
+    }, [socket]);
+
+    return (
+        <div style={{ width: '300px', paddingLeft: '20px', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ background: '#f5f5f5', borderRadius: '10px', padding: '15px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <h3 style={{ margin: '0 0 15px 0', textAlign: 'center', color: '#2c3e50' }}>
+                    🔥 リアルタイムランキング
+                </h3>
+                <div style={{ flex: 1, overflowY: 'auto', maxHeight: '400px' }}>
+                    {liveRanking.length > 0 ? (
+                        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 5px' }}>
+                            <tbody>
+                                {liveRanking.map((entry, idx) => {
+                                    const isMe = entry.user_id === playerName;
+                                    const legendThreshold = globalLegends.length >= 5 ? globalLegends[4].score : 0;
+                                    const isLegendBeat = entry.score > legendThreshold && entry.score > 0;
+                                    
+                                    return (
+                                        <tr key={idx} style={{ 
+                                            background: isLegendBeat ? 'linear-gradient(90deg, #FFD700 0%, #FDB931 100%)' : (isMe ? '#e8eaf6' : '#fff'),
+                                            fontWeight: isMe || isLegendBeat ? 'bold' : 'normal',
+                                            boxShadow: isLegendBeat ? '0 0 10px rgba(255,215,0,0.8)' : '0 1px 3px rgba(0,0,0,0.1)',
+                                            transform: isLegendBeat ? 'scale(1.02)' : 'none',
+                                            transition: 'all 0.3s',
+                                            borderRadius: '5px'
+                                        }}>
+                                            <td style={{ padding: '8px 5px', width: '40px', color: isLegendBeat ? '#000' : (idx < 3 ? '#e8734a' : '#888'), borderRadius: '5px 0 0 5px' }}>
+                                                {idx + 1}.
+                                            </td>
+                                            <td style={{ padding: '8px 5px', color: isLegendBeat ? '#000' : 'inherit' }}>
+                                                {isLegendBeat && <span style={{marginRight: '5px'}}>👑</span>}
+                                                {entry.jobType ? `[${entry.jobType}] ` : ''}{entry.user_id}
+                                            </td>
+                                            <td style={{ padding: '8px 5px', textAlign: 'right', color: isLegendBeat ? '#000' : '#5c6bc0', borderRadius: '0 5px 5px 0' }}>
+                                                {entry.score}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    ) : (
+                        <p style={{ textAlign: 'center', color: '#aaa', marginTop: '50px' }}>まだスコアがありません</p>
+                    )}
+                </div>
+                <div style={{ marginTop: '15px', padding: '10px', background: '#e8eaf6', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.9em', color: '#666' }}>あなたの最高スコア</div>
+                    <div style={{ fontSize: '1.5em', fontWeight: 'bold', color: '#2c3e50' }}>{highestScore}</div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// 2. Battle (Typing) Component
+function TournamentBattle({
+    socket,
+    playerName,
+    jobType,
+    cpuLevel,
+    gameState,
+    setGameState,
+    timeRemaining,
+    lastResult,
+    setLastResult,
+    highestScore,
+    setHighestScore,
+    onBackToHome
+}) {
     const [playerInfo, setPlayerInfo] = useState({ hp: 1000, currentWord: null, typingState: null });
     const [cpuInfo, setCpuInfo] = useState({ hp: 1000, currentWord: null, typingState: null });
     const [damageFlash, setDamageFlash] = useState(false);
     const [isMiss, setIsMiss] = useState(false);
+    const [countdown, setCountdown] = useState(3);
 
+    const usedWordsRef = useRef(new Set());
     const inputRef = useRef(null);
     const cpuIntervalRef = useRef(null);
     const cpuStateRef = useRef(cpuInfo);
@@ -49,141 +115,15 @@ export default function Tournament({ socket, onBackToHome }) {
     const pSessionRef = useRef(null);
     const cSessionRef = useRef(null);
     
-    // For e-typing score calculation
     const currentBattleStartRef = useRef(null);
     const playerStatsRef = useRef({ missCount: 0, totalCorrect: 0 });
-    
-    const highestScoreRef = useRef(0);
 
     useEffect(() => { cpuStateRef.current = cpuInfo; }, [cpuInfo]);
     useEffect(() => { playerStateRef.current = playerInfo; }, [playerInfo]);
 
-    // Socket Event Listeners
-    useEffect(() => {
-        if (!socket) return;
-
-        socket.on('tournamentState', (state) => {
-            if (state.cpuLevel) {
-                setCpuLevel(state.cpuLevel);
-            }
-            if (state.status === 'active' && gameState === 'waiting') {
-                const remainingMs = state.endTime - Date.now();
-                if (remainingMs > 0) {
-                    setTimeRemaining(Math.ceil(remainingMs / 1000));
-                    setGameState('playing');
-                    startNewBattle();
-                } else {
-                    setGameState('finished');
-                }
-            } else if (state.status === 'finished') {
-                setGameState('finished');
-            }
-        });
-
-        socket.on('tournamentStarted', (data) => {
-            if (data.cpuLevel) {
-                setCpuLevel(data.cpuLevel);
-            }
-            if (gameState === 'waiting') {
-                const remainingMs = data.endTime - Date.now();
-                setTimeRemaining(Math.max(0, Math.ceil(remainingMs / 1000)));
-                usedWordsRef.current = new Set();
-                setGameState('countdown');
-                setCountdown(3);
-            }
-        });
-
-        socket.on('tournamentFinished', () => {
-            setGameState('finished');
-        });
-
-        socket.on('tournamentLiveRanking', (ranking) => {
-            setLiveRanking(ranking);
-        });
-
-        return () => {
-            socket.off('tournamentState');
-            socket.off('tournamentStarted');
-            socket.off('tournamentFinished');
-            socket.off('tournamentLiveRanking');
-        };
-    }, [socket, gameState]);
-
-    const handleJoin = () => {
-        const trimmed = nameInput.trim();
-        if (/^[0-9]{1,4}$/.test(trimmed)) {
-            setPlayerName(trimmed);
-            socket.emit('joinTournament', { playerName: trimmed, jobType });
-            setGameState('waiting');
-        } else {
-            alert('社員番号は1〜4桁の数字で入力してください');
-        }
-    };
-
-    // Countdown Logic
-    useEffect(() => {
-        if (gameState === 'countdown') {
-            if (countdown > 0) {
-                const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-                return () => clearTimeout(timer);
-            } else {
-                setGameState('playing');
-                startNewBattle();
-            }
-        }
-    }, [gameState, countdown]);
-
-    // Global Tournament Timer
-    useEffect(() => {
-        if (gameState === 'playing' || gameState === 'intermission' || gameState === 'spectating') {
-            const timer = setInterval(() => {
-                setTimeRemaining((prev) => {
-                    if (prev <= 1) {
-                        clearInterval(timer);
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
-            return () => clearInterval(timer);
-        }
-    }, [gameState]);
-
-    // Fetch past tournaments for setup screen
-    useEffect(() => {
-        if (gameState === 'setup') {
-            fetch('/api/tournaments')
-                .then(res => res.json())
-                .then(data => {
-                    const latest5 = data.slice(0, 5);
-                    setPastTournaments(latest5);
-                    if (latest5.length > 0) {
-                        setSelectedPastId(latest5[0].id.toString());
-                    }
-                })
-                .catch(err => console.error(err));
-                
-            fetch('/api/tournaments/legends')
-                .then(res => res.json())
-                .then(data => setGlobalLegends(data))
-                .catch(err => console.error(err));
-        }
-    }, [gameState]);
-
-    useEffect(() => {
-        if (selectedPastId) {
-            fetch(`/api/tournaments/${selectedPastId}/scores`)
-                .then(res => res.json())
-                .then(data => setPastScores(data))
-                .catch(err => console.error(err));
-        } else {
-            setPastScores([]);
-        }
-    }, [selectedPastId]);
-
     // Keep focus
     useEffect(() => {
-        if (gameState === 'playing' && inputRef.current) {
+        if ((gameState === 'playing' || gameState === 'ready') && inputRef.current) {
             inputRef.current.focus();
         }
     }, [gameState, playerInfo]);
@@ -202,6 +142,19 @@ export default function Tournament({ socket, onBackToHome }) {
         setCpuInfo({ hp: 1000, currentWord: cWord, typingState: cSessionRef.current.state });
     };
 
+    // Countdown Logic
+    useEffect(() => {
+        if (gameState === 'countdown') {
+            if (countdown > 0) {
+                const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+                return () => clearTimeout(timer);
+            } else {
+                setGameState('playing');
+                startNewBattle();
+            }
+        }
+    }, [gameState, countdown]);
+
     // CPU Logic
     useEffect(() => {
         if (gameState === 'playing') {
@@ -214,6 +167,7 @@ export default function Tournament({ socket, onBackToHome }) {
                 let pState = playerStateRef.current;
 
                 if (currentCpu.hp <= 0 || pState.hp <= 0) return;
+                if (!cSessionRef.current || !cSessionRef.current.state.targetRomaji) return;
 
                 const charToType = cSessionRef.current.state.targetRomaji[0];
                 const res = cSessionRef.current.input(charToType);
@@ -263,6 +217,15 @@ export default function Tournament({ socket, onBackToHome }) {
 
     // Player Typing Logic
     const handleKeyDown = (e) => {
+        if (gameState === 'ready') {
+            if (e.key === ' ' || e.code === 'Space') {
+                e.preventDefault();
+                setCountdown(3);
+                setGameState('countdown');
+            }
+            return;
+        }
+
         if (gameState !== 'playing' || playerInfo.hp <= 0) return;
 
         if (e.key.length === 1) {
@@ -301,8 +264,8 @@ export default function Tournament({ socket, onBackToHome }) {
                             eScore = Math.round(wpm * Math.pow(accuracy, 3));
                         }
                         
-                        if (eScore > highestScoreRef.current) {
-                            highestScoreRef.current = eScore;
+                        if (eScore > highestScore) {
+                            setHighestScore(eScore);
                             socket.emit('tournamentUpdateScore', { playerName, score: eScore, jobType });
                         }
                         
@@ -321,12 +284,345 @@ export default function Tournament({ socket, onBackToHome }) {
         }
     };
 
-    // Render Helpers
     const formatTime = (seconds) => {
         const m = Math.floor(seconds / 60);
         const s = seconds % 60;
         return `${m}:${s.toString().padStart(2, '0')}`;
     };
+
+    if (gameState === 'ready') {
+        return (
+            <div 
+                className="game-container battle-screen ready-screen" 
+                onKeyDown={handleKeyDown} 
+                tabIndex="0" 
+                ref={inputRef} 
+                style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    height: '100%', 
+                    flex: 1, 
+                    outline: 'none',
+                    background: '#fcfcfc',
+                    boxShadow: 'inset 0 0 10px rgba(0,0,0,0.02)'
+                }}
+            >
+                <div style={{ textAlign: 'center' }}>
+                    <div 
+                        style={{ 
+                            fontSize: '3.5em', 
+                            fontWeight: 'bold', 
+                            color: '#5c6bc0', 
+                            marginBottom: '20px', 
+                            animation: 'pulse 1.5s infinite',
+                            textShadow: '0 2px 4px rgba(92,107,192,0.1)'
+                        }}
+                    >
+                        スペースキーで開始
+                    </div>
+                    <div style={{ fontSize: '1.2em', color: '#888' }}>
+                        スペースキーを押すとカウントダウンが始まります
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (gameState === 'countdown') {
+        return (
+            <div className="game-container battle-screen" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#fafafa' }}>
+                <h1 style={{ fontSize: '8em', textAlign: 'center', margin: 0, color: '#2c3e50', fontWeight: 'bold' }}>
+                    {countdown}
+                </h1>
+            </div>
+        );
+    }
+
+    return (
+        <div className={`game-container battle-screen ${damageFlash ? 'flash-damage' : ''}`} onKeyDown={gameState === 'playing' ? handleKeyDown : undefined} tabIndex="0" ref={inputRef} style={{ flex: 1, outline: 'none' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <span style={{ fontSize: '1.2em', fontWeight: 'bold', color: '#2c3e50' }}>イベントモード: {TOURNAMENT_GENRE}</span>
+                    <span style={{ fontSize: '1.5em', fontWeight: 'bold', color: '#e53935' }}>
+                        残り時間: {formatTime(timeRemaining)}
+                    </span>
+                </div>
+
+                {gameState === 'playing' && (
+                    <>
+                        <div className="players-hud" style={{ marginBottom: '30px' }}>
+                            {/* Player HUD */}
+                            <div className={`hud-card me ${playerInfo.hp <= 0 ? 'dead' : ''}`}>
+                                <div className="hud-header">
+                                    <span>{playerName}</span>
+                                    <span>{playerInfo.hp} HP</span>
+                                </div>
+                                <div className="hp-bar-container">
+                                    <div className="hp-bar" style={{ width: `${Math.max(0, playerInfo.hp) / 10}%`, backgroundColor: '#4caf50' }}></div>
+                                </div>
+                                <div className="progress-container" style={{ marginTop: '8px', background: '#e8e8e8', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
+                                    <div className="progress-bar" style={{
+                                        width: playerInfo.typingState ? `${(playerInfo.typingState.typedRomaji.length / Math.max(1, playerInfo.typingState.typedRomaji.length + playerInfo.typingState.targetRomaji.length)) * 100}%` : '0%',
+                                        backgroundColor: '#5c6bc0', height: '100%', transition: 'width 0.1s'
+                                    }}></div>
+                                </div>
+                            </div>
+
+                            {/* CPU HUD */}
+                            <div className={`hud-card ${cpuInfo.hp <= 0 ? 'dead' : ''}`}>
+                                <div className="hud-header">
+                                    <span>CPU (Lv.5)</span>
+                                    <span>{cpuInfo.hp} HP</span>
+                                </div>
+                                <div className="hp-bar-container">
+                                    <div className="hp-bar" style={{ width: `${Math.max(0, cpuInfo.hp) / 10}%`, backgroundColor: '#f44336' }}></div>
+                                </div>
+                                <div className="progress-container" style={{ marginTop: '8px', background: '#e8e8e8', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
+                                    <div className="progress-bar" style={{
+                                        width: cpuInfo.typingState ? `${(cpuInfo.typingState.typedRomaji.length / Math.max(1, cpuInfo.typingState.typedRomaji.length + cpuInfo.typingState.targetRomaji.length)) * 100}%` : '0%',
+                                        backgroundColor: '#e8734a', height: '100%', transition: 'width 0.1s'
+                                    }}></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="typing-area" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            {playerInfo.hp > 0 && cpuInfo.hp > 0 ? (
+                                <>
+                                    <div className="target-word-japanese">
+                                        <div className="ruby" style={{ fontSize: '0.9em', color: '#888', marginBottom: '5px' }}>
+                                            {playerInfo.typingState ? (
+                                                <>
+                                                    <span style={{ color: '#ff9800' }}>{playerInfo.typingState.typedRuby}</span>
+                                                    <span>{playerInfo.typingState.targetRuby}</span>
+                                                </>
+                                            ) : playerInfo.currentWord?.ruby}
+                                        </div>
+                                        <div className="kanji" style={{ fontSize: '2.5em', fontWeight: 'bold', marginBottom: '15px' }}>
+                                            {(() => {
+                                                if (!playerInfo.currentWord?.text) return null;
+                                                if (!playerInfo.typingState || !playerInfo.typingState.typedRuby) return <span style={{ color: '#2c3e50' }}>{playerInfo.currentWord.text}</span>;
+                                                
+                                                const chunks = alignTextAndRuby(playerInfo.currentWord.text, playerInfo.currentWord.ruby);
+                                                let remainingTypedRuby = playerInfo.typingState.typedRuby.length;
+
+                                                return chunks.map((chunk, index) => {
+                                                  let chunkRubyLen = chunk.ruby.length;
+                                                  let chunkTypedRubyLen = Math.min(remainingTypedRuby, chunkRubyLen);
+                                                  remainingTypedRuby -= chunkTypedRubyLen;
+
+                                                  let coloredTextChars = 0;
+                                                  if (chunkRubyLen > 0) {
+                                                      let ratio = chunkTypedRubyLen / chunkRubyLen;
+                                                      coloredTextChars = Math.floor(ratio * chunk.text.length);
+                                                  } else {
+                                                      coloredTextChars = remainingTypedRuby > 0 ? chunk.text.length : 0;
+                                                  }
+                                                  
+                                                  let greenText = chunk.text.substring(0, coloredTextChars);
+                                                  let blueText = chunk.text.substring(coloredTextChars);
+                                                  
+                                                  return (
+                                                      <React.Fragment key={index}>
+                                                          {greenText && <span style={{ color: '#ff9800' }}>{greenText}</span>}
+                                                          {blueText && <span style={{ color: '#2c3e50' }}>{blueText}</span>}
+                                                      </React.Fragment>
+                                                  );
+                                                });
+                                            })()}
+                                        </div>
+                                    </div>
+                                    <div className="target-word" style={{ fontSize: '2em' }}>
+                                        {playerInfo.typingState && (
+                                            <>
+                                                <span className="char typed" style={{ color: '#ff9800' }}>{playerInfo.typingState.typedRomaji}</span>
+                                                {playerInfo.typingState.targetRomaji.length > 0 && (
+                                                    <span className={`char ${isMiss ? 'miss' : 'current'}`}>{playerInfo.typingState.targetRomaji[0]}</span>
+                                                )}
+                                                <span className="char">{playerInfo.typingState.targetRomaji.slice(1)}</span>
+                                            </>
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <h2 style={{ color: playerInfo.hp <= 0 ? '#e53935' : '#4caf50' }}>
+                                    {playerInfo.hp <= 0 ? 'DEFEATED! Restarting...' : 'VICTORY! Restarting...'}
+                                </h2>
+                            )}
+                        </div>
+                    </>
+                )}
+
+                {gameState === 'intermission' && (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                        <h2 style={{ fontSize: '4em', margin: 0, color: lastResult?.status === 'win' ? '#4caf50' : '#e53935' }}>
+                            {lastResult?.status === 'win' ? 'VICTORY!' : 'DEFEATED...'}
+                        </h2>
+                        {lastResult?.status === 'win' && (
+                            <div style={{ fontSize: '1.5em', margin: '20px 0' }}>
+                                今回のスコア: <span style={{ fontWeight: 'bold', color: '#5c6bc0', fontSize: '1.5em' }}>{lastResult.score}</span>
+                            </div>
+                        )}
+                        <div style={{ display: 'flex', gap: '20px', marginTop: '40px' }}>
+                            <button className="action-btn" onClick={() => {
+                                setGameState('ready');
+                            }}>
+                                もう一度挑戦する
+                            </button>
+                            <button className="action-btn" style={{ background: '#e0e0e0', color: '#333' }} onClick={() => {
+                                setGameState('spectating');
+                            }}>
+                                待機してランキングを見る
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {gameState === 'spectating' && (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                        <h2 style={{ fontSize: '2.5em', color: '#5c6bc0' }}>観戦モード</h2>
+                        <p style={{ fontSize: '1.2em', color: '#666' }}>他のプレイヤーの進行を見守っています...</p>
+                        <button className="action-btn" style={{ marginTop: '40px' }} onClick={() => {
+                            setGameState('ready');
+                        }}>
+                            もう一度挑戦する
+                        </button>
+                    </div>
+                )}
+
+                {gameState === 'finished' && (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                        <h2 style={{ fontSize: '3em', color: '#2c3e50' }}>イベント終了！</h2>
+                        <p style={{ fontSize: '1.2em' }}>最終ランキングをご確認ください</p>
+                        <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '20px' }}>Homeへ戻る</button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// 3. Parent Component
+export default function Tournament({ socket, onBackToHome }) {
+    const [playerName, setPlayerName] = useState('');
+    const [nameInput, setNameInput] = useState('');
+    const [jobType, setJobType] = useState('CL');
+    const [cpuLevel, setCpuLevel] = useState(5);
+    const [gameState, setGameState] = useState('setup'); // setup, waiting, ready, countdown, playing, intermission, spectating, finished
+    const [timeRemaining, setTimeRemaining] = useState(0);
+    const [lastResult, setLastResult] = useState(null);
+    const [highestScore, setHighestScore] = useState(0);
+    
+    // Past Tournaments State
+    const [pastTournaments, setPastTournaments] = useState([]);
+    const [selectedPastId, setSelectedPastId] = useState('');
+    const [pastScores, setPastScores] = useState([]);
+    const [globalLegends, setGlobalLegends] = useState([]);
+
+    // Socket Event Listeners
+    useEffect(() => {
+        if (!socket) return;
+
+        socket.on('tournamentState', (state) => {
+            if (state.cpuLevel) {
+                setCpuLevel(state.cpuLevel);
+            }
+            if (state.status === 'active' && gameState === 'waiting') {
+                const remainingMs = state.endTime - Date.now();
+                if (remainingMs > 0) {
+                    setTimeRemaining(Math.ceil(remainingMs / 1000));
+                    setGameState('ready'); // 管理者が開始した後は ready 状態になる (自動で countdown はしない)
+                } else {
+                    setGameState('finished');
+                }
+            } else if (state.status === 'finished') {
+                setGameState('finished');
+            }
+        });
+
+        socket.on('tournamentStarted', (data) => {
+            if (data.cpuLevel) {
+                setCpuLevel(data.cpuLevel);
+            }
+            if (gameState === 'waiting') {
+                const remainingMs = data.endTime - Date.now();
+                setTimeRemaining(Math.max(0, Math.ceil(remainingMs / 1000)));
+                setGameState('ready'); // countdown ではなく ready
+            }
+        });
+
+        socket.on('tournamentFinished', () => {
+            setGameState('finished');
+        });
+
+        return () => {
+            socket.off('tournamentState');
+            socket.off('tournamentStarted');
+            socket.off('tournamentFinished');
+        };
+    }, [socket, gameState]);
+
+    const handleJoin = () => {
+        const trimmed = nameInput.trim();
+        if (/^[0-9]{1,4}$/.test(trimmed)) {
+            setPlayerName(trimmed);
+            socket.emit('joinTournament', { playerName: trimmed, jobType });
+            setGameState('waiting');
+        } else {
+            alert('社員番号は1〜4桁の数字で入力してください');
+        }
+    };
+
+    // Global Tournament Timer
+    useEffect(() => {
+        if (gameState === 'playing' || gameState === 'intermission' || gameState === 'spectating' || gameState === 'ready' || gameState === 'countdown') {
+            const timer = setInterval(() => {
+                setTimeRemaining((prev) => {
+                    if (prev <= 1) {
+                        clearInterval(timer);
+                        setGameState('finished');
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+            return () => clearInterval(timer);
+        }
+    }, [gameState]);
+
+    // Fetch past tournaments for setup screen
+    useEffect(() => {
+        if (gameState === 'setup') {
+            fetch('/api/tournaments')
+                .then(res => res.json())
+                .then(data => {
+                    const latest5 = data.slice(0, 5);
+                    setPastTournaments(latest5);
+                    if (latest5.length > 0) {
+                        setSelectedPastId(latest5[0].id.toString());
+                    }
+                })
+                .catch(err => console.error(err));
+                
+            fetch('/api/tournaments/legends')
+                .then(res => res.json())
+                .then(data => setGlobalLegends(data))
+                .catch(err => console.error(err));
+        }
+    }, [gameState]);
+
+    useEffect(() => {
+        if (selectedPastId) {
+            fetch(`/api/tournaments/${selectedPastId}/scores`)
+                .then(res => res.json())
+                .then(data => setPastScores(data))
+                .catch(err => console.error(err));
+        } else {
+            setPastScores([]);
+        }
+    }, [selectedPastId]);
 
     if (gameState === 'setup') {
         return (
@@ -450,233 +746,30 @@ export default function Tournament({ socket, onBackToHome }) {
         );
     }
 
-    if (gameState === 'countdown') {
-        return (
-            <div className="game-container battle-screen">
-                <h1 style={{ fontSize: '8em', textAlign: 'center', marginTop: '20vh' }}>
-                    {countdown}
-                </h1>
-            </div>
-        );
-    }
-
     return (
-        <div className={`game-container battle-screen ${damageFlash ? 'flash-damage' : ''}`} onKeyDown={gameState === 'playing' ? handleKeyDown : undefined} tabIndex="0" ref={inputRef}>
-            
-            <div style={{ display: 'flex', height: '100%' }}>
-                
-                {/* Main Battle Area */}
-                <div style={{ flex: 1, paddingRight: '20px', borderRight: '2px dashed #ddd', display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                        <span style={{ fontSize: '1.2em', fontWeight: 'bold', color: '#2c3e50' }}>イベントモード: {TOURNAMENT_GENRE}</span>
-                        <span style={{ fontSize: '1.5em', fontWeight: 'bold', color: '#e53935' }}>
-                            残り時間: {formatTime(timeRemaining)}
-                        </span>
-                    </div>
-
-                    {gameState === 'playing' && (
-                        <>
-                            <div className="players-hud" style={{ marginBottom: '30px' }}>
-                                {/* Player HUD */}
-                                <div className={`hud-card me ${playerInfo.hp <= 0 ? 'dead' : ''}`}>
-                                    <div className="hud-header">
-                                        <span>{playerName}</span>
-                                        <span>{playerInfo.hp} HP</span>
-                                    </div>
-                                    <div className="hp-bar-container">
-                                        <div className="hp-bar" style={{ width: `${Math.max(0, playerInfo.hp) / 10}%`, backgroundColor: '#4caf50' }}></div>
-                                    </div>
-                                    <div className="progress-container" style={{ marginTop: '8px', background: '#e8e8e8', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
-                                        <div className="progress-bar" style={{
-                                            width: playerInfo.typingState ? `${(playerInfo.typingState.typedRomaji.length / Math.max(1, playerInfo.typingState.typedRomaji.length + playerInfo.typingState.targetRomaji.length)) * 100}%` : '0%',
-                                            backgroundColor: '#5c6bc0', height: '100%', transition: 'width 0.1s'
-                                        }}></div>
-                                    </div>
-                                </div>
-
-                                {/* CPU HUD */}
-                                <div className={`hud-card ${cpuInfo.hp <= 0 ? 'dead' : ''}`}>
-                                    <div className="hud-header">
-                                        <span>CPU (Lv.5)</span>
-                                        <span>{cpuInfo.hp} HP</span>
-                                    </div>
-                                    <div className="hp-bar-container">
-                                        <div className="hp-bar" style={{ width: `${Math.max(0, cpuInfo.hp) / 10}%`, backgroundColor: '#f44336' }}></div>
-                                    </div>
-                                    <div className="progress-container" style={{ marginTop: '8px', background: '#e8e8e8', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
-                                        <div className="progress-bar" style={{
-                                            width: cpuInfo.typingState ? `${(cpuInfo.typingState.typedRomaji.length / Math.max(1, cpuInfo.typingState.typedRomaji.length + cpuInfo.typingState.targetRomaji.length)) * 100}%` : '0%',
-                                            backgroundColor: '#e8734a', height: '100%', transition: 'width 0.1s'
-                                        }}></div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="typing-area" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                {playerInfo.hp > 0 && cpuInfo.hp > 0 ? (
-                                    <>
-                                        <div className="target-word-japanese">
-                                            <div className="ruby" style={{ fontSize: '0.9em', color: '#888', marginBottom: '5px' }}>
-                                                {playerInfo.typingState ? (
-                                                    <>
-                                                        <span style={{ color: '#ff9800' }}>{playerInfo.typingState.typedRuby}</span>
-                                                        <span>{playerInfo.typingState.targetRuby}</span>
-                                                    </>
-                                                ) : playerInfo.currentWord?.ruby}
-                                            </div>
-                                            <div className="kanji" style={{ fontSize: '2.5em', fontWeight: 'bold', marginBottom: '15px' }}>
-                                                {(() => {
-                                                    if (!playerInfo.currentWord?.text) return null;
-                                                    if (!playerInfo.typingState || !playerInfo.typingState.typedRuby) return <span style={{ color: '#2c3e50' }}>{playerInfo.currentWord.text}</span>;
-                                                    
-                                                    const chunks = alignTextAndRuby(playerInfo.currentWord.text, playerInfo.currentWord.ruby);
-                                                    let remainingTypedRuby = playerInfo.typingState.typedRuby.length;
-
-                                                    return chunks.map((chunk, index) => {
-                                                      let chunkRubyLen = chunk.ruby.length;
-                                                      let chunkTypedRubyLen = Math.min(remainingTypedRuby, chunkRubyLen);
-                                                      remainingTypedRuby -= chunkTypedRubyLen;
-
-                                                      let coloredTextChars = 0;
-                                                      if (chunkRubyLen > 0) {
-                                                          let ratio = chunkTypedRubyLen / chunkRubyLen;
-                                                          coloredTextChars = Math.floor(ratio * chunk.text.length);
-                                                      } else {
-                                                          coloredTextChars = remainingTypedRuby > 0 ? chunk.text.length : 0;
-                                                      }
-                                                      
-                                                      let greenText = chunk.text.substring(0, coloredTextChars);
-                                                      let blueText = chunk.text.substring(coloredTextChars);
-                                                      
-                                                      return (
-                                                          <React.Fragment key={index}>
-                                                              {greenText && <span style={{ color: '#ff9800' }}>{greenText}</span>}
-                                                              {blueText && <span style={{ color: '#2c3e50' }}>{blueText}</span>}
-                                                          </React.Fragment>
-                                                      );
-                                                    });
-                                                })()}
-                                            </div>
-                                        </div>
-                                        <div className="target-word" style={{ fontSize: '2em' }}>
-                                            {playerInfo.typingState && (
-                                                <>
-                                                    <span className="char typed" style={{ color: '#ff9800' }}>{playerInfo.typingState.typedRomaji}</span>
-                                                    {playerInfo.typingState.targetRomaji.length > 0 && (
-                                                        <span className={`char ${isMiss ? 'miss' : 'current'}`}>{playerInfo.typingState.targetRomaji[0]}</span>
-                                                    )}
-                                                    <span className="char">{playerInfo.typingState.targetRomaji.slice(1)}</span>
-                                                </>
-                                            )}
-                                        </div>
-                                    </>
-                                ) : (
-                                    <h2 style={{ color: playerInfo.hp <= 0 ? '#e53935' : '#4caf50' }}>
-                                        {playerInfo.hp <= 0 ? 'DEFEATED! Restarting...' : 'VICTORY! Restarting...'}
-                                    </h2>
-                                )}
-                            </div>
-                        </>
-                    )}
-
-                    {gameState === 'intermission' && (
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                            <h2 style={{ fontSize: '4em', margin: 0, color: lastResult?.status === 'win' ? '#4caf50' : '#e53935' }}>
-                                {lastResult?.status === 'win' ? 'VICTORY!' : 'DEFEATED...'}
-                            </h2>
-                            {lastResult?.status === 'win' && (
-                                <div style={{ fontSize: '1.5em', margin: '20px 0' }}>
-                                    今回のスコア: <span style={{ fontWeight: 'bold', color: '#5c6bc0', fontSize: '1.5em' }}>{lastResult.score}</span>
-                                </div>
-                            )}
-                            <div style={{ display: 'flex', gap: '20px', marginTop: '40px' }}>
-                                <button className="action-btn" onClick={() => {
-                                    setGameState('playing');
-                                    startNewBattle();
-                                }}>
-                                    もう一度挑戦する
-                                </button>
-                                <button className="action-btn" style={{ background: '#e0e0e0', color: '#333' }} onClick={() => {
-                                    setGameState('spectating');
-                                }}>
-                                    待機してランキングを見る
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {gameState === 'spectating' && (
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                            <h2 style={{ fontSize: '2.5em', color: '#5c6bc0' }}>観戦モード</h2>
-                            <p style={{ fontSize: '1.2em', color: '#666' }}>他のプレイヤーの進行を見守っています...</p>
-                            <button className="action-btn" style={{ marginTop: '40px' }} onClick={() => {
-                                setGameState('playing');
-                                startNewBattle();
-                            }}>
-                                もう一度挑戦する
-                            </button>
-                        </div>
-                    )}
-
-                    {gameState === 'finished' && (
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                            <h2 style={{ fontSize: '3em', color: '#2c3e50' }}>イベント終了！</h2>
-                            <p style={{ fontSize: '1.2em' }}>最終ランキングをご確認ください</p>
-                            <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '20px' }}>Homeへ戻る</button>
-                        </div>
-                    )}
-                </div>
-
-                {/* Sidebar: Live Ranking */}
-                <div style={{ width: '300px', paddingLeft: '20px', display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ background: '#f5f5f5', borderRadius: '10px', padding: '15px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                        <h3 style={{ margin: '0 0 15px 0', textAlign: 'center', color: '#2c3e50' }}>
-                            {gameState === 'finished' ? '👑 最終ランキング' : '🔥 リアルタイムランキング'}
-                        </h3>
-                        <div style={{ flex: 1, overflowY: 'auto', maxHeight: '400px' }}>
-                            {liveRanking.length > 0 ? (
-                                <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 5px' }}>
-                                    <tbody>
-                                        {liveRanking.map((entry, idx) => {
-                                            const isMe = entry.user_id === playerName;
-                                            const legendThreshold = globalLegends.length >= 5 ? globalLegends[4].score : 0;
-                                            const isLegendBeat = entry.score > legendThreshold && entry.score > 0;
-                                            
-                                            return (
-                                                <tr key={idx} style={{ 
-                                                    background: isLegendBeat ? 'linear-gradient(90deg, #FFD700 0%, #FDB931 100%)' : (isMe ? '#e8eaf6' : '#fff'),
-                                                    fontWeight: isMe || isLegendBeat ? 'bold' : 'normal',
-                                                    boxShadow: isLegendBeat ? '0 0 10px rgba(255,215,0,0.8)' : '0 1px 3px rgba(0,0,0,0.1)',
-                                                    transform: isLegendBeat ? 'scale(1.02)' : 'none',
-                                                    transition: 'all 0.3s',
-                                                    borderRadius: '5px'
-                                                }}>
-                                                    <td style={{ padding: '8px 5px', width: '40px', color: isLegendBeat ? '#000' : (idx < 3 ? '#e8734a' : '#888'), borderRadius: '5px 0 0 5px' }}>
-                                                        {idx + 1}.
-                                                    </td>
-                                                    <td style={{ padding: '8px 5px', color: isLegendBeat ? '#000' : 'inherit' }}>
-                                                        {isLegendBeat && <span style={{marginRight: '5px'}}>👑</span>}
-                                                        {entry.jobType ? `[${entry.jobType}] ` : ''}{entry.user_id}
-                                                    </td>
-                                                    <td style={{ padding: '8px 5px', textAlign: 'right', color: isLegendBeat ? '#000' : '#5c6bc0', borderRadius: '0 5px 5px 0' }}>
-                                                        {entry.score}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            ) : (
-                                <p style={{ textAlign: 'center', color: '#aaa', marginTop: '50px' }}>まだスコアがありません</p>
-                            )}
-                        </div>
-                        <div style={{ marginTop: '15px', padding: '10px', background: '#e8eaf6', borderRadius: '8px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '0.9em', color: '#666' }}>あなたの最高スコア</div>
-                            <div style={{ fontSize: '1.5em', fontWeight: 'bold', color: '#2c3e50' }}>{highestScoreRef.current}</div>
-                        </div>
-                    </div>
-                </div>
-
+        <div className="game-container battle-layout" style={{ maxWidth: '1200px', width: '95%', background: '#fff', border: '1px solid #e8e8e8', borderRadius: '16px', padding: '2rem' }}>
+            <div style={{ display: 'flex', height: '100%', width: '100%' }}>
+                <TournamentBattle
+                    socket={socket}
+                    playerName={playerName}
+                    jobType={jobType}
+                    cpuLevel={cpuLevel}
+                    gameState={gameState}
+                    setGameState={setGameState}
+                    timeRemaining={timeRemaining}
+                    lastResult={lastResult}
+                    setLastResult={setLastResult}
+                    highestScore={highestScore}
+                    setHighestScore={setHighestScore}
+                    onBackToHome={onBackToHome}
+                />
+                <TournamentRanking
+                    socket={socket}
+                    playerName={playerName}
+                    jobType={jobType}
+                    globalLegends={globalLegends}
+                    highestScore={highestScore}
+                />
             </div>
         </div>
     );
