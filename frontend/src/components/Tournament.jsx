@@ -362,24 +362,12 @@ function TournamentBattle({
                                 <div className="hud-header">
                                     <span>{playerName}</span>
                                 </div>
-                                <div className="progress-container" style={{ marginTop: '8px', background: '#e8e8e8', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
-                                    <div className="progress-bar" style={{
-                                        width: playerInfo.typingState ? `${(playerInfo.typingState.typedRomaji.length / Math.max(1, playerInfo.typingState.typedRomaji.length + playerInfo.typingState.targetRomaji.length)) * 100}%` : '0%',
-                                        backgroundColor: '#5c6bc0', height: '100%', transition: 'width 0.1s'
-                                    }}></div>
-                                </div>
                             </div>
 
                             {/* CPU HUD */}
                             <div className={`hud-card ${cpuInfo.hp <= 0 ? 'dead' : ''}`}>
                                 <div className="hud-header">
                                     <span>CPU (Lv.5)</span>
-                                </div>
-                                <div className="progress-container" style={{ marginTop: '8px', background: '#e8e8e8', height: '6px', borderRadius: '3px', overflow: 'hidden' }}>
-                                    <div className="progress-bar" style={{
-                                        width: cpuInfo.typingState ? `${(cpuInfo.typingState.typedRomaji.length / Math.max(1, cpuInfo.typingState.typedRomaji.length + cpuInfo.typingState.targetRomaji.length)) * 100}%` : '0%',
-                                        backgroundColor: '#e8734a', height: '100%', transition: 'width 0.1s'
-                                    }}></div>
                                 </div>
                             </div>
                         </div>
