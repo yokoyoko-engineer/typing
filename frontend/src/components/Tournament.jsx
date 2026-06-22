@@ -17,7 +17,7 @@ const CPU_DIFFICULTY_MAP = {
 };
 const TOURNAMENT_GENRE = CATEGORIES.BUSINESS;
 
-// 1. Live Ranking Component (Optimized to update independently)
+// 1. Live Ranking Component (Optimized to update independently and scrollable)
 function TournamentRanking({ socket, playerName, jobType, globalLegends, highestScore }) {
     const [liveRanking, setLiveRanking] = useState([]);
 
@@ -34,12 +34,12 @@ function TournamentRanking({ socket, playerName, jobType, globalLegends, highest
     }, [socket]);
 
     return (
-        <div style={{ width: '300px', paddingLeft: '20px', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ background: '#f5f5f5', borderRadius: '10px', padding: '15px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ width: '300px', paddingLeft: '20px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+            <div style={{ background: '#f5f5f5', borderRadius: '10px', padding: '15px', flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
                 <h3 style={{ margin: '0 0 15px 0', textAlign: 'center', color: '#2c3e50' }}>
                     🔥 リアルタイムランキング
                 </h3>
-                <div style={{ flex: 1, overflowY: 'auto', maxHeight: '400px' }}>
+                <div style={{ flex: 1, overflowY: 'auto', paddingRight: '5px' }}>
                     {liveRanking.length > 0 ? (
                         <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 5px' }}>
                             <tbody>
@@ -85,7 +85,7 @@ function TournamentRanking({ socket, playerName, jobType, globalLegends, highest
     );
 }
 
-// 2. Battle (Typing) Component
+// 2. Battle (Typing) Component (Locked UI positions)
 function TournamentBattle({
     socket,
     playerName,
@@ -306,7 +306,11 @@ function TournamentBattle({
                     flex: 1, 
                     outline: 'none',
                     background: '#fcfcfc',
-                    boxShadow: 'inset 0 0 10px rgba(0,0,0,0.02)'
+                    boxShadow: 'none',
+                    border: 'none',
+                    margin: 0,
+                    padding: 0,
+                    boxSizing: 'border-box'
                 }}
             >
                 <div style={{ textAlign: 'center' }}>
@@ -332,7 +336,7 @@ function TournamentBattle({
 
     if (gameState === 'countdown') {
         return (
-            <div className="game-container battle-screen" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#fafafa' }}>
+            <div className="game-container battle-screen" style={{ flex: 1, height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#fafafa', border: 'none', boxShadow: 'none', margin: 0, padding: 0, boxSizing: 'border-box' }}>
                 <h1 style={{ fontSize: '8em', textAlign: 'center', margin: 0, color: '#2c3e50', fontWeight: 'bold' }}>
                     {countdown}
                 </h1>
@@ -341,7 +345,7 @@ function TournamentBattle({
     }
 
     return (
-        <div className={`game-container battle-screen ${damageFlash ? 'flash-damage' : ''}`} onKeyDown={gameState === 'playing' ? handleKeyDown : undefined} tabIndex="0" ref={inputRef} style={{ flex: 1, outline: 'none' }}>
+        <div className={`game-container battle-screen ${damageFlash ? 'flash-damage' : ''}`} onKeyDown={gameState === 'playing' ? handleKeyDown : undefined} tabIndex="0" ref={inputRef} style={{ flex: 1, height: '100%', outline: 'none', border: 'none', boxShadow: 'none', padding: 0, margin: 0, boxSizing: 'border-box' }}>
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                     <span style={{ fontSize: '1.2em', fontWeight: 'bold', color: '#2c3e50' }}>イベントモード: {TOURNAMENT_GENRE}</span>
@@ -388,11 +392,13 @@ function TournamentBattle({
                             </div>
                         </div>
 
-                        <div className="typing-area" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                        {/* Typing Area with Fixed Height and Flex Center */}
+                        <div className="typing-area" style={{ height: '350px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', padding: '2rem 1.5rem', boxSizing: 'border-box', background: '#f8f9fa', borderRadius: '12px', border: '1px solid #e8e8e8' }}>
                             {playerInfo.hp > 0 && cpuInfo.hp > 0 ? (
                                 <>
-                                    <div className="target-word-japanese">
-                                        <div className="ruby" style={{ fontSize: '0.9em', color: '#888', marginBottom: '5px' }}>
+                                    <div className="target-word-japanese" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                        {/* Ruby height locked */}
+                                        <div className="ruby" style={{ fontSize: '0.9em', color: '#888', marginBottom: '5px', height: '24px', lineHeight: '24px', textAlign: 'center', overflow: 'hidden', width: '100%' }}>
                                             {playerInfo.typingState ? (
                                                 <>
                                                     <span style={{ color: '#ff9800' }}>{playerInfo.typingState.typedRuby}</span>
@@ -400,56 +406,64 @@ function TournamentBattle({
                                                 </>
                                             ) : playerInfo.currentWord?.ruby}
                                         </div>
-                                        <div className="kanji" style={{ fontSize: '2.5em', fontWeight: 'bold', marginBottom: '15px' }}>
-                                            {(() => {
-                                                if (!playerInfo.currentWord?.text) return null;
-                                                if (!playerInfo.typingState || !playerInfo.typingState.typedRuby) return <span style={{ color: '#2c3e50' }}>{playerInfo.currentWord.text}</span>;
-                                                
-                                                const chunks = alignTextAndRuby(playerInfo.currentWord.text, playerInfo.currentWord.ruby);
-                                                let remainingTypedRuby = playerInfo.typingState.typedRuby.length;
+                                        {/* Kanji height locked and vertically centered */}
+                                        <div className="kanji" style={{ fontSize: '2.5em', fontWeight: 'bold', marginBottom: '15px', height: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', overflow: 'hidden', width: '100%' }}>
+                                            <div style={{ width: '100%', wordBreak: 'break-word' }}>
+                                                {(() => {
+                                                    if (!playerInfo.currentWord?.text) return null;
+                                                    if (!playerInfo.typingState || !playerInfo.typingState.typedRuby) return <span style={{ color: '#2c3e50' }}>{playerInfo.currentWord.text}</span>;
+                                                    
+                                                    const chunks = alignTextAndRuby(playerInfo.currentWord.text, playerInfo.currentWord.ruby);
+                                                    let remainingTypedRuby = playerInfo.typingState.typedRuby.length;
 
-                                                return chunks.map((chunk, index) => {
-                                                  let chunkRubyLen = chunk.ruby.length;
-                                                  let chunkTypedRubyLen = Math.min(remainingTypedRuby, chunkRubyLen);
-                                                  remainingTypedRuby -= chunkTypedRubyLen;
+                                                    return chunks.map((chunk, index) => {
+                                                      let chunkRubyLen = chunk.ruby.length;
+                                                      let chunkTypedRubyLen = Math.min(remainingTypedRuby, chunkRubyLen);
+                                                      remainingTypedRuby -= chunkTypedRubyLen;
 
-                                                  let coloredTextChars = 0;
-                                                  if (chunkRubyLen > 0) {
-                                                      let ratio = chunkTypedRubyLen / chunkRubyLen;
-                                                      coloredTextChars = Math.floor(ratio * chunk.text.length);
-                                                  } else {
-                                                      coloredTextChars = remainingTypedRuby > 0 ? chunk.text.length : 0;
-                                                  }
-                                                  
-                                                  let greenText = chunk.text.substring(0, coloredTextChars);
-                                                  let blueText = chunk.text.substring(coloredTextChars);
-                                                  
-                                                  return (
-                                                      <React.Fragment key={index}>
-                                                          {greenText && <span style={{ color: '#ff9800' }}>{greenText}</span>}
-                                                          {blueText && <span style={{ color: '#2c3e50' }}>{blueText}</span>}
-                                                      </React.Fragment>
-                                                  );
-                                                });
-                                            })()}
+                                                      let coloredTextChars = 0;
+                                                      if (chunkRubyLen > 0) {
+                                                          let ratio = chunkTypedRubyLen / chunkRubyLen;
+                                                          coloredTextChars = Math.floor(ratio * chunk.text.length);
+                                                      } else {
+                                                          coloredTextChars = remainingTypedRuby > 0 ? chunk.text.length : 0;
+                                                      }
+                                                      
+                                                      let greenText = chunk.text.substring(0, coloredTextChars);
+                                                      let blueText = chunk.text.substring(coloredTextChars);
+                                                      
+                                                      return (
+                                                          <React.Fragment key={index}>
+                                                              {greenText && <span style={{ color: '#ff9800' }}>{greenText}</span>}
+                                                              {blueText && <span style={{ color: '#2c3e50' }}>{blueText}</span>}
+                                                          </React.Fragment>
+                                                      );
+                                                    });
+                                                })()}
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="target-word" style={{ fontSize: '2em' }}>
-                                        {playerInfo.typingState && (
-                                            <>
-                                                <span className="char typed" style={{ color: '#ff9800' }}>{playerInfo.typingState.typedRomaji}</span>
-                                                {playerInfo.typingState.targetRomaji.length > 0 && (
-                                                    <span className={`char ${isMiss ? 'miss' : 'current'}`}>{playerInfo.typingState.targetRomaji[0]}</span>
-                                                )}
-                                                <span className="char">{playerInfo.typingState.targetRomaji.slice(1)}</span>
-                                            </>
-                                        )}
+                                    {/* Romaji height locked and vertically centered */}
+                                    <div className="target-word" style={{ fontSize: '2em', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', overflow: 'hidden', width: '100%' }}>
+                                        <div style={{ width: '100%', wordBreak: 'break-word' }}>
+                                            {playerInfo.typingState && (
+                                                <>
+                                                    <span className="char typed" style={{ color: '#ff9800' }}>{playerInfo.typingState.typedRomaji}</span>
+                                                    {playerInfo.typingState.targetRomaji.length > 0 && (
+                                                        <span className={`char ${isMiss ? 'miss' : 'current'}`}>{playerInfo.typingState.targetRomaji[0]}</span>
+                                                    )}
+                                                    <span className="char">{playerInfo.typingState.targetRomaji.slice(1)}</span>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 </>
                             ) : (
-                                <h2 style={{ color: playerInfo.hp <= 0 ? '#e53935' : '#4caf50' }}>
-                                    {playerInfo.hp <= 0 ? 'DEFEATED! Restarting...' : 'VICTORY! Restarting...'}
-                                </h2>
+                                <div style={{ height: '244px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <h2 style={{ color: playerInfo.hp <= 0 ? '#e53935' : '#4caf50', margin: 0 }}>
+                                        {playerInfo.hp <= 0 ? 'DEFEATED! Restarting...' : 'VICTORY! Restarting...'}
+                                    </h2>
+                                </div>
                             )}
                         </div>
                     </>
@@ -504,7 +518,7 @@ function TournamentBattle({
     );
 }
 
-// 3. Parent Component
+// 3. Parent Component (Fixed overall size and overflow controller)
 export default function Tournament({ socket, onBackToHome }) {
     const [playerName, setPlayerName] = useState('');
     const [nameInput, setNameInput] = useState('');
@@ -533,7 +547,7 @@ export default function Tournament({ socket, onBackToHome }) {
                 const remainingMs = state.endTime - Date.now();
                 if (remainingMs > 0) {
                     setTimeRemaining(Math.ceil(remainingMs / 1000));
-                    setGameState('ready'); // 管理者が開始した後は ready 状態になる (自動で countdown はしない)
+                    setGameState('ready'); // ready state
                 } else {
                     setGameState('finished');
                 }
@@ -549,7 +563,7 @@ export default function Tournament({ socket, onBackToHome }) {
             if (gameState === 'waiting') {
                 const remainingMs = data.endTime - Date.now();
                 setTimeRemaining(Math.max(0, Math.ceil(remainingMs / 1000)));
-                setGameState('ready'); // countdown ではなく ready
+                setGameState('ready'); // ready
             }
         });
 
@@ -747,8 +761,8 @@ export default function Tournament({ socket, onBackToHome }) {
     }
 
     return (
-        <div className="game-container battle-layout" style={{ maxWidth: '1200px', width: '95%', background: '#fff', border: '1px solid #e8e8e8', borderRadius: '16px', padding: '2rem' }}>
-            <div style={{ display: 'flex', height: '100%', width: '100%' }}>
+        <div className="game-container battle-layout" style={{ maxWidth: '1200px', width: '95%', height: '700px', background: '#fff', border: '1px solid #e8e8e8', borderRadius: '16px', padding: '2rem', boxSizing: 'border-box' }}>
+            <div style={{ display: 'flex', height: '100%', width: '100%', overflow: 'hidden' }}>
                 <TournamentBattle
                     socket={socket}
                     playerName={playerName}
