@@ -356,21 +356,7 @@ function TournamentBattle({
 
                 {gameState === 'playing' && (
                     <>
-                        <div className="players-hud" style={{ marginBottom: '30px' }}>
-                            {/* Player HUD */}
-                            <div className={`hud-card me ${playerInfo.hp <= 0 ? 'dead' : ''}`}>
-                                <div className="hud-header">
-                                    <span>{playerName}</span>
-                                </div>
-                            </div>
 
-                            {/* CPU HUD */}
-                            <div className={`hud-card ${cpuInfo.hp <= 0 ? 'dead' : ''}`}>
-                                <div className="hud-header">
-                                    <span>CPU (Lv.5)</span>
-                                </div>
-                            </div>
-                        </div>
 
                         {/* Typing Area with Fixed Height and Flex Center */}
                         <div className="typing-area" style={{ height: '350px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', padding: '2rem 1.5rem', boxSizing: 'border-box', background: '#f8f9fa', borderRadius: '12px', border: '1px solid #e8e8e8' }}>
