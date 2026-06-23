@@ -26,7 +26,7 @@ const JOB_COLORS = {
 };
 
 export default function Admin() {
-  const [activeTab, setActiveTab] = useState('analysis'); // 'analysis' or 'tournament'
+  const [activeTab, setActiveTab] = useState('analysis'); // 'analysis', 'tournament', or 'users'
 
   const today = new Date();
   const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
@@ -95,6 +95,178 @@ export default function Admin() {
   const [tTopGrowthUser, setTTopGrowthUser] = useState(null);
   const [tRanking, setTRanking] = useState([]);
   const [tRankingPage, setTRankingPage] = useState(1);
+
+  // --- User Management Tab State ---
+  const [dbUsers, setDbUsers] = useState([]);
+  const [dbCohortMap, setDbCohortMap] = useState({}); // user_id -> { job_type, cohort }
+  const [cohortList, setCohortList] = useState(['すべて']);
+  const [csvFile, setCsvFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState(null);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  
+  // 個別登録フォーム用ステート
+  const [singleUserId, setSingleUserId] = useState('');
+  const [singleJobType, setSingleJobType] = useState('CL');
+  const [singleCohort, setSingleCohort] = useState('');
+
+  // Fetch users and cohorts from DB
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch('/api/users');
+      if (res.ok) {
+        const users = await res.json();
+        setDbUsers(users);
+        const map = {};
+        const cohorts = new Set();
+        users.forEach(u => {
+          map[u.user_id.toString()] = { job_type: u.job_type, cohort: u.cohort };
+          cohorts.add(u.cohort);
+        });
+        setDbCohortMap(map);
+        setCohortList(['すべて', ...Array.from(cohorts).sort()]);
+      }
+    } catch (err) {
+      console.error("Failed to fetch users:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  // --- CSV Import & Single User Registration Action Handlers ---
+  const handleCsvFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setCsvFile(file);
+      setImportMessage(null);
+    }
+  };
+
+  const handleCsvDrop = (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith('.csv')) {
+      setCsvFile(file);
+      setImportMessage(null);
+    } else {
+      alert("CSVファイルのみドロップ可能です");
+    }
+  };
+
+  const handleCsvUpload = () => {
+    if (!csvFile) return;
+    setImporting(true);
+    setImportMessage(null);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const text = e.target.result;
+      const lines = text.split(/\r?\n/);
+      const parsedUsers = [];
+
+      if (lines.length > 0) {
+        const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const idIdx = header.indexOf('user_id') !== -1 ? header.indexOf('user_id') : header.indexOf('社員番号');
+        const jobIdx = header.indexOf('job_type') !== -1 ? header.indexOf('job_type') : header.indexOf('職種');
+        const cohortIdx = header.indexOf('cohort') !== -1 ? header.indexOf('cohort') : header.indexOf('入社時期');
+
+        const actualIdIdx = idIdx !== -1 ? idIdx : 0;
+        const actualJobIdx = jobIdx !== -1 ? jobIdx : 1;
+        const actualCohortIdx = cohortIdx !== -1 ? cohortIdx : 2;
+
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          const cols = line.split(',').map(c => c.trim());
+          if (cols.length >= 3) {
+            parsedUsers.push({
+              user_id: cols[actualIdIdx],
+              job_type: cols[actualJobIdx],
+              cohort: cols[actualCohortIdx]
+            });
+          }
+        }
+      }
+
+      if (parsedUsers.length === 0) {
+        setImportMessage({ type: 'error', text: '有効なユーザーデータが見つかりませんでした。' });
+        setImporting(false);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/users/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ users: parsedUsers })
+        });
+        const result = await res.json();
+        if (res.ok && result.success) {
+          setImportMessage({ type: 'success', text: `${result.count} 件のユーザーをインポートしました。` });
+          setCsvFile(null);
+          fetchUsers();
+        } else {
+          setImportMessage({ type: 'error', text: result.error || 'インポート中にエラーが発生しました。' });
+        }
+      } catch (err) {
+        setImportMessage({ type: 'error', text: '通信エラーが発生しました。' });
+      } finally {
+        setImporting(false);
+      }
+    };
+    reader.readAsText(csvFile);
+  };
+
+  const handleSingleUserRegister = async (e) => {
+    e.preventDefault();
+    if (!singleUserId || !singleJobType || !singleCohort) {
+      alert("すべてのフィールドを入力してください。");
+      return;
+    }
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: singleUserId,
+          job_type: singleJobType,
+          cohort: singleCohort
+        })
+      });
+      const result = await res.json();
+      if (res.ok && result.success) {
+        alert(`ユーザー ${singleUserId} を登録しました。`);
+        setSingleUserId('');
+        setSingleCohort('');
+        fetchUsers();
+      } else {
+        alert(result.error || '登録に失敗しました。');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('通信エラーが発生しました。');
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm(`ユーザー ${userId} を削除しますか？`)) return;
+    try {
+      const res = await fetch(`/api/users/${userId}`, {
+        method: 'DELETE'
+      });
+      const result = await res.json();
+      if (res.ok && result.success) {
+        fetchUsers();
+      } else {
+        alert('削除に失敗しました。');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('通信エラーが発生しました。');
+    }
+  };
   
   // Setup Socket for Admin
   useEffect(() => {
@@ -183,7 +355,7 @@ export default function Admin() {
         const uid = s.user_id;
         userMap[uid] = {
           user_id: uid,
-          job_type: s.job_type || COHORT_MAP[uid] || '',
+          job_type: s.job_type || dbCohortMap[uid]?.job_type || '',
           scoreA: s.score,
           scoreB: null
         };
@@ -196,10 +368,13 @@ export default function Admin() {
           if (!userMap[uid].job_type && s.job_type) {
             userMap[uid].job_type = s.job_type;
           }
+          if (!userMap[uid].job_type && dbCohortMap[uid]?.job_type) {
+            userMap[uid].job_type = dbCohortMap[uid].job_type;
+          }
         } else {
           userMap[uid] = {
             user_id: uid,
-            job_type: s.job_type || COHORT_MAP[uid] || '',
+            job_type: s.job_type || dbCohortMap[uid]?.job_type || '',
             scoreA: null,
             scoreB: s.score
           };
@@ -245,7 +420,7 @@ export default function Admin() {
       let url = `/api/tournaments/scores/admin?min_user=${tMinUser}&max_user=${tMaxUser}`;
       if (tStartDate) url += `&start_date=${tStartDate}`;
       if (tEndDate) url += `&end_date=${tEndDate}`;
-      if (tJobType !== 'すべて' && tCohort !== '202604') url += `&job_type=${tJobType}`;
+      if (tJobType !== 'すべて' && tCohort === 'すべて') url += `&job_type=${tJobType}`;
       if (tSearchStartTournamentId !== 'all') url += `&start_tournament_id=${tSearchStartTournamentId}`;
       if (tSearchEndTournamentId !== 'all') url += `&end_tournament_id=${tSearchEndTournamentId}`;
       
@@ -253,13 +428,18 @@ export default function Admin() {
       if (!res.ok) throw new Error('API Error');
       let data = await res.json();
       
-      if (tCohort === '202604') {
-        data = data.filter(row => COHORT_MAP[row.user_id.toString()] !== undefined);
-        data = data.map(row => ({ ...row, job_type: COHORT_MAP[row.user_id.toString()] }));
+      if (tCohort !== 'すべて') {
+        data = data.filter(row => dbCohortMap[row.user_id.toString()] !== undefined && dbCohortMap[row.user_id.toString()].cohort === tCohort);
+        data = data.map(row => ({ ...row, job_type: dbCohortMap[row.user_id.toString()].job_type }));
         
         if (tJobType !== 'すべて') {
           data = data.filter(row => row.job_type === tJobType);
         }
+      } else {
+        data = data.map(row => {
+          const uInfo = dbCohortMap[row.user_id.toString()];
+          return uInfo ? { ...row, job_type: uInfo.job_type } : row;
+        });
       }
       
       setTRawData(data); 
@@ -513,19 +693,24 @@ export default function Admin() {
       let url = `/api/scores/admin?min_user=${minUser}&max_user=${maxUser}`;
       if (startDate) url += `&start_date=${startDate}`;
       if (endDate) url += `&end_date=${endDate}`;
-      if (jobType !== 'すべて' && cohort !== '202604') url += `&job_type=${jobType}`;
+      if (jobType !== 'すべて' && cohort === 'すべて') url += `&job_type=${jobType}`;
       
       const res = await fetch(url);
       if (!res.ok) throw new Error('API Error');
       let data = await res.json();
       
-      if (cohort === '202604') {
-        data = data.filter(row => COHORT_MAP[row.user_id.toString()] !== undefined);
-        data = data.map(row => ({ ...row, job_type: COHORT_MAP[row.user_id.toString()] }));
+      if (cohort !== 'すべて') {
+        data = data.filter(row => dbCohortMap[row.user_id.toString()] !== undefined && dbCohortMap[row.user_id.toString()].cohort === cohort);
+        data = data.map(row => ({ ...row, job_type: dbCohortMap[row.user_id.toString()].job_type }));
         
         if (jobType !== 'すべて') {
           data = data.filter(row => row.job_type === jobType);
         }
+      } else {
+        data = data.map(row => {
+          const uInfo = dbCohortMap[row.user_id.toString()];
+          return uInfo ? { ...row, job_type: uInfo.job_type } : row;
+        });
       }
       
       setRawData(data); 
@@ -619,6 +804,12 @@ export default function Admin() {
         >
           🏆 イベント管理
         </button>
+        <button 
+          onClick={() => setActiveTab('users')}
+          style={{ padding: '10px 20px', fontSize: '1.1em', background: activeTab === 'users' ? '#4caf50' : '#eee', color: activeTab === 'users' ? '#fff' : '#333', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
+        >
+          👤 ユーザー管理
+        </button>
       </div>
 
       {activeTab === 'analysis' && (
@@ -658,8 +849,9 @@ export default function Admin() {
                   value={cohort} onChange={e => setCohort(e.target.value)}
                   style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc' }}
                 >
-                  <option value="すべて">すべて</option>
-                  <option value="202604">202604</option>
+                  {cohortList.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -1338,8 +1530,9 @@ export default function Admin() {
                     value={tCohort} onChange={e => setTCohort(e.target.value)}
                     style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc' }}
                   >
-                    <option value="すべて">すべて</option>
-                    <option value="202604">202604</option>
+                    {cohortList.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -1621,6 +1814,292 @@ export default function Admin() {
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'users' && (
+        <div style={{ animation: 'fadeIn 0.3s ease-in-out' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', marginBottom: '30px' }}>
+            {/* 左側: CSVインポート＆テンプレートダウンロード */}
+            <div style={{ background: '#fff', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', border: '1px solid #eaeaea' }}>
+              <h2 style={{ color: '#2c3e50', marginTop: 0, borderBottom: '2px solid #4caf50', paddingBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.4em' }}>
+                📥 CSV一括登録
+              </h2>
+              <p style={{ color: '#666', fontSize: '0.9em', lineHeight: '1.6', marginBottom: '20px' }}>
+                CSVファイルを使用して、ユーザーを一括で登録・更新します。重複する社員番号がある場合は、新しい職種・入社時期で上書きされます。
+              </p>
+              
+              <div style={{ marginBottom: '25px' }}>
+                <a 
+                  href="/api/users/template"
+                  download="users_template.csv"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '12px 20px',
+                    background: 'linear-gradient(135deg, #2196f3, #0b7dda)',
+                    color: '#fff',
+                    textDecoration: 'none',
+                    borderRadius: '8px',
+                    fontWeight: 'bold',
+                    boxShadow: '0 4px 10px rgba(33,150,243,0.3)',
+                    transition: 'all 0.2s',
+                    cursor: 'pointer',
+                    fontSize: '0.95em'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                  onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+                >
+                  📄 ひな形CSVをダウンロード
+                </a>
+              </div>
+
+              <div 
+                onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#4caf50'; e.currentTarget.style.background = '#f1f8e9'; }}
+                onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#ccc'; e.currentTarget.style.background = '#fafafa'; }}
+                onDrop={handleCsvDrop}
+                style={{
+                  border: '2px dashed #ccc',
+                  borderRadius: '10px',
+                  padding: '40px 20px',
+                  textAlign: 'center',
+                  background: '#fafafa',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s'
+                }}
+                onClick={() => document.getElementById('csv-file-input').click()}
+              >
+                <input 
+                  type="file" 
+                  id="csv-file-input" 
+                  accept=".csv" 
+                  onChange={handleCsvFileSelect} 
+                  style={{ display: 'none' }} 
+                />
+                <span style={{ fontSize: '2.5em', display: 'block', marginBottom: '10px' }}>📁</span>
+                <span style={{ fontWeight: 'bold', color: '#555', fontSize: '1.05em' }}>
+                  {csvFile ? csvFile.name : 'CSVファイルをドラッグ＆ドロップするか、クリックして選択してください'}
+                </span>
+                {csvFile && (
+                  <span style={{ display: 'block', fontSize: '0.85em', color: '#888', marginTop: '5px' }}>
+                    サイズ: {(csvFile.size / 1024).toFixed(2)} KB
+                  </span>
+                )}
+              </div>
+
+              {csvFile && (
+                <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+                  <button 
+                    onClick={handleCsvUpload}
+                    disabled={importing}
+                    style={{
+                      flex: 1,
+                      padding: '12px',
+                      background: 'linear-gradient(135deg, #4caf50, #388e3c)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 10px rgba(76,175,80,0.3)',
+                      transition: 'all 0.2s',
+                      fontSize: '1em'
+                    }}
+                  >
+                    {importing ? 'インポート中...' : 'インポートを実行する'}
+                  </button>
+                  <button 
+                    onClick={() => setCsvFile(null)}
+                    style={{
+                      padding: '12px 20px',
+                      background: '#eee',
+                      color: '#333',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      fontSize: '1em'
+                    }}
+                  >
+                    キャンセル
+                  </button>
+                </div>
+              )}
+
+              {importMessage && (
+                <div style={{
+                  marginTop: '20px',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  background: importMessage.type === 'success' ? '#e8f5e9' : '#ffebee',
+                  color: importMessage.type === 'success' ? '#2e7d32' : '#c62828',
+                  fontSize: '0.95em',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
+                }}>
+                  {importMessage.type === 'success' ? '✅' : '❌'} {importMessage.text}
+                </div>
+              )}
+            </div>
+
+            {/* 右側: 手動登録フォーム */}
+            <div style={{ background: '#fff', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', border: '1px solid #eaeaea' }}>
+              <h2 style={{ color: '#2c3e50', marginTop: 0, borderBottom: '2px solid #2196f3', paddingBottom: '10px', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.4em' }}>
+                👤 個別ユーザー登録
+              </h2>
+              <form onSubmit={handleSingleUserRegister} style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#555' }}>社員番号:</label>
+                  <input 
+                    type="text" 
+                    value={singleUserId} 
+                    onChange={e => setSingleUserId(e.target.value)} 
+                    placeholder="例: 5905" 
+                    required 
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box', fontSize: '1em' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#555' }}>職種:</label>
+                  <select 
+                    value={singleJobType} 
+                    onChange={e => setSingleJobType(e.target.value)} 
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box', fontSize: '1em' }}
+                  >
+                    <option value="CL">CL</option>
+                    <option value="JAVA">JAVA</option>
+                    <option value="ML">ML</option>
+                    <option value="FR">FR</option>
+                    <option value="QA">QA</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#555' }}>入社時期 (コホート):</label>
+                  <input 
+                    type="text" 
+                    value={singleCohort} 
+                    onChange={e => setSingleCohort(e.target.value)} 
+                    placeholder="例: 202604" 
+                    required 
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box', fontSize: '1em' }}
+                  />
+                </div>
+                <button 
+                  type="submit"
+                  style={{
+                    padding: '12px',
+                    background: 'linear-gradient(135deg, #2196f3, #0b7dda)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 10px rgba(33,150,243,0.3)',
+                    marginTop: '10px',
+                    fontSize: '1em',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                  onMouseOut={(e) => e.currentTarget.style.transform = 'none'}
+                >
+                  登録する
+                </button>
+              </form>
+            </div>
+          </div>
+
+          {/* 下部: 登録済みユーザー一覧 */}
+          <div style={{ background: '#fff', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', border: '1px solid #eaeaea' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '2px solid #eee', paddingBottom: '15px' }}>
+              <h2 style={{ color: '#2c3e50', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.4em' }}>
+                📋 登録ユーザー一覧 ({dbUsers.length}名)
+              </h2>
+              <div>
+                <input 
+                  type="text" 
+                  placeholder="社員番号で検索..." 
+                  value={userSearchQuery} 
+                  onChange={e => setUserSearchQuery(e.target.value)} 
+                  style={{ padding: '8px 16px', borderRadius: '20px', border: '1px solid #ccc', width: '220px', fontSize: '0.9em', outline: 'none' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ maxHeight: '450px', overflowY: 'auto', border: '1px solid #eee', borderRadius: '8px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: '#f8f9fa', borderBottom: '2px solid #eaeaea', position: 'sticky', top: 0 }}>
+                    <th style={{ padding: '14px 20px', color: '#555', fontWeight: 'bold' }}>社員番号</th>
+                    <th style={{ padding: '14px 20px', color: '#555', fontWeight: 'bold' }}>職種</th>
+                    <th style={{ padding: '14px 20px', color: '#555', fontWeight: 'bold' }}>入社時期</th>
+                    <th style={{ padding: '14px 20px', color: '#555', fontWeight: 'bold', textAlign: 'center' }}>アクション</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dbUsers
+                    .filter(u => u.user_id.toString().includes(userSearchQuery))
+                    .map((user, idx) => (
+                      <tr 
+                        key={user.user_id} 
+                        style={{ 
+                          borderBottom: '1px solid #eee', 
+                          background: idx % 2 === 0 ? '#fff' : '#fafafa',
+                          transition: 'background 0.2s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.background = '#f1f3f5'}
+                        onMouseOut={(e) => e.currentTarget.style.background = idx % 2 === 0 ? '#fff' : '#fafafa'}
+                      >
+                        <td style={{ padding: '14px 20px', fontWeight: 'bold', color: '#333' }}>{user.user_id}</td>
+                        <td style={{ padding: '14px 20px' }}>
+                          <span style={{
+                            padding: '4px 10px',
+                            borderRadius: '4px',
+                            background: JOB_COLORS[user.job_type] || '#888',
+                            color: '#fff',
+                            fontSize: '0.85em',
+                            fontWeight: 'bold'
+                          }}>
+                            {user.job_type}
+                          </span>
+                        </td>
+                        <td style={{ padding: '14px 20px', color: '#666' }}>{user.cohort}</td>
+                        <td style={{ padding: '14px 20px', textAlign: 'center' }}>
+                          <button 
+                            onClick={() => handleDeleteUser(user.user_id)}
+                            style={{
+                              padding: '6px 14px',
+                              background: '#ffebee',
+                              color: '#c62828',
+                              border: '1px solid #ffcdd2',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontWeight: 'bold',
+                              fontSize: '0.85em',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => { e.currentTarget.style.background = '#c62828'; e.currentTarget.style.color = '#fff'; }}
+                            onMouseOut={(e) => { e.currentTarget.style.background = '#ffebee'; e.currentTarget.style.color = '#c62828'; }}
+                          >
+                            削除
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  {dbUsers.filter(u => u.user_id.toString().includes(userSearchQuery)).length === 0 && (
+                    <tr>
+                      <td colSpan="4" style={{ padding: '30px', textAlign: 'center', color: '#999' }}>
+                        該当するユーザーが見つかりません。
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

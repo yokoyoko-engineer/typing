@@ -311,6 +311,107 @@ app.get('/api/tournaments/legends', async (req, res) => {
   }
 });
 
+// --- ユーザー管理API ---
+
+// ユーザー一覧取得
+app.get('/api/users', async (req, res) => {
+  try {
+    const db = await getDb();
+    const rows = await db.all(`SELECT user_id, job_type, cohort FROM users ORDER BY CAST(user_id AS INTEGER) ASC, user_id ASC`);
+    res.json(rows);
+  } catch (err) {
+    console.error("Error fetching users:", err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ひな形CSVダウンロード
+app.get('/api/users/template', (req, res) => {
+  const csvContent = "user_id,job_type,cohort\n5905,CL,202604\n5887,JAVA,202604\n5925,ML,202604\n";
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=users_template.csv');
+  res.status(200).send(csvContent);
+});
+
+// 個別ユーザー登録（追加・更新）
+app.post('/api/users', async (req, res) => {
+  const { user_id, job_type, cohort } = req.body;
+  if (!user_id || !job_type || !cohort) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  const cleanUserId = user_id.toString().trim();
+  const cleanJobType = job_type.toString().trim();
+  const cleanCohort = cohort.toString().trim();
+
+  // 単純なバリデーション
+  if (!/^[0-9a-zA-Z_-]+$/.test(cleanUserId)) {
+    return res.status(400).json({ error: 'Invalid user_id format' });
+  }
+
+  try {
+    const db = await getDb();
+    await db.run(
+      `INSERT OR REPLACE INTO users (user_id, job_type, cohort) VALUES (?, ?, ?)`,
+      [cleanUserId, cleanJobType, cleanCohort]
+    );
+    res.json({ success: true, user: { user_id: cleanUserId, job_type: cleanJobType, cohort: cleanCohort } });
+  } catch (err) {
+    console.error("Error registering user:", err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// 複数ユーザー一括登録（インポート）
+app.post('/api/users/import', async (req, res) => {
+  const { users } = req.body;
+  if (!users || !Array.isArray(users)) {
+    return res.status(400).json({ error: 'Invalid or missing users list' });
+  }
+
+  try {
+    const db = await getDb();
+    await db.run('BEGIN TRANSACTION');
+    const stmt = await db.prepare(`INSERT OR REPLACE INTO users (user_id, job_type, cohort) VALUES (?, ?, ?)`);
+    
+    let count = 0;
+    for (const u of users) {
+      const uid = u.user_id?.toString().trim();
+      const job = u.job_type?.toString().trim();
+      const coh = u.cohort?.toString().trim();
+      
+      if (uid && job && coh) {
+        await stmt.run([uid, job, coh]);
+        count++;
+      }
+    }
+    await stmt.finalize();
+    await db.run('COMMIT');
+    res.json({ success: true, count });
+  } catch (err) {
+    console.error("Error importing users:", err);
+    try {
+      const db = await getDb();
+      await db.run('ROLLBACK');
+    } catch (rbErr) {
+      console.error("Rollback failed:", rbErr);
+    }
+    res.status(500).json({ error: 'Database error during import' });
+  }
+});
+
+// ユーザー削除
+app.delete('/api/users/:user_id', async (req, res) => {
+  const { user_id } = req.params;
+  try {
+    const db = await getDb();
+    await db.run(`DELETE FROM users WHERE user_id = ?`, [user_id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error deleting user:", err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // ヘルスチェック用
 app.get('/', (req, res) => {
   res.send('Server is running');
