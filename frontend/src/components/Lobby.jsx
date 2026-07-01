@@ -24,10 +24,10 @@ export default function Lobby({ socket, lobbies, onJoinRoom }) {
           <input 
             type="number" 
             min="1"
-            max="9999"
+            max="9999999"
             value={playerName} 
-            onChange={(e) => setPlayerName(e.target.value.slice(0, 4))} 
-            placeholder="1〜4桁の社員番号"
+            onChange={(e) => setPlayerName(e.target.value.slice(0, 7))} 
+            placeholder="1〜7桁の社員番号"
             required 
           />
         </label>

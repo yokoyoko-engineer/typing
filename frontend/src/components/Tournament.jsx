@@ -546,12 +546,12 @@ export default function Tournament({ socket, onBackToHome }) {
 
     const handleJoin = () => {
         const trimmed = nameInput.trim();
-        if (/^[0-9]{1,4}$/.test(trimmed)) {
+        if (/^[0-9]{1,7}$/.test(trimmed)) {
             setPlayerName(trimmed);
             socket.emit('joinTournament', { playerName: trimmed, jobType });
             setGameState('waiting');
         } else {
-            alert('社員番号は1〜4桁の数字で入力してください');
+            alert('社員番号は1〜7桁の数字で入力してください');
         }
     };
 
@@ -627,11 +627,11 @@ export default function Tournament({ socket, onBackToHome }) {
                         <input
                             type="number"
                             min="1"
-                            max="9999"
+                            max="9999999"
                             value={nameInput}
-                            onChange={(e) => setNameInput(e.target.value.slice(0, 4))}
+                            onChange={(e) => setNameInput(e.target.value.slice(0, 7))}
                             onKeyDown={(e) => { if (e.key === 'Enter') handleJoin(); }}
-                            placeholder="社員番号 (1〜9999)"
+                            placeholder="社員番号 (1〜9999999)"
                             style={{
                                 width: '100%', padding: '15px 20px', fontSize: '1.3em',
                                 border: '2px solid #ddd', borderRadius: '10px', textAlign: 'center', outline: 'none'

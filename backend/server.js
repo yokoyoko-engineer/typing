@@ -425,8 +425,8 @@ import { GameRoom } from './gameLogic.js';
 function sanitizePlayerName(name) {
   if (typeof name !== 'string' && typeof name !== 'number') return null;
   const str = String(name).trim();
-  // Allow only 1 to 4 digits (1 - 9999)
-  if (/^[0-9]{1,4}$/.test(str)) {
+  // Allow only 1 to 7 digits (1 - 9999999)
+  if (/^[0-9]{1,7}$/.test(str)) {
     return str;
   }
   return null;

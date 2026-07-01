@@ -95,11 +95,11 @@ export default function CPUGame({ onBackToHome }) {
 
     const confirmName = () => {
         const trimmed = nameInput.trim();
-        if (/^[0-9]{1,4}$/.test(trimmed)) {
+        if (/^[0-9]{1,7}$/.test(trimmed)) {
             setPlayerName(trimmed);
             setSelectionStep('category');
         } else {
-            alert('社員番号は1〜4桁の数字で入力してください');
+            alert('社員番号は1〜7桁の数字で入力してください');
         }
     };
 
@@ -359,11 +359,11 @@ export default function CPUGame({ onBackToHome }) {
                             ref={nameInputRef}
                             type="number"
                             min="1"
-                            max="9999"
+                            max="9999999"
                             value={nameInput}
-                            onChange={(e) => setNameInput(e.target.value.slice(0, 4))}
+                            onChange={(e) => setNameInput(e.target.value.slice(0, 7))}
                             onKeyDown={(e) => { if (e.key === 'Enter') confirmName(); }}
-                            placeholder="社員番号 (1〜9999)"
+                            placeholder="社員番号 (1〜9999999)"
                             style={{
                                 width: '100%',
                                 padding: '15px 20px',

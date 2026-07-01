@@ -820,14 +820,14 @@ export default function Admin() {
               <div>
                 <label style={{ marginRight: '10px' }}>Min 社員番号:</label>
                 <input 
-                  type="number" min="1" max="9999" value={minUser} onChange={e => setMinUser(e.target.value)} 
+                  type="number" min="1" max="9999999" value={minUser} onChange={e => setMinUser(e.target.value)} 
                   placeholder="例: 5000" style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc' }} required
                 />
               </div>
               <div>
                 <label style={{ marginRight: '10px' }}>Max 社員番号:</label>
                 <input 
-                  type="number" min="1" max="9999" value={maxUser} onChange={e => setMaxUser(e.target.value)} 
+                  type="number" min="1" max="9999999" value={maxUser} onChange={e => setMaxUser(e.target.value)} 
                   placeholder="例: 5100" style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc', width: '100px' }} required
                 />
               </div>
@@ -1501,14 +1501,14 @@ export default function Admin() {
                 <div>
                   <label style={{ marginRight: '10px' }}>Min 社員番号:</label>
                   <input 
-                    type="number" min="1" max="9999" value={tMinUser} onChange={e => setTMinUser(e.target.value)} 
+                    type="number" min="1" max="9999999" value={tMinUser} onChange={e => setTMinUser(e.target.value)} 
                     placeholder="例: 5000" style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc' }} required
                   />
                 </div>
                 <div>
                   <label style={{ marginRight: '10px' }}>Max 社員番号:</label>
                   <input 
-                    type="number" min="1" max="9999" value={tMaxUser} onChange={e => setTMaxUser(e.target.value)} 
+                    type="number" min="1" max="9999999" value={tMaxUser} onChange={e => setTMaxUser(e.target.value)} 
                     placeholder="例: 5100" style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc', width: '100px' }} required
                   />
                 </div>
