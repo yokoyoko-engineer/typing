@@ -492,6 +492,7 @@ export default function Tournament({ socket, onBackToHome }) {
     const [cpuLevel, setCpuLevel] = useState(5);
     const [gameState, setGameState] = useState('setup'); // setup, waiting, ready, countdown, playing, intermission, spectating, finished
     const [timeRemaining, setTimeRemaining] = useState(0);
+    const [endTime, setEndTime] = useState(null);
     const [lastResult, setLastResult] = useState(null);
     const [highestScore, setHighestScore] = useState(0);
     
@@ -510,14 +511,17 @@ export default function Tournament({ socket, onBackToHome }) {
                 setCpuLevel(state.cpuLevel);
             }
             if (state.status === 'active' && gameState === 'waiting') {
+                setEndTime(state.endTime);
                 const remainingMs = state.endTime - Date.now();
                 if (remainingMs > 0) {
                     setTimeRemaining(Math.ceil(remainingMs / 1000));
                     setGameState('ready'); // ready state
                 } else {
+                    setTimeRemaining(0);
                     setGameState('finished');
                 }
             } else if (state.status === 'finished') {
+                setTimeRemaining(0);
                 setGameState('finished');
             }
         });
@@ -527,6 +531,7 @@ export default function Tournament({ socket, onBackToHome }) {
                 setCpuLevel(data.cpuLevel);
             }
             if (gameState === 'waiting') {
+                setEndTime(data.endTime);
                 const remainingMs = data.endTime - Date.now();
                 setTimeRemaining(Math.max(0, Math.ceil(remainingMs / 1000)));
                 setGameState('ready'); // ready
@@ -534,6 +539,7 @@ export default function Tournament({ socket, onBackToHome }) {
         });
 
         socket.on('tournamentFinished', () => {
+            setTimeRemaining(0);
             setGameState('finished');
         });
 
@@ -557,20 +563,22 @@ export default function Tournament({ socket, onBackToHome }) {
 
     // Global Tournament Timer
     useEffect(() => {
-        if (gameState === 'playing' || gameState === 'intermission' || gameState === 'spectating' || gameState === 'ready' || gameState === 'countdown') {
-            const timer = setInterval(() => {
-                setTimeRemaining((prev) => {
-                    if (prev <= 1) {
-                        clearInterval(timer);
-                        setGameState('finished');
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
+        if ((gameState === 'playing' || gameState === 'intermission' || gameState === 'spectating' || gameState === 'ready' || gameState === 'countdown') && endTime) {
+            const updateTimer = () => {
+                const remainingMs = endTime - Date.now();
+                if (remainingMs <= 0) {
+                    setTimeRemaining(0);
+                    setGameState('finished');
+                } else {
+                    setTimeRemaining(Math.ceil(remainingMs / 1000));
+                }
+            };
+
+            updateTimer();
+            const timer = setInterval(updateTimer, 1000);
             return () => clearInterval(timer);
         }
-    }, [gameState]);
+    }, [gameState, endTime]);
 
     // Fetch past tournaments for setup screen
     useEffect(() => {
