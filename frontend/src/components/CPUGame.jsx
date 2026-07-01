@@ -398,12 +398,12 @@ export default function CPUGame({ onBackToHome }) {
                         <button
                             className="action-btn"
                             onClick={confirmName}
-                            disabled={!/^[0-9]{1,4}$/.test(nameInput.trim())}
+                            disabled={!/^[0-9]{1,7}$/.test(nameInput.trim())}
                             style={{
                                 width: '100%',
                                 height: '55px',
                                 fontSize: '1.2em',
-                                opacity: !/^[0-9]{1,4}$/.test(nameInput.trim()) ? 0.5 : 1,
+                                opacity: !/^[0-9]{1,7}$/.test(nameInput.trim()) ? 0.5 : 1,
                             }}
                         >
                             決定

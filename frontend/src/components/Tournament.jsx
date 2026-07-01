@@ -658,7 +658,7 @@ export default function Tournament({ socket, onBackToHome }) {
                         <button
                             className="action-btn"
                             onClick={handleJoin}
-                            disabled={!/^[0-9]{1,4}$/.test(nameInput.trim())}
+                            disabled={!/^[0-9]{1,7}$/.test(nameInput.trim())}
                             style={{ width: '100%', height: '55px', fontSize: '1.2em' }}
                         >
                             待機室へ入る
