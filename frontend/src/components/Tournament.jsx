@@ -34,7 +34,7 @@ function TournamentRanking({ socket, playerName, jobType, globalLegends, highest
     }, [socket]);
 
     return (
-        <div style={{ width: '300px', paddingLeft: '20px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+        <div style={{ width: '380px', paddingLeft: '20px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
             <div style={{ background: '#f5f5f5', borderRadius: '10px', padding: '15px', flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
                 <h3 style={{ margin: '0 0 15px 0', textAlign: 'center', color: '#2c3e50' }}>
                     🔥 リアルタイムランキング
@@ -57,14 +57,17 @@ function TournamentRanking({ socket, playerName, jobType, globalLegends, highest
                                             transition: 'all 0.3s',
                                             borderRadius: '5px'
                                         }}>
-                                            <td style={{ padding: '8px 5px', width: '40px', color: isLegendBeat ? '#000' : (idx < 3 ? '#e8734a' : '#888'), borderRadius: '5px 0 0 5px' }}>
+                                            <td style={{ padding: '8px 5px', width: '35px', color: isLegendBeat ? '#000' : (idx < 3 ? '#e8734a' : '#888'), borderRadius: '5px 0 0 5px' }}>
                                                 {idx + 1}.
                                             </td>
-                                            <td style={{ padding: '8px 5px', color: isLegendBeat ? '#000' : 'inherit' }}>
+                                            <td style={{ padding: '8px 5px', color: isLegendBeat ? '#000' : 'inherit', wordBreak: 'break-all' }}>
                                                 {isLegendBeat && <span style={{marginRight: '5px'}}>👑</span>}
                                                 {entry.jobType ? `[${entry.jobType}] ` : ''}{entry.user_id}
                                             </td>
-                                            <td style={{ padding: '8px 5px', textAlign: 'right', color: isLegendBeat ? '#000' : '#5c6bc0', borderRadius: '0 5px 5px 0' }}>
+                                            <td style={{ padding: '8px 5px', width: '95px', textAlign: 'center', fontWeight: 'bold', color: isLegendBeat ? '#000' : '#ff9800' }}>
+                                                {getEvaluationLevel(entry.score)}
+                                            </td>
+                                            <td style={{ padding: '8px 5px', width: '60px', textAlign: 'right', color: isLegendBeat ? '#000' : '#5c6bc0', borderRadius: '0 5px 5px 0' }}>
                                                 {entry.score}
                                             </td>
                                         </tr>
@@ -78,7 +81,9 @@ function TournamentRanking({ socket, playerName, jobType, globalLegends, highest
                 </div>
                 <div style={{ marginTop: '15px', padding: '10px', background: '#e8eaf6', borderRadius: '8px', textAlign: 'center' }}>
                     <div style={{ fontSize: '0.9em', color: '#666' }}>あなたの最高スコア</div>
-                    <div style={{ fontSize: '1.5em', fontWeight: 'bold', color: '#2c3e50' }}>{highestScore}</div>
+                    <div style={{ fontSize: '1.5em', fontWeight: 'bold', color: '#2c3e50' }}>
+                        {highestScore} <span style={{ fontSize: '0.7em', color: '#ff9800', marginLeft: '8px' }}>({getEvaluationLevel(highestScore)})</span>
+                    </div>
                 </div>
             </div>
         </div>
