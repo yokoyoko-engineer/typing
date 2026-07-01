@@ -512,3 +512,34 @@ export class TypingSession {
         };
     }
 }
+
+export function getEvaluationLevel(score) {
+    const s = Number(score);
+    if (isNaN(s)) return '-';
+    
+    if (s >= 750) return 'Godhand';
+    if (s >= 700) return 'Jedi';
+    if (s >= 650) return 'Tatujin';
+    if (s >= 600) return 'Rocket';
+    if (s >= 550) return 'Meijin';
+    if (s >= 500) return 'EddieVH';
+    if (s >= 450) return 'LaserBeam';
+    if (s >= 400) return 'Professor';
+    if (s >= 375) return 'Comet';
+    if (s >= 350) return 'Ninja';
+    if (s >= 325) return 'Thunder';
+    if (s >= 300) return 'Fast';
+    if (s >= 277) return 'Good!';
+    if (s >= 260) return 'S';
+    if (s >= 243) return 'A+';
+    if (s >= 226) return 'A';
+    if (s >= 209) return 'A-';
+    if (s >= 192) return 'B+';
+    if (s >= 175) return 'B';
+    if (s >= 158) return 'B-';
+    if (s >= 141) return 'C+';
+    if (s >= 124) return 'C';
+    if (s >= 107) return 'C-';
+    if (s >= 90) return 'D+';
+    return 'D';
+}

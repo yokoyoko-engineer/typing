@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getRandomWord, CATEGORIES, CLOUD_GENRES, GENRES_BY_CATEGORY } from '../words';
-import { TypingSession, alignTextAndRuby } from '../utils/typingEngine';
+import { TypingSession, alignTextAndRuby, getEvaluationLevel } from '../utils/typingEngine';
 import './Game.css'; // Reuse existing Game styles
 
 // CPU difficulty settings (ms per character) based on requested tiers
@@ -634,6 +634,9 @@ export default function CPUGame({ onBackToHome }) {
                                     </p>
                                     <p style={{ fontSize: '1.3em', fontWeight: 'bold', color: '#d4af37', margin: '5px 0 0 0' }}>
                                         ⭐ スコア: {stats.finalScore || 0}
+                                    </p>
+                                    <p style={{ fontSize: '1.3em', fontWeight: 'bold', color: '#ff9800', margin: '5px 0 0 0' }}>
+                                        🏷️ レベル: {getEvaluationLevel(stats.finalScore || 0)}
                                     </p>
                                 </>
                             )}

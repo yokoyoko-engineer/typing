@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { CATEGORIES, GENRES_BY_CATEGORY } from '../words';
-import { alignTextAndRuby } from '../utils/typingEngine';
+import { alignTextAndRuby, getEvaluationLevel } from '../utils/typingEngine';
 import './Game.css';
 
 export default function Game({ socket, roomState, myId, onLeaveRoom }) {
@@ -10,6 +10,9 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
   const [damageFlash, setDamageFlash] = useState(false);
   const [isMiss, setIsMiss] = useState(false);
   const inputRef = useRef(null);
+  const startTimeRef = useRef(null);
+  const correctKeysRef = useRef(0);
+  const missKeysRef = useRef(0);
 
   useEffect(() => {
     const handleGameCountdown = (count) => {
@@ -33,6 +36,9 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
     // 状態が playing になったら auto focus
     if (roomState.status === 'playing') {
       setGameStarted(true);
+      startTimeRef.current = Date.now();
+      correctKeysRef.current = 0;
+      missKeysRef.current = 0;
       if (inputRef.current) inputRef.current.focus();
     } else if (roomState.status === 'waiting') {
       // 待機状態に戻ったらリセット
@@ -45,8 +51,10 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
     const handleTypingResult = ({ success }) => {
       if (success) {
         setIsMiss(false);
+        correctKeysRef.current++;
       } else {
         setIsMiss(true);
+        missKeysRef.current++;
       }
     };
 
@@ -174,6 +182,18 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
         k, avg: Math.round(times.reduce((a,b) => a+b, 0) / Math.max(1, times.length))
     })).sort((a,b) => b.avg - a.avg).slice(0,3);
 
+    const elapsed = startTimeRef.current ? (Date.now() - startTimeRef.current) / 1000 : 0;
+    const totalCorrect = correctKeysRef.current;
+    const totalMiss = missKeysRef.current;
+    const totalTyped = totalCorrect + totalMiss;
+
+    let eScore = 0;
+    if (totalTyped > 0 && elapsed > 0) {
+        const wpm = totalCorrect / (elapsed / 60);
+        const accuracy = totalCorrect / totalTyped;
+        eScore = Math.round(wpm * Math.pow(accuracy, 3));
+    }
+
     return (
       <div className="game-container result-screen">
         <h2>Game Over!</h2>
@@ -199,6 +219,12 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
 
             {/* Right Column: Tracking Stats display */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <div style={{ background: '#fff', padding: '15px', borderRadius: '10px', minWidth: '160px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                    <h4 style={{ margin: '0 0 10px', color: '#d4af37' }}>スコア / レベル</h4>
+                    <div style={{ fontSize: '1.8em', fontWeight: 'bold', color: '#d4af37' }}>{eScore} <span style={{fontSize:'0.4em', color:'#888'}}>点</span></div>
+                    <div style={{ fontSize: '1.5em', fontWeight: 'bold', color: '#ff9800', marginTop: '5px' }}>{getEvaluationLevel(eScore)}</div>
+                </div>
+
                 <div style={{ background: '#fff', padding: '15px', borderRadius: '10px', minWidth: '160px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
                     <h4 style={{ margin: '0 0 10px', color: '#5c6bc0' }}>ミスタイプ</h4>
                     <div style={{ fontSize: '1.8em', fontWeight: 'bold', color: '#e53935' }}>{stats.missCount || 0} <span style={{fontSize:'0.4em', color:'#888'}}>回</span></div>

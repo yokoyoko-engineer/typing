@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getRandomWord, CATEGORIES } from '../words';
-import { TypingSession, alignTextAndRuby } from '../utils/typingEngine';
+import { TypingSession, alignTextAndRuby, getEvaluationLevel } from '../utils/typingEngine';
 import './Game.css';
 
 const CPU_DIFFICULTY_MAP = {
@@ -441,8 +441,9 @@ function TournamentBattle({
                             {lastResult?.status === 'win' ? 'VICTORY!' : 'DEFEATED...'}
                         </h2>
                         {lastResult?.status === 'win' && (
-                            <div style={{ fontSize: '1.5em', margin: '20px 0' }}>
-                                今回のスコア: <span style={{ fontWeight: 'bold', color: '#5c6bc0', fontSize: '1.5em' }}>{lastResult.score}</span>
+                            <div style={{ fontSize: '1.5em', margin: '20px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                <div>今回のスコア: <span style={{ fontWeight: 'bold', color: '#5c6bc0', fontSize: '1.5em' }}>{lastResult.score}</span></div>
+                                <div style={{ fontSize: '1.1em' }}>レベル: <span style={{ fontWeight: 'bold', color: '#ff9800', fontSize: '1.3em' }}>{getEvaluationLevel(lastResult.score)}</span></div>
                             </div>
                         )}
                         <div style={{ display: 'flex', gap: '20px', marginTop: '40px' }}>
@@ -474,8 +475,12 @@ function TournamentBattle({
 
                 {gameState === 'finished' && (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                        <h2 style={{ fontSize: '3em', color: '#2c3e50' }}>イベント終了！</h2>
-                        <p style={{ fontSize: '1.2em' }}>最終ランキングをご確認ください</p>
+                        <h2 style={{ fontSize: '3em', color: '#2c3e50', marginBottom: '10px' }}>イベント終了！</h2>
+                        <div style={{ fontSize: '1.5em', margin: '15px 0', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                            <div>あなたの最高スコア: <span style={{ fontWeight: 'bold', color: '#5c6bc0' }}>{highestScore}</span></div>
+                            <div style={{ fontSize: '1.1em' }}>レベル: <span style={{ fontWeight: 'bold', color: '#ff9800' }}>{getEvaluationLevel(highestScore)}</span></div>
+                        </div>
+                        <p style={{ fontSize: '1.2em', color: '#666' }}>最終ランキングをご確認ください</p>
                         <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '20px' }}>Homeへ戻る</button>
                     </div>
                 )}
