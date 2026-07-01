@@ -34,7 +34,7 @@ export default function Admin() {
 
   // --- Analysis Tab State ---
   const [minUser, setMinUser] = useState('1');
-  const [maxUser, setMaxUser] = useState('9999');
+  const [maxUser, setMaxUser] = useState('99999999');
   const [startDate, setStartDate] = useState(firstDay);
   const [endDate, setEndDate] = useState(lastDay);
   const [cohort, setCohort] = useState('すべて');
@@ -74,7 +74,7 @@ export default function Admin() {
 
   // --- Tournament Analysis State ---
   const [tMinUser, setTMinUser] = useState('1');
-  const [tMaxUser, setTMaxUser] = useState('9999');
+  const [tMaxUser, setTMaxUser] = useState('99999999');
   const [tStartDate, setTStartDate] = useState(firstDay);
   const [tEndDate, setTEndDate] = useState(lastDay);
   const [tCohort, setTCohort] = useState('すべて');
@@ -827,7 +827,7 @@ export default function Admin() {
               <div>
                 <label style={{ marginRight: '10px' }}>Max 社員番号:</label>
                 <input 
-                  type="number" min="1" max="9999999" value={maxUser} onChange={e => setMaxUser(e.target.value)} 
+                  type="number" min="1" max="99999999" value={maxUser} onChange={e => setMaxUser(e.target.value)} 
                   placeholder="例: 5100" style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc', width: '100px' }} required
                 />
               </div>
@@ -1508,7 +1508,7 @@ export default function Admin() {
                 <div>
                   <label style={{ marginRight: '10px' }}>Max 社員番号:</label>
                   <input 
-                    type="number" min="1" max="9999999" value={tMaxUser} onChange={e => setTMaxUser(e.target.value)} 
+                    type="number" min="1" max="99999999" value={tMaxUser} onChange={e => setTMaxUser(e.target.value)} 
                     placeholder="例: 5100" style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc', width: '100px' }} required
                   />
                 </div>
