@@ -153,10 +153,16 @@ export function alignTextAndRuby(text, ruby) {
     let currentType = null;
     let currentStr = '';
 
-    const isHiragana = (char) => /^[\u3040-\u309F\u30FC]+$/.test(char);
+    const isPhonetic = (char) => /^[\u3040-\u309F\u30A0-\u30FF\u30FC]+$/.test(char);
+
+    const katakanaToHiragana = (str) => {
+        return str.replace(/[\u30A1-\u30F6]/g, function(match) {
+            return String.fromCharCode(match.charCodeAt(0) - 0x60);
+        });
+    };
 
     for (let char of text) {
-        let type = isHiragana(char) ? 'H' : 'N';
+        let type = isPhonetic(char) ? 'H' : 'N';
         if (type !== currentType) {
             if (currentStr) textChunks.push({ type: currentType, text: currentStr });
             currentType = type;
@@ -170,7 +176,8 @@ export function alignTextAndRuby(text, ruby) {
     let rubyIdx = 0;
     for (let chunk of textChunks) {
         if (chunk.type === 'H') {
-            let matchIdx = ruby.indexOf(chunk.text, rubyIdx);
+            let searchStr = katakanaToHiragana(chunk.text);
+            let matchIdx = ruby.indexOf(searchStr, rubyIdx);
             if (matchIdx === -1) {
                 return [{ text, ruby }]; // Fallback
             }
@@ -181,8 +188,8 @@ export function alignTextAndRuby(text, ruby) {
                     lastChunk.ruby = prevRuby;
                 }
             }
-            chunks.push({ type: 'H', text: chunk.text, ruby: chunk.text });
-            rubyIdx = matchIdx + chunk.text.length;
+            chunks.push({ type: 'H', text: chunk.text, ruby: searchStr });
+            rubyIdx = matchIdx + searchStr.length;
         } else {
             chunks.push({ type: 'N', text: chunk.text, ruby: '' });
         }
@@ -498,6 +505,14 @@ export class TypingSession {
         for (let i = 0; i < this.nodes.length; i++) {
             if (i < this.currentIndex) {
                 typedRuby += this.nodes[i].chars;
+            } else if (i === this.currentIndex) {
+                const node = this.nodes[i];
+                if (node.chars.startsWith('ん') && this.typedNodePrefix.length > 0) {
+                    typedRuby += 'ん';
+                    targetRuby += node.chars.substring(1);
+                } else {
+                    targetRuby += node.chars;
+                }
             } else {
                 targetRuby += this.nodes[i].chars;
             }

@@ -69,7 +69,7 @@ export const KANJI_SPLIT_MAP = {
     '先日': ['せん', 'じつ'],
     '共有': ['きょう', 'ゆう'],
     '再発防止': ['さい', 'はつ', 'ぼう', 'し'],
-    '力添': ['ちから', 'ぞ'],
+    '力添': ['ち力を', 'ぞ'],
     '参加': ['さん', 'か'],
     '参考': ['さん', 'こう'],
     '可能': ['か', 'のう'],
@@ -153,10 +153,16 @@ export function alignTextAndRuby(text, ruby) {
     let currentType = null;
     let currentStr = '';
 
-    const isHiragana = (char) => /^[\u3040-\u309F\u30FC]+$/.test(char);
+    const isPhonetic = (char) => /^[\u3040-\u309F\u30A0-\u30FF\u30FC]+$/.test(char);
+
+    const katakanaToHiragana = (str) => {
+        return str.replace(/[\u30A1-\u30F6]/g, function(match) {
+            return String.fromCharCode(match.charCodeAt(0) - 0x60);
+        });
+    };
 
     for (let char of text) {
-        let type = isHiragana(char) ? 'H' : 'N';
+        let type = isPhonetic(char) ? 'H' : 'N';
         if (type !== currentType) {
             if (currentStr) textChunks.push({ type: currentType, text: currentStr });
             currentType = type;
@@ -170,7 +176,8 @@ export function alignTextAndRuby(text, ruby) {
     let rubyIdx = 0;
     for (let chunk of textChunks) {
         if (chunk.type === 'H') {
-            let matchIdx = ruby.indexOf(chunk.text, rubyIdx);
+            let searchStr = katakanaToHiragana(chunk.text);
+            let matchIdx = ruby.indexOf(searchStr, rubyIdx);
             if (matchIdx === -1) {
                 return [{ text, ruby }]; // Fallback
             }
@@ -181,8 +188,8 @@ export function alignTextAndRuby(text, ruby) {
                     lastChunk.ruby = prevRuby;
                 }
             }
-            chunks.push({ type: 'H', text: chunk.text, ruby: chunk.text });
-            rubyIdx = matchIdx + chunk.text.length;
+            chunks.push({ type: 'H', text: chunk.text, ruby: searchStr });
+            rubyIdx = matchIdx + searchStr.length;
         } else {
             chunks.push({ type: 'N', text: chunk.text, ruby: '' });
         }
@@ -217,6 +224,19 @@ export function alignTextAndRuby(text, ruby) {
 
     return finalChunks;
 }
+
+
+const NA_LINE_FIRST_CHARS = new Set(['な', 'に', 'ぬ', 'ね', 'の', 'ナ', 'ニ', 'ヌ', 'ネ', 'ノ']);
+const A_YA_CHARS = new Set([
+    'あ', 'い', 'う', 'え', 'お',
+    'ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ',
+    'や', 'ゆ', 'よ',
+    'ゃ', 'ゅ', 'ょ',
+    'ア', 'イ', 'ウ', 'エ', 'オ',
+    'ァ', 'ィ', 'ゥ', 'ェ', 'ォ',
+    'ヤ', 'ユ', 'ヨ',
+    'ャ', 'ュ', 'ョ'
+]);
 
 const NUMBER_MAP = {
     '0': ['ぜろ', 'れい', 'まる'],
@@ -314,8 +334,8 @@ export class TypingSession {
             if (char === 'っ' && nextChar && nextChar !== 'っ') {
                 let baseOpts = [...ROMAJI_MAP['っ']]; // fallback ltu, xtu
 
-                let nextOpts = ROMAJI_MAP[nextChar + nextNextChar]
-                    ? ROMAJI_MAP[nextChar + nextNextChar]
+                let nextOpts = ROMAJI_MAP[nextChar + nextNextChar] 
+                    ? ROMAJI_MAP[nextChar + nextNextChar] 
                     : (ROMAJI_MAP[nextChar] ? ROMAJI_MAP[nextChar] : []);
 
                 let consonants = [];
@@ -324,8 +344,34 @@ export class TypingSession {
                         consonants.push(opt[0]);
                     }
                 }
-
+                
                 opts = [...consonants, ...baseOpts];
+            }
+            // 1.5 ん + な行の複合ノード化
+            else if (char === 'ん' && nextChar && NA_LINE_FIRST_CHARS.has(nextChar)) {
+                let naChars = nextChar;
+                let naOpts = [];
+                let naStep = 1;
+
+                if (nextNextChar && ROMAJI_MAP[nextChar + nextNextChar]) {
+                    naChars = nextChar + nextNextChar;
+                    naOpts = [...ROMAJI_MAP[naChars]];
+                    naStep = 2;
+                } else if (ROMAJI_MAP[nextChar]) {
+                    naOpts = [...ROMAJI_MAP[nextChar]];
+                }
+
+                if (naOpts.length > 0) {
+                    let combinedOpts = [];
+                    for (let opt of naOpts) {
+                        combinedOpts.push('n' + opt);
+                        combinedOpts.push('nn' + opt);
+                        combinedOpts.push("n'" + opt);
+                    }
+                    nodes.push({ opts: combinedOpts, chars: char + naChars });
+                    i += 1 + naStep;
+                    continue;
+                }
             }
             // 2. Check for yoon (2 chars combined)
             else if (nextChar && ROMAJI_MAP[char + nextChar]) {
@@ -333,6 +379,13 @@ export class TypingSession {
                 step = 2; // consumed 2 chars
             }
             // 3. Single char
+            else if (char === 'ん') {
+                if (nextChar && A_YA_CHARS.has(nextChar)) {
+                    opts = ['nn', "n'"];
+                } else {
+                    opts = ['nn', 'n', "n'"];
+                }
+            }
             else if (ROMAJI_MAP[char]) {
                 opts = [...ROMAJI_MAP[char]];
             }
@@ -361,7 +414,17 @@ export class TypingSession {
 
         // Append rest
         for (let i = this.currentIndex + 1; i < this.nodes.length; i++) {
-            res += this.nodes[i].opts[0];
+            if (this.nodes[i].chars === 'ん') {
+                if (i + 1 < this.nodes.length) {
+                    let nextOpts = this.nodes[i + 1].opts;
+                    let needsNn = nextOpts.some(o => ['a', 'i', 'u', 'e', 'o', 'y', 'n'].includes(o[0]));
+                    res += needsNn ? 'nn' : 'n';
+                } else {
+                    res += 'n';
+                }
+            } else {
+                res += this.nodes[i].opts[0];
+            }
         }
         return res;
     }
@@ -369,8 +432,9 @@ export class TypingSession {
     input(char) {
         if (this.isFinished()) return null;
 
+        let currentNode = this.nodes[this.currentIndex];
         let nextPrefix = this.typedNodePrefix + char;
-        let validOpts = this.nodes[this.currentIndex].opts.filter(o => o.startsWith(nextPrefix));
+        let validOpts = currentNode.opts.filter(o => o.startsWith(nextPrefix));
 
         if (validOpts.length > 0) {
             // Correct input
@@ -383,13 +447,7 @@ export class TypingSession {
 
                 // Handling 'n' vs 'nn'
                 if (nextPrefix === 'n' && validOpts.includes('nn')) {
-                    if (this.currentIndex + 1 < this.nodes.length) {
-                        let nextOpts = this.nodes[this.currentIndex + 1].opts;
-                        let needsNn = nextOpts.some(o => ['a', 'i', 'u', 'e', 'o', 'y'].includes(o[0]));
-                        if (needsNn) {
-                            shouldAdvance = false;
-                        }
-                    }
+                    shouldAdvance = false;
                 }
 
                 // Single consonant from sokuon logic e.g. "k"
@@ -409,6 +467,30 @@ export class TypingSession {
             return { success: true, finishedWord: false };
         }
 
+        // Special handling for 'n' followed by non-vowel/non-y/non-n consonant.
+        // If current node is 'ん', we have already typed 'n' (typedNodePrefix === 'n'),
+        // and the next char doesn't match any option of 'ん' (e.g. 'k' in 'kankei'),
+        // and the next node is NOT an "a/na/ya" line node,
+        // and the typed char is a valid start for the next node:
+        // then we auto-complete 'ん' with a single 'n' and apply the char to the next node.
+        if (currentNode.chars === 'ん' && this.typedNodePrefix === 'n') {
+            const nextNode = this.nodes[this.currentIndex + 1];
+            if (nextNode) {
+                const firstChar = nextNode.chars[0];
+                const isAnaya = A_YA_CHARS.has(firstChar) || NA_LINE_FIRST_CHARS.has(firstChar);
+                if (!isAnaya) {
+                    const nextValidOpts = nextNode.opts.filter(o => o.startsWith(char));
+                    if (nextValidOpts.length > 0) {
+                        // Advance 'ん' node
+                        this.currentIndex++;
+                        this.typedNodePrefix = '';
+                        // Process the char for the next node
+                        return this.input(char);
+                    }
+                }
+            }
+        }
+
         return { success: false, finishedWord: false };
     }
 
@@ -423,6 +505,14 @@ export class TypingSession {
         for (let i = 0; i < this.nodes.length; i++) {
             if (i < this.currentIndex) {
                 typedRuby += this.nodes[i].chars;
+            } else if (i === this.currentIndex) {
+                const node = this.nodes[i];
+                if (node.chars.startsWith('ん') && this.typedNodePrefix.length > 0) {
+                    typedRuby += 'ん';
+                    targetRuby += node.chars.substring(1);
+                } else {
+                    targetRuby += node.chars;
+                }
             } else {
                 targetRuby += this.nodes[i].chars;
             }
@@ -436,4 +526,35 @@ export class TypingSession {
             isFinished: this.isFinished()
         };
     }
+}
+
+export function getEvaluationLevel(score) {
+    const s = Number(score);
+    if (isNaN(s)) return '-';
+    
+    if (s >= 750) return 'Godhand';
+    if (s >= 700) return 'Jedi';
+    if (s >= 650) return 'Tatujin';
+    if (s >= 600) return 'Rocket';
+    if (s >= 550) return 'Meijin';
+    if (s >= 500) return 'EddieVH';
+    if (s >= 450) return 'LaserBeam';
+    if (s >= 400) return 'Professor';
+    if (s >= 375) return 'Comet';
+    if (s >= 350) return 'Ninja';
+    if (s >= 325) return 'Thunder';
+    if (s >= 300) return 'Fast';
+    if (s >= 277) return 'Good!';
+    if (s >= 260) return 'S';
+    if (s >= 243) return 'A+';
+    if (s >= 226) return 'A';
+    if (s >= 209) return 'A-';
+    if (s >= 192) return 'B+';
+    if (s >= 175) return 'B';
+    if (s >= 158) return 'B-';
+    if (s >= 141) return 'C+';
+    if (s >= 124) return 'C';
+    if (s >= 107) return 'C-';
+    if (s >= 90) return 'D+';
+    return 'D';
 }
