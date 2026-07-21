@@ -25,6 +25,64 @@ const JOB_COLORS = {
   QA: '#9c27b0'
 };
 
+function TournamentLobbyMonitor({ socket, onStartTournament }) {
+  const [lobbyCount, setLobbyCount] = useState(0);
+  const [lobbyPlayers, setLobbyPlayers] = useState([]);
+
+  useEffect(() => {
+    if (!socket) return;
+    socket.emit('adminGetLobby');
+
+    const handleUpdate = (data) => {
+      setLobbyCount(data.count || 0);
+      setLobbyPlayers(data.players || []);
+    };
+
+    socket.on('tournamentLobbyUpdate', handleUpdate);
+
+    return () => {
+      socket.off('tournamentLobbyUpdate', handleUpdate);
+    };
+  }, [socket]);
+
+  return (
+    <div style={{ background: '#fff3e0', padding: '20px', borderRadius: '10px', marginBottom: '30px', borderLeft: '5px solid #ff9800' }}>
+      <h3 style={{ marginTop: 0, color: '#e65100' }}>イベント開催コントロール</h3>
+      <div style={{ background: '#fff', padding: '15px', borderRadius: '8px', marginBottom: '20px', display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+        <div style={{ flex: 1 }}>
+          <h4 style={{ margin: '0 0 10px 0', color: '#2c3e50' }}>現在の待機室</h4>
+          <div style={{ fontSize: '2em', fontWeight: 'bold', color: '#5c6bc0' }}>
+            {lobbyCount} <span style={{ fontSize: '0.4em', color: '#666' }}>人</span>
+          </div>
+        </div>
+        <div style={{ flex: 2, background: '#f5f5f5', padding: '10px', borderRadius: '5px', maxHeight: '100px', overflowY: 'auto' }}>
+          <h5 style={{ margin: '0 0 5px 0', color: '#666' }}>参加者一覧 {lobbyCount > lobbyPlayers.length ? `(最新 ${lobbyPlayers.length}件)` : ''}</h5>
+          {lobbyPlayers.length > 0 ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {lobbyPlayers.map((p, idx) => (
+                <span key={idx} style={{ background: '#e0e0e0', padding: '3px 8px', borderRadius: '12px', fontSize: '0.9em', color: '#333' }}>
+                  {p}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <span style={{ color: '#aaa', fontSize: '0.9em' }}>待機中の参加者はいません</span>
+          )}
+        </div>
+      </div>
+
+      <p style={{ color: '#666' }}>現在待機室にいるすべてのプレイヤーを対象にイベント（5分間）を開始します。</p>
+      <button 
+        onClick={onStartTournament}
+        style={{ padding: '15px 30px', fontSize: '1.2em', background: '#ff9800', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+        disabled={lobbyCount === 0}
+      >
+        🚀 タイピングイベントを開始する
+      </button>
+    </div>
+  );
+}
+
 export default function Admin() {
   const [activeTab, setActiveTab] = useState('analysis'); // 'analysis', 'tournament', or 'users'
 
@@ -59,8 +117,6 @@ export default function Admin() {
   const [tournaments, setTournaments] = useState([]);
   const [selectedTournament, setSelectedTournament] = useState('');
   const [tournamentScores, setTournamentScores] = useState([]);
-  const [lobbyCount, setLobbyCount] = useState(0);
-  const [lobbyPlayers, setLobbyPlayers] = useState([]);
   const [adminCpuLevel, setAdminCpuLevel] = useState(5);
   const [compareTourneyA, setCompareTourneyA] = useState('');
   const [compareTourneyB, setCompareTourneyB] = useState('');
@@ -272,12 +328,6 @@ export default function Admin() {
   useEffect(() => {
     const newSocket = io();
     setSocket(newSocket);
-    
-    newSocket.on('tournamentLobbyUpdate', (data) => {
-      setLobbyCount(data.count);
-      setLobbyPlayers(data.players);
-    });
-    
     return () => newSocket.close();
   }, []);
 
@@ -295,11 +345,8 @@ export default function Admin() {
   useEffect(() => {
     if (activeTab === 'tournament') {
       fetchTournaments();
-      if (socket) {
-        socket.emit('adminGetLobby');
-      }
     }
-  }, [activeTab, socket]);
+  }, [activeTab]);
 
   useEffect(() => {
     if (selectedTournament) {
@@ -1082,41 +1129,7 @@ export default function Admin() {
       {activeTab === 'tournament' && (
         <div>
           {/* 大会開催パネル */}
-          <div style={{ background: '#fff3e0', padding: '20px', borderRadius: '10px', marginBottom: '30px', borderLeft: '5px solid #ff9800' }}>
-            <h3 style={{ marginTop: 0, color: '#e65100' }}>イベント開催コントロール</h3>
-            <div style={{ background: '#fff', padding: '15px', borderRadius: '8px', marginBottom: '20px', display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
-              <div style={{ flex: 1 }}>
-                <h4 style={{ margin: '0 0 10px 0', color: '#2c3e50' }}>現在の待機室</h4>
-                <div style={{ fontSize: '2em', fontWeight: 'bold', color: '#5c6bc0' }}>
-                  {lobbyCount} <span style={{ fontSize: '0.4em', color: '#666' }}>人</span>
-                </div>
-              </div>
-              <div style={{ flex: 2, background: '#f5f5f5', padding: '10px', borderRadius: '5px', maxHeight: '100px', overflowY: 'auto' }}>
-                <h5 style={{ margin: '0 0 5px 0', color: '#666' }}>参加者一覧 {lobbyCount > lobbyPlayers.length ? `(最新 ${lobbyPlayers.length}件)` : ''}</h5>
-                {lobbyPlayers.length > 0 ? (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    {lobbyPlayers.map((p, idx) => (
-                      <span key={idx} style={{ background: '#e0e0e0', padding: '3px 8px', borderRadius: '12px', fontSize: '0.9em', color: '#333' }}>
-                        {p}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <span style={{ color: '#aaa', fontSize: '0.9em' }}>待機中の参加者はいません</span>
-                )}
-              </div>
-            </div>
-
-            <p style={{ color: '#666' }}>現在待機室にいるすべてのプレイヤーを対象にイベント（5分間）を開始します。</p>
-            <button 
-              onClick={handleStartTournament}
-              style={{ padding: '15px 30px', fontSize: '1.2em', background: '#ff9800', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
-              disabled={lobbyCount === 0}
-            >
-              🚀 イベントをスタートする
-            </button>
-            {lobbyCount === 0 && <p style={{ color: '#f44336', fontSize: '0.9em', marginTop: '10px' }}>参加者が0人のため開始できません</p>}
-          </div>
+          <TournamentLobbyMonitor socket={socket} onStartTournament={handleStartTournament} />
 
           {/* 大会履歴パネル */}
           <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>

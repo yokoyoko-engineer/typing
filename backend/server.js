@@ -477,6 +477,32 @@ let tournamentState = {
 let tournamentTimer = null;
 const tournamentLobbyPlayers = {}; // socketId -> playerName
 
+let lobbyUpdateTimer = null;
+function emitTournamentLobbyUpdate() {
+  if (lobbyUpdateTimer) return;
+  lobbyUpdateTimer = setTimeout(() => {
+    lobbyUpdateTimer = null;
+    io.to('admin_room').emit('tournamentLobbyUpdate', {
+      count: Object.keys(tournamentLobbyPlayers).length,
+      players: Object.values(tournamentLobbyPlayers).map(p => p.name).slice(0, 20)
+    });
+  }, 500);
+}
+
+let liveRankingUpdateTimer = null;
+function emitTournamentLiveRanking() {
+  if (liveRankingUpdateTimer) return;
+  liveRankingUpdateTimer = setTimeout(() => {
+    liveRankingUpdateTimer = null;
+    const sorted = Object.entries(tournamentState.participants)
+      .map(([user_id, data]) => ({ user_id, score: data.score, jobType: data.jobType }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 100);
+      
+    io.to('tournament_lobby').emit('tournamentLiveRanking', sorted);
+  }, 500);
+}
+
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
   let currentRoomId = null;
@@ -485,8 +511,8 @@ io.on('connection', (socket) => {
   const sendLobbiesState = (targetSocket = io) => {
     const lobbies = Object.values(rooms).map(room => ({
       roomId: room.roomId,
+      genre: room.genre,
       playerCount: Object.keys(room.players).length,
-      players: Object.values(room.players).map(p => p.name),
       status: room.status
     }));
     targetSocket.emit('lobbiesState', lobbies);
@@ -503,10 +529,7 @@ io.on('connection', (socket) => {
     }
     socket.join('tournament_lobby');
     tournamentLobbyPlayers[socket.id] = { name: safeName, jobType: jobType || '' };
-    io.to('admin_room').emit('tournamentLobbyUpdate', {
-      count: Object.keys(tournamentLobbyPlayers).length,
-      players: Object.values(tournamentLobbyPlayers).map(p => p.name).slice(0, 100)
-    });
+    emitTournamentLobbyUpdate();
     
     socket.emit('tournamentState', { status: tournamentState.status, endTime: tournamentState.endTime, cpuLevel: tournamentState.cpuLevel });
   });
@@ -515,7 +538,7 @@ io.on('connection', (socket) => {
     socket.join('admin_room');
     socket.emit('tournamentLobbyUpdate', {
       count: Object.keys(tournamentLobbyPlayers).length,
-      players: Object.values(tournamentLobbyPlayers).map(p => p.name).slice(0, 100)
+      players: Object.values(tournamentLobbyPlayers).map(p => p.name).slice(0, 20)
     });
   });
 
@@ -579,12 +602,6 @@ io.on('connection', (socket) => {
     const currentMax = tournamentState.participants[safeName]?.score || 0;
     if (score > currentMax) {
       tournamentState.participants[safeName] = { score, jobType: jobType || '' };
-      
-      const sorted = Object.entries(tournamentState.participants)
-        .map(([user_id, data]) => ({ user_id, score: data.score, jobType: data.jobType }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 300);
-        
       io.to('tournament_lobby').emit('tournamentLiveRanking', sorted);
     }
   });
@@ -719,10 +736,7 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     if (tournamentLobbyPlayers[socket.id]) {
       delete tournamentLobbyPlayers[socket.id];
-      io.to('admin_room').emit('tournamentLobbyUpdate', {
-        count: Object.keys(tournamentLobbyPlayers).length,
-        players: Object.values(tournamentLobbyPlayers).map(p => p.name).slice(0, 100)
-      });
+      emitTournamentLobbyUpdate();
     }
     console.log(`User disconnected: ${socket.id}`);
     typingTimestamps.delete(socket.id);
