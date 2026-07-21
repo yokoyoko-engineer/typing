@@ -519,14 +519,11 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('adminStartTournament', async (data) => {
+  socket.on('adminStartTournament', async () => {
     if (tournamentState.status === 'active') return;
-    
-    const requestedCpuLevel = (data && data.cpuLevel) ? parseInt(data.cpuLevel, 10) : 5;
     
     tournamentState.status = 'active';
     tournamentState.endTime = Date.now() + 5 * 60 * 1000; // 5 minutes
-    tournamentState.cpuLevel = requestedCpuLevel;
     tournamentState.participants = {};
     
     // Create DB record
@@ -543,7 +540,7 @@ io.on('connection', (socket) => {
       console.error("Tournament creation error", err);
     }
 
-    io.to('tournament_lobby').emit('tournamentStarted', { endTime: tournamentState.endTime, cpuLevel: tournamentState.cpuLevel });
+    io.to('tournament_lobby').emit('tournamentStarted', { endTime: tournamentState.endTime });
     
     if (tournamentTimer) clearTimeout(tournamentTimer);
     

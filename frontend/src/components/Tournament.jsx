@@ -3,18 +3,7 @@ import { getRandomWord, CATEGORIES } from '../words';
 import { TypingSession, alignTextAndRuby, getEvaluationLevel } from '../utils/typingEngine';
 import './Game.css';
 
-const CPU_DIFFICULTY_MAP = {
-    1: 400,
-    2: 363,
-    3: 333,
-    4: 307,
-    5: 285,
-    6: 266,
-    7: 244,
-    8: 222,
-    9: 200,
-    10: 158
-};
+const TOTAL_WORDS = 20;
 const TOURNAMENT_GENRE = CATEGORIES.BUSINESS;
 
 // 1. Live Ranking Component (Optimized to update independently and scrollable)
@@ -90,12 +79,11 @@ function TournamentRanking({ socket, playerName, jobType, globalLegends, highest
     );
 }
 
-// 2. Battle (Typing) Component (Locked UI positions)
+// 2. Battle (Typing) Component
 function TournamentBattle({
     socket,
     playerName,
     jobType,
-    cpuLevel,
     gameState,
     setGameState,
     timeRemaining,
@@ -105,46 +93,37 @@ function TournamentBattle({
     setHighestScore,
     onBackToHome
 }) {
-    const [playerInfo, setPlayerInfo] = useState({ hp: 1000, currentWord: null, typingState: null });
-    const [cpuInfo, setCpuInfo] = useState({ hp: 1000, currentWord: null, typingState: null });
-    const [damageFlash, setDamageFlash] = useState(false);
+    const [wordCount, setWordCount] = useState(0);
+    const [currentWord, setCurrentWord] = useState(null);
+    const [typingState, setTypingState] = useState(null);
     const [isMiss, setIsMiss] = useState(false);
     const [countdown, setCountdown] = useState(3);
 
     const usedWordsRef = useRef(new Set());
     const inputRef = useRef(null);
-    const cpuIntervalRef = useRef(null);
-    const cpuStateRef = useRef(cpuInfo);
-    const playerStateRef = useRef(playerInfo);
-    
     const pSessionRef = useRef(null);
-    const cSessionRef = useRef(null);
     
     const currentBattleStartRef = useRef(null);
     const playerStatsRef = useRef({ missCount: 0, totalCorrect: 0 });
-
-    useEffect(() => { cpuStateRef.current = cpuInfo; }, [cpuInfo]);
-    useEffect(() => { playerStateRef.current = playerInfo; }, [playerInfo]);
 
     // Keep focus
     useEffect(() => {
         if ((gameState === 'playing' || gameState === 'ready') && inputRef.current) {
             inputRef.current.focus();
         }
-    }, [gameState, playerInfo]);
+    }, [gameState, currentWord]);
 
     const startNewBattle = () => {
+        usedWordsRef.current.clear();
         const pWord = getRandomWord(TOURNAMENT_GENRE, usedWordsRef.current);
-        const cWord = getRandomWord(TOURNAMENT_GENRE, usedWordsRef.current);
         
         pSessionRef.current = new TypingSession(pWord.ruby, pWord.text);
-        cSessionRef.current = new TypingSession(cWord.ruby, cWord.text);
-        
         playerStatsRef.current = { missCount: 0, totalCorrect: 0 };
         currentBattleStartRef.current = Date.now();
 
-        setPlayerInfo({ hp: 1000, currentWord: pWord, typingState: pSessionRef.current.state });
-        setCpuInfo({ hp: 1000, currentWord: cWord, typingState: cSessionRef.current.state });
+        setWordCount(0);
+        setCurrentWord(pWord);
+        setTypingState(pSessionRef.current.state);
     };
 
     // Countdown Logic
@@ -160,66 +139,6 @@ function TournamentBattle({
         }
     }, [gameState, countdown]);
 
-    // CPU Logic
-    useEffect(() => {
-        if (gameState === 'playing') {
-            const msPerKey = CPU_DIFFICULTY_MAP[cpuLevel] || 285;
-
-            const typeNextChar = () => {
-                if (gameState !== 'playing') return;
-
-                let currentCpu = cpuStateRef.current;
-                let pState = playerStateRef.current;
-
-                if (currentCpu.hp <= 0 || pState.hp <= 0) return;
-                if (!cSessionRef.current || !cSessionRef.current.state.targetRomaji) return;
-
-                const charToType = cSessionRef.current.state.targetRomaji[0];
-                const res = cSessionRef.current.input(charToType);
-
-                if (res && res.success) {
-                    if (res.finishedWord) {
-                        const newWord = getRandomWord(TOURNAMENT_GENRE, usedWordsRef.current);
-                        const damage = Math.round((currentCpu.currentWord.ruby.length * 2) * 2.4);
-                        const newPlayerHp = Math.max(0, pState.hp - damage);
-
-                        cSessionRef.current = new TypingSession(newWord.ruby, newWord.text);
-
-                        setPlayerInfo(prev => ({ ...prev, hp: newPlayerHp }));
-                        setCpuInfo(prev => ({
-                            ...prev,
-                            typingState: cSessionRef.current.state,
-                            currentWord: newWord
-                        }));
-
-                        setDamageFlash(true);
-                        setTimeout(() => setDamageFlash(false), 300);
-
-                        if (newPlayerHp <= 0) {
-                            // Player lost this round.
-                            setLastResult({ status: 'lose', score: 0 });
-                            setTimeout(() => {
-                                setGameState(prev => (prev === 'playing' ? 'intermission' : prev));
-                            }, 1000);
-                            return;
-                        }
-                    } else {
-                        setCpuInfo(prev => ({ ...prev, typingState: cSessionRef.current.state }));
-                    }
-                }
-
-                const variance = msPerKey * 0.1;
-                const randomDelay = msPerKey + (Math.random() * variance * 2 - variance);
-                cpuIntervalRef.current = setTimeout(typeNextChar, randomDelay);
-            };
-
-            cpuIntervalRef.current = setTimeout(typeNextChar, msPerKey);
-            return () => {
-                if (cpuIntervalRef.current) clearTimeout(cpuIntervalRef.current);
-            };
-        }
-    }, [gameState, cpuLevel]);
-
     // Player Typing Logic
     const handleKeyDown = (e) => {
         if (gameState === 'ready') {
@@ -231,7 +150,7 @@ function TournamentBattle({
             return;
         }
 
-        if (gameState !== 'playing' || playerInfo.hp <= 0) return;
+        if (gameState !== 'playing' || !pSessionRef.current) return;
 
         if (e.key.length === 1) {
             const typedChar = e.key.toLowerCase();
@@ -242,21 +161,9 @@ function TournamentBattle({
                 stats.totalCorrect++;
                 setIsMiss(false);
                 if (res.finishedWord) {
-                    const newWord = getRandomWord(TOURNAMENT_GENRE, usedWordsRef.current);
-                    const damage = Math.round((playerInfo.currentWord.ruby.length * 2) * 2.4);
-                    const newCpuHp = Math.max(0, cpuInfo.hp - damage);
-
-                    pSessionRef.current = new TypingSession(newWord.ruby, newWord.text);
-
-                    setCpuInfo(prev => ({ ...prev, hp: newCpuHp }));
-                    setPlayerInfo(prev => ({
-                        ...prev,
-                        typingState: pSessionRef.current.state,
-                        currentWord: newWord
-                    }));
-
-                    if (newCpuHp <= 0) {
-                        // Player WON this round
+                    const nextCount = wordCount + 1;
+                    if (nextCount >= TOTAL_WORDS) {
+                        // 20 words completed!
                         const elapsed = ((Date.now() - currentBattleStartRef.current) / 1000);
                         const totalCorrect = stats.totalCorrect;
                         const totalMiss = stats.missCount;
@@ -274,13 +181,19 @@ function TournamentBattle({
                             socket.emit('tournamentUpdateScore', { playerName, score: eScore, jobType });
                         }
                         
-                        setLastResult({ status: 'win', score: eScore });
+                        setLastResult({ status: 'completed', score: eScore, elapsed });
                         setTimeout(() => {
                             setGameState(prev => (prev === 'playing' ? 'intermission' : prev));
-                        }, 1000);
+                        }, 800);
+                    } else {
+                        const newWord = getRandomWord(TOURNAMENT_GENRE, usedWordsRef.current);
+                        pSessionRef.current = new TypingSession(newWord.ruby, newWord.text);
+                        setWordCount(nextCount);
+                        setCurrentWord(newWord);
+                        setTypingState(pSessionRef.current.state);
                     }
                 } else {
-                    setPlayerInfo(prev => ({ ...prev, typingState: pSessionRef.current.state }));
+                    setTypingState({ ...pSessionRef.current.state });
                 }
             } else {
                 stats.missCount++;
@@ -332,7 +245,7 @@ function TournamentBattle({
                         スペースキーで開始
                     </div>
                     <div style={{ fontSize: '1.2em', color: '#888' }}>
-                        スペースキーを押すとカウントダウンが始まります
+                        20問のタイピングをクリアしてスコアを競いましょう！
                     </div>
                 </div>
             </div>
@@ -350,42 +263,48 @@ function TournamentBattle({
     }
 
     return (
-        <div className={`game-container battle-screen ${damageFlash ? 'flash-damage' : ''}`} onKeyDown={gameState === 'playing' ? handleKeyDown : undefined} tabIndex="0" ref={inputRef} style={{ flex: 1, height: '100%', outline: 'none', border: 'none', boxShadow: 'none', padding: 0, margin: 0, boxSizing: 'border-box' }}>
+        <div className="game-container battle-screen" onKeyDown={gameState === 'playing' ? handleKeyDown : undefined} tabIndex="0" ref={inputRef} style={{ flex: 1, height: '100%', outline: 'none', border: 'none', boxShadow: 'none', padding: 0, margin: 0, boxSizing: 'border-box' }}>
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                    <span style={{ fontSize: '1.2em', fontWeight: 'bold', color: '#2c3e50' }}>イベントモード: {TOURNAMENT_GENRE}</span>
-                    <span style={{ fontSize: '1.5em', fontWeight: 'bold', color: '#e53935' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <span style={{ fontSize: '1.1em', fontWeight: 'bold', color: '#2c3e50' }}>イベントモード: {TOURNAMENT_GENRE}</span>
+                    <div style={{ fontSize: '1.2em', fontWeight: 'bold', color: '#5c6bc0', background: '#e8eaf6', padding: '6px 16px', borderRadius: '20px' }}>
+                        進捗: {wordCount + 1} / {TOTAL_WORDS} 問
+                    </div>
+                    <span style={{ fontSize: '1.3em', fontWeight: 'bold', color: '#e53935' }}>
                         残り時間: {formatTime(timeRemaining)}
                     </span>
                 </div>
 
+                {/* Progress Bar */}
+                <div style={{ width: '100%', height: '8px', background: '#e0e0e0', borderRadius: '4px', marginBottom: '20px', overflow: 'hidden' }}>
+                    <div style={{ width: `${(wordCount / TOTAL_WORDS) * 100}%`, height: '100%', background: 'linear-gradient(90deg, #5c6bc0, #3949ab)', transition: 'width 0.3s ease' }} />
+                </div>
+
                 {gameState === 'playing' && (
                     <>
-
-
                         {/* Typing Area with Fixed Height and Flex Center */}
                         <div className="typing-area" style={{ width: '100%', height: '350px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', padding: '2rem 1.5rem', boxSizing: 'border-box', background: '#f8f9fa', borderRadius: '12px', border: '1px solid #e8e8e8' }}>
-                            {playerInfo.hp > 0 && cpuInfo.hp > 0 ? (
+                            {currentWord ? (
                                 <>
                                     <div className="target-word-japanese" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                                         {/* Ruby height locked */}
                                         <div className="ruby" style={{ fontSize: '0.9em', color: '#888', marginBottom: '5px', height: '24px', lineHeight: '24px', textAlign: 'center', overflow: 'hidden', width: '100%' }}>
-                                            {playerInfo.typingState ? (
+                                            {typingState ? (
                                                 <>
-                                                    <span style={{ color: '#ff9800' }}>{playerInfo.typingState.typedRuby}</span>
-                                                    <span>{playerInfo.typingState.targetRuby}</span>
+                                                    <span style={{ color: '#ff9800' }}>{typingState.typedRuby}</span>
+                                                    <span>{typingState.targetRuby}</span>
                                                 </>
-                                            ) : playerInfo.currentWord?.ruby}
+                                            ) : currentWord?.ruby}
                                         </div>
                                         {/* Kanji height locked and vertically centered */}
                                         <div className="kanji" style={{ fontSize: '2.5em', fontWeight: 'bold', marginBottom: '15px', height: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', overflow: 'hidden', width: '100%' }}>
                                             <div style={{ width: '100%', wordBreak: 'break-word' }}>
                                                 {(() => {
-                                                    if (!playerInfo.currentWord?.text) return null;
-                                                    if (!playerInfo.typingState || !playerInfo.typingState.typedRuby) return <span style={{ color: '#2c3e50' }}>{playerInfo.currentWord.text}</span>;
+                                                    if (!currentWord?.text) return null;
+                                                    if (!typingState || !typingState.typedRuby) return <span style={{ color: '#2c3e50' }}>{currentWord.text}</span>;
                                                     
-                                                    const chunks = alignTextAndRuby(playerInfo.currentWord.text, playerInfo.currentWord.ruby);
-                                                    let remainingTypedRuby = playerInfo.typingState.typedRuby.length;
+                                                    const chunks = alignTextAndRuby(currentWord.text, currentWord.ruby);
+                                                    let remainingTypedRuby = typingState.typedRuby.length;
 
                                                     return chunks.map((chunk, index) => {
                                                       let chunkRubyLen = chunk.ruby.length;
@@ -417,13 +336,13 @@ function TournamentBattle({
                                     {/* Romaji height locked and vertically centered */}
                                     <div className="target-word" style={{ fontSize: '2em', height: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', overflow: 'hidden', width: '100%' }}>
                                         <div style={{ width: '100%', wordBreak: 'break-word' }}>
-                                            {playerInfo.typingState && (
+                                            {typingState && (
                                                 <>
-                                                    <span className="char typed" style={{ color: '#ff9800' }}>{playerInfo.typingState.typedRomaji}</span>
-                                                    {playerInfo.typingState.targetRomaji.length > 0 && (
-                                                        <span className={`char ${isMiss ? 'miss' : 'current'}`}>{playerInfo.typingState.targetRomaji[0]}</span>
+                                                    <span className="char typed" style={{ color: '#ff9800' }}>{typingState.typedRomaji}</span>
+                                                    {typingState.targetRomaji.length > 0 && (
+                                                        <span className={`char ${isMiss ? 'miss' : 'current'}`}>{typingState.targetRomaji[0]}</span>
                                                     )}
-                                                    <span className="char">{playerInfo.typingState.targetRomaji.slice(1)}</span>
+                                                    <span className="char">{typingState.targetRomaji.slice(1)}</span>
                                                 </>
                                             )}
                                         </div>
@@ -431,8 +350,8 @@ function TournamentBattle({
                                 </>
                             ) : (
                                 <div style={{ height: '244px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <h2 style={{ color: playerInfo.hp <= 0 ? '#e53935' : '#4caf50', margin: 0 }}>
-                                        {playerInfo.hp <= 0 ? 'DEFEATED! Restarting...' : 'VICTORY! Restarting...'}
+                                    <h2 style={{ color: '#4caf50', margin: 0 }}>
+                                        FINISH!
                                     </h2>
                                 </div>
                             )}
@@ -442,16 +361,21 @@ function TournamentBattle({
 
                 {gameState === 'intermission' && (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                        <h2 style={{ fontSize: '4em', margin: 0, color: lastResult?.status === 'win' ? '#4caf50' : '#e53935' }}>
-                            {lastResult?.status === 'win' ? 'VICTORY!' : 'DEFEATED...'}
+                        <h2 style={{ fontSize: '3.5em', margin: 0, color: '#4caf50' }}>
+                            CLEAR! 🎉
                         </h2>
-                        {lastResult?.status === 'win' && (
-                            <div style={{ fontSize: '1.5em', margin: '20px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                        {lastResult && (
+                            <div style={{ fontSize: '1.4em', margin: '20px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                                 <div>今回のスコア: <span style={{ fontWeight: 'bold', color: '#5c6bc0', fontSize: '1.5em' }}>{lastResult.score}</span></div>
                                 <div style={{ fontSize: '1.1em' }}>レベル: <span style={{ fontWeight: 'bold', color: '#ff9800', fontSize: '1.3em' }}>{getEvaluationLevel(lastResult.score)}</span></div>
+                                {lastResult.elapsed && (
+                                    <div style={{ fontSize: '0.9em', color: '#888', marginTop: '5px' }}>
+                                        クリアタイム: {lastResult.elapsed.toFixed(1)} 秒
+                                    </div>
+                                )}
                             </div>
                         )}
-                        <div style={{ display: 'flex', gap: '20px', marginTop: '40px' }}>
+                        <div style={{ display: 'flex', gap: '20px', marginTop: '30px' }}>
                             <button className="action-btn" onClick={() => {
                                 setGameState('ready');
                             }}>
@@ -751,7 +675,6 @@ export default function Tournament({ socket, onBackToHome }) {
                     socket={socket}
                     playerName={playerName}
                     jobType={jobType}
-                    cpuLevel={cpuLevel}
                     gameState={gameState}
                     setGameState={setGameState}
                     timeRemaining={timeRemaining}

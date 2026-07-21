@@ -314,9 +314,9 @@ export default function Admin() {
 
   const handleStartTournament = () => {
     if (socket) {
-      if (window.confirm(`CPUレベル ${adminCpuLevel} でタイピングイベントを開始しますか？（待機中の全ユーザーの画面でカウントダウンが始まります）`)) {
-        socket.emit('adminStartTournament', { cpuLevel: adminCpuLevel });
-        alert(`イベント開始シグナル（CPUレベル ${adminCpuLevel}）を送信しました。5分後に自動終了します。`);
+      if (window.confirm(`タイピングイベントを開始しますか？（待機中の全ユーザーの画面でカウントダウンが始まります）`)) {
+        socket.emit('adminStartTournament');
+        alert(`イベント開始シグナルを送信しました。5分後に自動終了します。`);
         setTimeout(fetchTournaments, 2000); // Wait a bit to fetch the newly created tournament
       }
     }
@@ -1106,25 +1106,7 @@ export default function Admin() {
                 )}
               </div>
             </div>
-            <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <label style={{ fontWeight: 'bold', color: '#2c3e50' }}>CPUレベルを選択 (大会中のCPU強さ):</label>
-              <select
-                value={adminCpuLevel}
-                onChange={e => setAdminCpuLevel(parseInt(e.target.value, 10))}
-                style={{ padding: '10px', borderRadius: '5px', border: '1px solid #ccc', minWidth: '180px', fontWeight: 'bold' }}
-              >
-                <option value="1">レベル1 (C)</option>
-                <option value="2">レベル2 (C+)</option>
-                <option value="3">レベル3 (B-)</option>
-                <option value="4">レベル4 (B)</option>
-                <option value="5">レベル5 (B+) 【デフォルト】</option>
-                <option value="6">レベル6 (A-)</option>
-                <option value="7">レベル7 (A)</option>
-                <option value="8">レベル8 (A+)</option>
-                <option value="9">レベル9 (S)</option>
-                <option value="10">レベル10 (Fast)</option>
-              </select>
-            </div>
+
             <p style={{ color: '#666' }}>現在待機室にいるすべてのプレイヤーを対象にイベント（5分間）を開始します。</p>
             <button 
               onClick={handleStartTournament}
