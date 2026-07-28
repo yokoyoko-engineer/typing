@@ -529,7 +529,7 @@ export default function CPUGame({ onBackToHome }) {
                             {[...Array(10)].map((_, i) => {
                                 const level = i + 1;
                                 const levelRankings = allRankings[level] || [];
-                                const bestTime = levelRankings.length > 0 ? levelRankings[0].time : null;
+                                const bestEntry = levelRankings.length > 0 ? levelRankings[0] : null;
                                 return (
                                     <button
                                         key={level}
@@ -539,8 +539,10 @@ export default function CPUGame({ onBackToHome }) {
                                         style={{ height: '80px', fontSize: '1em', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
                                     >
                                         <span style={{ fontWeight: 'bold', fontSize: '1.1em' }}>Lv.{level}</span>
-                                        {bestTime !== null && (
-                                            <span style={{ fontSize: '0.7em', color: '#e8734a' }}>🏆 {bestTime}s</span>
+                                        {bestEntry !== null && (
+                                            <span style={{ fontSize: '0.7em', color: '#e8734a' }}>
+                                                🏆 {bestEntry.score !== undefined && bestEntry.score !== null ? `★${bestEntry.score}` : `${bestEntry.time}s`}
+                                            </span>
                                         )}
                                     </button>
                                 )
@@ -572,10 +574,10 @@ export default function CPUGame({ onBackToHome }) {
                                         }}>
                                             <span style={{ minWidth: '35px', textAlign: 'center' }}>{medal}</span>
                                             <span style={{ flex: 1, textAlign: 'left', paddingLeft: '10px', color: '#2c3e50' }}>{entry.jobType ? `[${entry.jobType}] ` : ''}{entry.username}</span>
-                                            <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '90px', textAlign: 'right' }}>
-                                                {entry.time}s 
-                                                <span style={{ color: '#5c6bc0', fontSize: '0.9em', marginLeft: '5px' }}>
-                                                    {entry.score !== undefined ? `★${entry.score}` : ''}
+                                            <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '100px', textAlign: 'right' }}>
+                                                ★{entry.score ?? 0}
+                                                <span style={{ color: '#777', fontSize: '0.85em', marginLeft: '6px', fontWeight: 'normal' }}>
+                                                    ({entry.time}s)
                                                 </span>
                                             </span>
                                         </div>
@@ -653,7 +655,7 @@ export default function CPUGame({ onBackToHome }) {
                                 </h3>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.85em', maxHeight: '300px', overflowY: 'auto', paddingRight: '5px' }}>
                                     {latestRankings.slice(0, 30).map((entry, idx) => { // show up to top 30
-                                        const isMe = entry.time === finalTime && entry.username === playerName;
+                                        const isMe = entry.score === stats.finalScore && entry.time === finalTime && entry.username === playerName;
                                         const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
                                         return (
                                             <div key={idx} style={{
@@ -665,7 +667,7 @@ export default function CPUGame({ onBackToHome }) {
                                             }}>
                                                 <span style={{ minWidth: '25px', textAlign: 'center' }}>{medal}</span>
                                                 <span style={{ flex: 1, textAlign: 'left', paddingLeft: '5px', color: '#2c3e50', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.username}</span>
-                                                <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '50px', textAlign: 'right' }}>{entry.time}s {entry.score ? `(★${entry.score})` : ''}</span>
+                                                <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '70px', textAlign: 'right' }}>★{entry.score ?? 0} <span style={{ color: '#777', fontSize: '0.85em', fontWeight: 'normal' }}>({entry.time}s)</span></span>
                                             </div>
                                         );
                                     })}

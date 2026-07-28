@@ -86,7 +86,9 @@ app.get('/api/rankings/:genre/:level', async (req, res) => {
   const { genre, level } = req.params;
   const rankings = await getRankingsData();
   const key = `${genre}_lv${level}`;
-  res.json(rankings[key] || []);
+  const list = [...(rankings[key] || [])];
+  list.sort((a, b) => (b.score || 0) - (a.score || 0) || a.time - b.time);
+  res.json(list);
 });
 
 app.post('/api/rankings/:genre/:level', async (req, res) => {
@@ -112,7 +114,7 @@ app.post('/api/rankings/:genre/:level', async (req, res) => {
       }
       
       rankings[key].push({ username: safeName, time, date: new Date().toISOString(), jobType: jobType || '', score: score || 0 });
-      rankings[key].sort((a, b) => a.time - b.time);
+      rankings[key].sort((a, b) => (b.score || 0) - (a.score || 0) || a.time - b.time);
       rankings[key] = rankings[key].slice(0, 30); // TOP 30を維持
       
       await saveRankingsData(rankings);
