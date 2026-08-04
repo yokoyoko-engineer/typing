@@ -61,7 +61,7 @@ function TournamentLobbyMonitor({ socket, onStartTournament }) {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {lobbyPlayers.map((p, idx) => (
                 <span key={idx} style={{ background: '#e0e0e0', padding: '3px 8px', borderRadius: '12px', fontSize: '0.9em', color: '#333' }}>
-                  {p}
+                  {typeof p === 'object' ? (p.name || '') : p}
                 </span>
               ))}
             </div>
