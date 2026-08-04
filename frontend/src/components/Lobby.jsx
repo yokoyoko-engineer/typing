@@ -54,9 +54,9 @@ export default function Lobby({ socket, lobbies, onJoinRoom }) {
               {room.status === 'playing' ? <span className="status playing">Playing</span> : <span className="status waiting">Waiting</span>}
             </div>
             <div className="room-players">
-              {room.players.length > 0 ? (
+              {(room.players || []).length > 0 ? (
                 <ul>
-                  {room.players.map((p, idx) => <li key={idx}>{p}</li>)}
+                  {(room.players || []).map((p, idx) => <li key={idx}>{p}</li>)}
                 </ul>
               ) : (
                 <p className="empty-text">Empty</p>

@@ -515,6 +515,7 @@ io.on('connection', (socket) => {
       roomId: room.roomId,
       genre: room.genre,
       playerCount: Object.keys(room.players).length,
+      players: Object.values(room.players).map(p => p.name),
       status: room.status
     }));
     targetSocket.emit('lobbiesState', lobbies);

@@ -98,8 +98,17 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
     socket.emit('resetGame');
   };
 
-  const me = roomState.players[myId];
-  if (!me) return null;
+  const me = roomState?.players?.[myId];
+  if (!me) {
+    return (
+      <div className="game-container" style={{ textAlign: 'center', padding: '40px' }}>
+        <p>Loading player data or leaving room...</p>
+        <button className="action-btn" onClick={onLeaveRoom} style={{ marginTop: '10px', background: '#e53935', color: '#fff' }}>
+          Back to Lobby
+        </button>
+      </div>
+    );
+  }
 
   // Render waiting room
   if (roomState.status === 'waiting') {
