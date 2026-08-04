@@ -13,12 +13,16 @@ function TournamentRanking({ socket, playerName, jobType, globalLegends, highest
     useEffect(() => {
         if (!socket) return;
 
-        socket.on('tournamentLiveRanking', (ranking) => {
+        socket.emit('getTournamentLiveRanking');
+
+        const handleUpdate = (ranking) => {
             setLiveRanking(ranking);
-        });
+        };
+
+        socket.on('tournamentLiveRanking', handleUpdate);
 
         return () => {
-            socket.off('tournamentLiveRanking');
+            socket.off('tournamentLiveRanking', handleUpdate);
         };
     }, [socket]);
 
@@ -176,10 +180,11 @@ function TournamentBattle({
                             eScore = Math.round(wpm * Math.pow(accuracy, 3));
                         }
                         
+                        const newHighest = Math.max(eScore, highestScore);
                         if (eScore > highestScore) {
                             setHighestScore(eScore);
-                            socket.emit('tournamentUpdateScore', { playerName, score: eScore, jobType });
                         }
+                        socket.emit('tournamentUpdateScore', { playerName, score: newHighest, jobType });
                         
                         setLastResult({ status: 'completed', score: eScore, elapsed });
                         setTimeout(() => {

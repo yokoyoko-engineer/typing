@@ -598,6 +598,14 @@ io.on('connection', (socket) => {
     }, 5 * 60 * 1000); // 5 minutes
   });
 
+  socket.on('getTournamentLiveRanking', () => {
+    const sorted = Object.entries(tournamentState.participants)
+      .map(([user_id, data]) => ({ user_id, score: data.score, jobType: data.jobType }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 100);
+    socket.emit('tournamentLiveRanking', sorted);
+  });
+
   socket.on('tournamentUpdateScore', ({ playerName, score, jobType }) => {
     const safeName = sanitizePlayerName(playerName);
     if (!safeName || tournamentState.status !== 'active') return;
@@ -606,6 +614,12 @@ io.on('connection', (socket) => {
     if (score > currentMax) {
       tournamentState.participants[safeName] = { score, jobType: jobType || '' };
       emitTournamentLiveRanking();
+    } else {
+      const sorted = Object.entries(tournamentState.participants)
+        .map(([user_id, data]) => ({ user_id, score: data.score, jobType: data.jobType }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 100);
+      socket.emit('tournamentLiveRanking', sorted);
     }
   });
 
