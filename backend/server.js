@@ -532,6 +532,7 @@ io.on('connection', (socket) => {
     socket.join('tournament_lobby');
     tournamentLobbyPlayers[socket.id] = { name: safeName, jobType: jobType || '' };
     emitTournamentLobbyUpdate();
+    emitTournamentLiveRanking();
     
     socket.emit('tournamentState', { status: tournamentState.status, endTime: tournamentState.endTime, cpuLevel: tournamentState.cpuLevel });
   });
@@ -604,7 +605,7 @@ io.on('connection', (socket) => {
     const currentMax = tournamentState.participants[safeName]?.score || 0;
     if (score > currentMax) {
       tournamentState.participants[safeName] = { score, jobType: jobType || '' };
-      io.to('tournament_lobby').emit('tournamentLiveRanking', sorted);
+      emitTournamentLiveRanking();
     }
   });
 
