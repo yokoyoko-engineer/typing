@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { CATEGORIES, GENRES_BY_CATEGORY } from '../words';
 import { alignTextAndRuby, getEvaluationLevel } from '../utils/typingEngine';
+import MissFlash from './MissFlash';
 import './Game.css';
 
 export default function Game({ socket, roomState, myId, onLeaveRoom }) {
@@ -9,6 +10,7 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
   const [countdown, setCountdown] = useState(roomState.status === 'starting' ? 3 : null);
   const [damageFlash, setDamageFlash] = useState(false);
   const [isMiss, setIsMiss] = useState(false);
+  const [missSeq, setMissSeq] = useState(0); // ミスごとに増える連番（フラッシュ再生用）
   const inputRef = useRef(null);
   const startTimeRef = useRef(null);
   const correctKeysRef = useRef(0);
@@ -54,6 +56,7 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
         correctKeysRef.current++;
       } else {
         setIsMiss(true);
+        setMissSeq(n => n + 1);
         missKeysRef.current++;
       }
     };
@@ -302,6 +305,7 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
 
       {me.hp > 0 ? (
         <div className="typing-area">
+          <MissFlash seq={missSeq} />
           <div className="target-word-japanese">
             <div className="ruby" style={{ fontSize: '0.9em', color: '#888', marginBottom: '5px' }}>
               {me.typingState ? (

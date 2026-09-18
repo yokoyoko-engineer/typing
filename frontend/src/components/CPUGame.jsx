@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getRandomWord, CATEGORIES, CLOUD_GENRES, GENRES_BY_CATEGORY } from '../words';
 import { TypingSession, alignTextAndRuby, getEvaluationLevel } from '../utils/typingEngine';
+import MissFlash from './MissFlash';
 import './Game.css'; // Reuse existing Game styles
 
 // CPU difficulty settings (ms per character) based on requested tiers
@@ -33,6 +34,7 @@ export default function CPUGame({ onBackToHome }) {
     const usedWordsRef = useRef(new Set());
     const [damageFlash, setDamageFlash] = useState(false);
     const [isMiss, setIsMiss] = useState(false);
+    const [missSeq, setMissSeq] = useState(0); // ミスごとに増える連番（フラッシュ再生用）
     const [previewLevel, setPreviewLevel] = useState(1);
 
     // Timer
@@ -340,6 +342,7 @@ export default function CPUGame({ onBackToHome }) {
                     stats.keyMisses[typedChar] = (stats.keyMisses[typedChar] || 0) + 1;
                 }
                 setIsMiss(true);
+                setMissSeq(n => n + 1);
             }
         }
     };
@@ -768,6 +771,7 @@ export default function CPUGame({ onBackToHome }) {
             </div>
 
             <div className="typing-area">
+                <MissFlash seq={missSeq} />
                 {playerInfo.hp > 0 ? (
                     <>
                         <div className="target-word-japanese">

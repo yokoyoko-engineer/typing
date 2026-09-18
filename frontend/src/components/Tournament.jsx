@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getRandomWord, CATEGORIES } from '../words';
+import { JOB_TYPES } from '../jobTypes';
 import { TypingSession, alignTextAndRuby, getEvaluationLevel } from '../utils/typingEngine';
+import MissFlash from './MissFlash';
 import './Game.css';
 
 const TOTAL_WORDS = 20;
@@ -101,6 +103,7 @@ function TournamentBattle({
     const [currentWord, setCurrentWord] = useState(null);
     const [typingState, setTypingState] = useState(null);
     const [isMiss, setIsMiss] = useState(false);
+    const [missSeq, setMissSeq] = useState(0); // ミスごとに増える連番（フラッシュ再生用）
     const [countdown, setCountdown] = useState(3);
 
     const usedWordsRef = useRef(new Set());
@@ -203,6 +206,7 @@ function TournamentBattle({
             } else {
                 stats.missCount++;
                 setIsMiss(true);
+                setMissSeq(n => n + 1);
             }
         }
     };
@@ -289,6 +293,7 @@ function TournamentBattle({
                     <>
                         {/* Typing Area with Fixed Height and Flex Center */}
                         <div className="typing-area" style={{ width: '100%', height: '350px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', padding: '2rem 1.5rem', boxSizing: 'border-box', background: '#f8f9fa', borderRadius: '12px', border: '1px solid #e8e8e8' }}>
+                            <MissFlash seq={missSeq} />
                             {currentWord ? (
                                 <>
                                     <div className="target-word-japanese" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -596,11 +601,9 @@ export default function Tournament({ socket, onBackToHome }) {
                                 outline: 'none'
                             }}
                         >
-                            <option value="CL">CL</option>
-                            <option value="JAVA">JAVA</option>
-                            <option value="ML">ML</option>
-                            <option value="FR">FR</option>
-                            <option value="QA">QA</option>
+                            {JOB_TYPES.map(job => (
+                                <option key={job} value={job}>{job}</option>
+                            ))}
                         </select>
                         <button
                             className="action-btn"
