@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { JOB_TYPES } from '../jobTypes';
 import './Room.css';
 
 export default function Lobby({ socket, lobbies, onJoinRoom }) {
@@ -34,11 +35,9 @@ export default function Lobby({ socket, lobbies, onJoinRoom }) {
         <label>
           Job Type:
           <select value={jobType} onChange={(e) => setJobType(e.target.value)} style={{ marginLeft: '10px', padding: '5px' }}>
-            <option value="CL">CL</option>
-            <option value="JAVA">JAVA</option>
-            <option value="ML">ML</option>
-            <option value="FR">FR</option>
-            <option value="QA">QA</option>
+            {JOB_TYPES.map(job => (
+              <option key={job} value={job}>{job}</option>
+            ))}
           </select>
         </label>
       </div>

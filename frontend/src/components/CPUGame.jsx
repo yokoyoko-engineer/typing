@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { getRandomWord, CATEGORIES, CLOUD_GENRES, GENRES_BY_CATEGORY } from '../words';
 import { TypingSession, alignTextAndRuby, getEvaluationLevel } from '../utils/typingEngine';
 import MissFlash from './MissFlash';
+import { JOB_TYPES } from '../jobTypes';
 import './Game.css'; // Reuse existing Game styles
 
 // CPU difficulty settings (ms per character) based on requested tiers
@@ -392,11 +393,9 @@ export default function CPUGame({ onBackToHome }) {
                                 outline: 'none'
                             }}
                         >
-                            <option value="CL">CL</option>
-                            <option value="JAVA">JAVA</option>
-                            <option value="ML">ML</option>
-                            <option value="FR">FR</option>
-                            <option value="QA">QA</option>
+                            {JOB_TYPES.map(job => (
+                                <option key={job} value={job}>{job}</option>
+                            ))}
                         </select>
                         <button
                             className="action-btn"

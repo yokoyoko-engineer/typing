@@ -1,4 +1,4 @@
-// 職種・部署の選択肢（イベントBATTLEモード用）
+// 職種・部署の選択肢（オンライン / CPU / イベントの各モードで共通）
 export const JOB_TYPES = [
   'CL',
   'JAVA',
