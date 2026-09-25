@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { io } from 'socket.io-client';
+import { JOB_TYPES } from '../jobTypes';
 
 const COHORT_202604 = {
   CL: [3319, 5905, 5906, 5907, 5908, 5909, 5910, 5911, 5912, 5913, 5914, 5915, 5916, 5917, 5918, 5919, 5920, 5921, 5922, 5923, 5924, 5944, 5964, 5980, 5981],
@@ -22,7 +23,20 @@ const JOB_COLORS = {
   JAVA: '#2196f3',
   ML: '#4caf50',
   FR: '#e91e63',
-  QA: '#9c27b0'
+  QA: '#9c27b0',
+  '総務人事部': '#00897b',
+  '管理部': '#5c6bc0',
+  '人材開発部': '#8d6e63',
+  '育成部': '#43a047',
+  '採用部': '#d81b60',
+  'マーケティング部': '#fb8c00',
+  '事業戦略推進部': '#3949ab',
+  '営業推進部': '#00acc1',
+  '第一営業部': '#7cb342',
+  '第二営業部': '#c0ca33',
+  '第三営業部（ITソリューション課）': '#6d4c41',
+  '第三営業部（BP1課）': '#ad1457',
+  '第三営業部（BP2課）': '#4527a0'
 };
 
 function TournamentLobbyMonitor({ socket, onStartTournament }) {
@@ -467,7 +481,7 @@ export default function Admin() {
       let url = `/api/tournaments/scores/admin?min_user=${tMinUser}&max_user=${tMaxUser}`;
       if (tStartDate) url += `&start_date=${tStartDate}`;
       if (tEndDate) url += `&end_date=${tEndDate}`;
-      if (tJobType !== 'すべて' && tCohort === 'すべて') url += `&job_type=${tJobType}`;
+      if (tJobType !== 'すべて' && tCohort === 'すべて') url += `&job_type=${encodeURIComponent(tJobType)}`;
       if (tSearchStartTournamentId !== 'all') url += `&start_tournament_id=${tSearchStartTournamentId}`;
       if (tSearchEndTournamentId !== 'all') url += `&end_tournament_id=${tSearchEndTournamentId}`;
       
@@ -627,6 +641,13 @@ export default function Admin() {
     setTAverageScores(averageArray);
   }, [tRawData, tDisplayAverageTournamentId]);
 
+  // グラフの職種別平均ライン: 検索結果に実在する職種だけを描画する
+  // （職種を固定リストで持つと、追加した部署のラインが表示されないため）
+  const tJobTypesInData = useMemo(
+    () => Array.from(new Set(tRawData.map(row => row.job_type || '未設定'))).sort(),
+    [tRawData]
+  );
+
   const handleTUserSelect = (e) => {
     const userId = e.target.value;
     setTSelectedUser(userId);
@@ -740,7 +761,7 @@ export default function Admin() {
       let url = `/api/scores/admin?min_user=${minUser}&max_user=${maxUser}`;
       if (startDate) url += `&start_date=${startDate}`;
       if (endDate) url += `&end_date=${endDate}`;
-      if (jobType !== 'すべて' && cohort === 'すべて') url += `&job_type=${jobType}`;
+      if (jobType !== 'すべて' && cohort === 'すべて') url += `&job_type=${encodeURIComponent(jobType)}`;
       
       const res = await fetch(url);
       if (!res.ok) throw new Error('API Error');
@@ -908,11 +929,9 @@ export default function Admin() {
                   style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc' }}
                 >
                   <option value="すべて">すべて</option>
-                  <option value="CL">CL</option>
-                  <option value="JAVA">JAVA</option>
-                  <option value="ML">ML</option>
-                  <option value="FR">FR</option>
-                  <option value="QA">QA</option>
+                  {JOB_TYPES.map(job => (
+                    <option key={job} value={job}>{job}</option>
+                  ))}
                 </select>
               </div>
               <button type="submit" style={{ padding: '8px 20px', background: '#5c6bc0', color: '#fff', border: 'none', borderRadius: '5px', cursor: 'pointer', marginLeft: '10px' }}>
@@ -1345,11 +1364,9 @@ export default function Admin() {
                       style={{ padding: '6px 10px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.9em' }}
                     >
                       <option value="すべて">すべて</option>
-                      <option value="CL">CL</option>
-                      <option value="JAVA">JAVA</option>
-                      <option value="ML">ML</option>
-                      <option value="FR">FR</option>
-                      <option value="QA">QA</option>
+                      {JOB_TYPES.map(job => (
+                        <option key={job} value={job}>{job}</option>
+                      ))}
                     </select>
                   </div>
                   <div style={{ color: '#888', fontSize: '0.85em', marginLeft: 'auto' }}>
@@ -1537,11 +1554,9 @@ export default function Admin() {
                     style={{ padding: '8px', borderRadius: '5px', border: '1px solid #ccc' }}
                   >
                     <option value="すべて">すべて</option>
-                    <option value="CL">CL</option>
-                    <option value="JAVA">JAVA</option>
-                    <option value="ML">ML</option>
-                    <option value="FR">FR</option>
-                    <option value="QA">QA</option>
+                    {JOB_TYPES.map(job => (
+                      <option key={job} value={job}>{job}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -1662,7 +1677,7 @@ export default function Admin() {
                     <Tooltip />
                     <Legend />
                     {/* Job Average Lines */}
-                    {['CL', 'JAVA', 'ML', 'FR', 'QA'].map((job) => (
+                    {tJobTypesInData.map((job) => (
                       <Line 
                         key={`${job}平均`} 
                         type="monotone" 
@@ -1966,11 +1981,9 @@ export default function Admin() {
                     onChange={e => setSingleJobType(e.target.value)} 
                     style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box', fontSize: '1em' }}
                   >
-                    <option value="CL">CL</option>
-                    <option value="JAVA">JAVA</option>
-                    <option value="ML">ML</option>
-                    <option value="FR">FR</option>
-                    <option value="QA">QA</option>
+                    {JOB_TYPES.map(job => (
+                      <option key={job} value={job}>{job}</option>
+                    ))}
                   </select>
                 </div>
                 <div>

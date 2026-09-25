@@ -88,6 +88,17 @@ export const WORDS_BY_GENRE = {
 
 export const ALL_WORDS = Object.values(WORDS_BY_GENRE).flat();
 
+// pool 内のユニークな text 数（同じ text が複数あると使用済み判定がずれるため）
+const uniqueTextCountCache = new WeakMap();
+function countUniqueTexts(pool) {
+  let n = uniqueTextCountCache.get(pool);
+  if (n === undefined) {
+    n = new Set(pool.map(w => w.text)).size;
+    uniqueTextCountCache.set(pool, n);
+  }
+  return n;
+}
+
 export function getRandomWord(genre = null, prevOrUsedWords = null) {
   const pool = genre && WORDS_BY_GENRE[genre] ? WORDS_BY_GENRE[genre] : ALL_WORDS;
   if (!pool || pool.length === 0) return null;
@@ -95,7 +106,9 @@ export function getRandomWord(genre = null, prevOrUsedWords = null) {
 
   let word;
   if (prevOrUsedWords instanceof Set) {
-    if (prevOrUsedWords.size >= pool.length) {
+    // pool.length で比較すると、text が重複している pool では size が never 到達となり
+    // 下の do-while が無限ループする。ユニークな text 数で判定する。
+    if (prevOrUsedWords.size >= countUniqueTexts(pool)) {
       prevOrUsedWords.clear();
     }
     do {
