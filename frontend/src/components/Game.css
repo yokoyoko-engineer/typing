@@ -193,19 +193,20 @@
   border-bottom: 3px solid #e8734a;
 }
 
+/* レイアウトを動かさないよう padding/margin は使わず、
+   box-shadow で余白のある赤ブロックに見せる（.char.current と同じ寸法を維持） */
 .char.miss {
   color: #fff;
   background: #e53935;
+  box-shadow: 0 0 0 2px #e53935;
   border-bottom: 3px solid #b71c1c;
-  border-radius: 4px;
-  padding: 0 2px;
-  animation: shake 0.2s ease-in-out;
+  border-radius: 2px;
+  animation: missBlink 0.3s ease-out;
 }
 
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-3px); }
-  75% { transform: translateX(3px); }
+@keyframes missBlink {
+  0%   { background: #ff6f60; box-shadow: 0 0 0 4px rgba(229, 57, 53, 0.5); }
+  100% { background: #e53935; box-shadow: 0 0 0 2px #e53935; }
 }
 
 /* タイポ時のフラッシュ（typing-area 全体） */

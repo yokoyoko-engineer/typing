@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getRandomWord, CATEGORIES, CLOUD_GENRES, GENRES_BY_CATEGORY } from '../words';
 import { TypingSession, alignTextAndRuby, getEvaluationLevel } from '../utils/typingEngine';
-import MissFlash from './MissFlash';
+import MissFlash, { useMissFlash } from './MissFlash';
 import { JOB_TYPES } from '../jobTypes';
 import './Game.css'; // Reuse existing Game styles
 
@@ -35,7 +35,7 @@ export default function CPUGame({ onBackToHome }) {
     const usedWordsRef = useRef(new Set());
     const [damageFlash, setDamageFlash] = useState(false);
     const [isMiss, setIsMiss] = useState(false);
-    const [missSeq, setMissSeq] = useState(0); // ミスごとに増える連番（フラッシュ再生用）
+    const { missSeq, triggerMiss, clearMiss } = useMissFlash();
     const [previewLevel, setPreviewLevel] = useState(1);
 
     // Timer
@@ -153,6 +153,8 @@ export default function CPUGame({ onBackToHome }) {
         setGameState('countdown');
         setCountdown(3);
         setFinalTime(null);
+        setIsMiss(false);
+        clearMiss();
         usedWordsRef.current = new Set();
 
         const pWord = getRandomWord(genre, usedWordsRef.current);
@@ -343,7 +345,7 @@ export default function CPUGame({ onBackToHome }) {
                     stats.keyMisses[typedChar] = (stats.keyMisses[typedChar] || 0) + 1;
                 }
                 setIsMiss(true);
-                setMissSeq(n => n + 1);
+                triggerMiss();
             }
         }
     };

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { CATEGORIES, GENRES_BY_CATEGORY } from '../words';
 import { alignTextAndRuby, getEvaluationLevel } from '../utils/typingEngine';
-import MissFlash from './MissFlash';
+import MissFlash, { useMissFlash } from './MissFlash';
 import './Game.css';
 
 export default function Game({ socket, roomState, myId, onLeaveRoom }) {
@@ -10,7 +10,7 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
   const [countdown, setCountdown] = useState(roomState.status === 'starting' ? 3 : null);
   const [damageFlash, setDamageFlash] = useState(false);
   const [isMiss, setIsMiss] = useState(false);
-  const [missSeq, setMissSeq] = useState(0); // ミスごとに増える連番（フラッシュ再生用）
+  const { missSeq, triggerMiss, clearMiss } = useMissFlash();
   const inputRef = useRef(null);
   const startTimeRef = useRef(null);
   const correctKeysRef = useRef(0);
@@ -41,11 +41,15 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
       startTimeRef.current = Date.now();
       correctKeysRef.current = 0;
       missKeysRef.current = 0;
+      setIsMiss(false);
+      clearMiss();
       if (inputRef.current) inputRef.current.focus();
     } else if (roomState.status === 'waiting') {
       // 待機状態に戻ったらリセット
       setGameStarted(false);
       setIsReady(false);
+      setIsMiss(false);
+      clearMiss();
     } else if (roomState.status === 'starting') {
       setGameStarted(false);
     }
@@ -56,7 +60,7 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
         correctKeysRef.current++;
       } else {
         setIsMiss(true);
-        setMissSeq(n => n + 1);
+        triggerMiss();
         missKeysRef.current++;
       }
     };
@@ -72,7 +76,7 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
       socket.off('takingDamage', handleTakingDamage);
       socket.off('typingResult', handleTypingResult);
     };
-  }, [socket, myId, roomState.status]);
+  }, [socket, myId, roomState.status, clearMiss]);
 
   // フォーカス維持
   useEffect(() => {

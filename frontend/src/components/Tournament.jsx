@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { getRandomWord, CATEGORIES } from '../words';
 import { JOB_TYPES } from '../jobTypes';
 import { TypingSession, alignTextAndRuby, getEvaluationLevel } from '../utils/typingEngine';
-import MissFlash from './MissFlash';
+import MissFlash, { useMissFlash } from './MissFlash';
 import './Game.css';
 
 const TOTAL_WORDS = 20;
@@ -103,7 +103,7 @@ function TournamentBattle({
     const [currentWord, setCurrentWord] = useState(null);
     const [typingState, setTypingState] = useState(null);
     const [isMiss, setIsMiss] = useState(false);
-    const [missSeq, setMissSeq] = useState(0); // ミスごとに増える連番（フラッシュ再生用）
+    const { missSeq, triggerMiss, clearMiss } = useMissFlash();
     const [countdown, setCountdown] = useState(3);
 
     const usedWordsRef = useRef(new Set());
@@ -121,6 +121,8 @@ function TournamentBattle({
     }, [gameState, currentWord]);
 
     const startNewBattle = () => {
+        setIsMiss(false);
+        clearMiss();
         usedWordsRef.current.clear();
         const pWord = getRandomWord(TOURNAMENT_GENRE, usedWordsRef.current);
         
@@ -206,7 +208,7 @@ function TournamentBattle({
             } else {
                 stats.missCount++;
                 setIsMiss(true);
-                setMissSeq(n => n + 1);
+                triggerMiss();
             }
         }
     };
