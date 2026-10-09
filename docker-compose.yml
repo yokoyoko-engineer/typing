@@ -24,6 +24,8 @@ services:
       - backend
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt:ro
+      # 管理者画面のBasic認証ファイル（secrets/.htpasswd）。リポジトリには含めない
+      - ./secrets:/etc/nginx/secrets:ro
     restart: always
 
 volumes:

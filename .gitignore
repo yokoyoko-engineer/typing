@@ -6,3 +6,6 @@ yarn-error.log*
 .env
 dist/
 build/
+
+# 管理者画面のBasic認証ファイル（パスワードハッシュ）
+secrets/
