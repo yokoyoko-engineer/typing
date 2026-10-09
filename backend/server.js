@@ -8,6 +8,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { CATEGORIES } from './words.js';
+import {
+  startScheduler, describeSchedule, validateSchedule, jstKey, prevOccurrence,
+} from './scheduler.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -491,6 +494,65 @@ function emitTournamentLobbyUpdate() {
   }, 500);
 }
 
+/**
+ * イベント（5 分間）を開始する。手動開始（管理画面のボタン）と自動開始（予約）で共通。
+ * 戻り値: 'started' | 'skipped_active'（すでに開催中）
+ */
+async function startTournament() {
+  if (tournamentState.status === 'active') return 'skipped_active';
+
+  tournamentState.status = 'active';
+  tournamentState.endTime = Date.now() + 5 * 60 * 1000; // 5 minutes
+  tournamentState.participants = {};
+
+  // Create DB record
+  try {
+    const db = await getDb();
+    const dateStr = new Date().toISOString().split('T')[0];
+    const row = await db.get(`SELECT COUNT(*) as count FROM tournaments WHERE date = ?`, [dateStr]);
+    const count = (row.count || 0) + 1;
+    const name = `${dateStr} 第${count}回大会`;
+
+    const result = await db.run('INSERT INTO tournaments (name, date) VALUES (?, ?)', [name, dateStr]);
+    tournamentState.tournamentId = result.lastID;
+  } catch(err) {
+    console.error("Tournament creation error", err);
+  }
+
+  io.to('tournament_lobby').emit('tournamentStarted', { endTime: tournamentState.endTime });
+
+  if (tournamentTimer) clearTimeout(tournamentTimer);
+
+  tournamentTimer = setTimeout(async () => {
+    tournamentState.status = 'finished';
+    io.to('tournament_lobby').emit('tournamentFinished');
+
+    // Save scores to DB
+    if (tournamentState.tournamentId) {
+      try {
+        const db2 = await getDb();
+        for (const [userId, data] of Object.entries(tournamentState.participants)) {
+          await db2.run('INSERT INTO tournament_scores (tournament_id, user_id, score, job_type) VALUES (?, ?, ?, ?)', [tournamentState.tournamentId, userId, data.score, data.jobType || '']);
+        }
+      } catch (err) {
+        console.error("Error saving tournament scores", err);
+      }
+    }
+
+    // Delay resetting state to give clients time to see final ranking
+    setTimeout(() => {
+      tournamentState.status = 'waiting';
+      tournamentState.tournamentId = null;
+      tournamentState.endTime = null;
+      tournamentState.cpuLevel = 5;
+      tournamentState.participants = {};
+    }, 5000);
+
+  }, 5 * 60 * 1000); // 5 minutes
+
+  return 'started';
+}
+
 let liveRankingUpdateTimer = null;
 function emitTournamentLiveRanking() {
   if (liveRankingUpdateTimer) return;
@@ -547,56 +609,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('adminStartTournament', async () => {
-    if (tournamentState.status === 'active') return;
-    
-    tournamentState.status = 'active';
-    tournamentState.endTime = Date.now() + 5 * 60 * 1000; // 5 minutes
-    tournamentState.participants = {};
-    
-    // Create DB record
-    try {
-      const db = await getDb();
-      const dateStr = new Date().toISOString().split('T')[0];
-      const row = await db.get(`SELECT COUNT(*) as count FROM tournaments WHERE date = ?`, [dateStr]);
-      const count = (row.count || 0) + 1;
-      const name = `${dateStr} 第${count}回大会`;
-      
-      const result = await db.run('INSERT INTO tournaments (name, date) VALUES (?, ?)', [name, dateStr]);
-      tournamentState.tournamentId = result.lastID;
-    } catch(err) {
-      console.error("Tournament creation error", err);
-    }
-
-    io.to('tournament_lobby').emit('tournamentStarted', { endTime: tournamentState.endTime });
-    
-    if (tournamentTimer) clearTimeout(tournamentTimer);
-    
-    tournamentTimer = setTimeout(async () => {
-      tournamentState.status = 'finished';
-      io.to('tournament_lobby').emit('tournamentFinished');
-      
-      // Save scores to DB
-      if (tournamentState.tournamentId) {
-        try {
-          const db2 = await getDb();
-          for (const [userId, data] of Object.entries(tournamentState.participants)) {
-            await db2.run('INSERT INTO tournament_scores (tournament_id, user_id, score, job_type) VALUES (?, ?, ?, ?)', [tournamentState.tournamentId, userId, data.score, data.jobType || '']);
-          }
-        } catch (err) {
-          console.error("Error saving tournament scores", err);
-        }
-      }
-      
-      // Delay resetting state to give clients time to see final ranking
-      setTimeout(() => {
-        tournamentState.status = 'waiting';
-        tournamentState.tournamentId = null;
-        tournamentState.endTime = null;
-        tournamentState.cpuLevel = 5;
-        tournamentState.participants = {};
-      }, 5000);
-      
-    }, 5 * 60 * 1000); // 5 minutes
+    await startTournament();
   });
 
   socket.on('getTournamentLiveRanking', () => {
@@ -767,6 +780,97 @@ io.on('connection', (socket) => {
   });
 });
 
+// --- 管理者用 API: イベントの毎週自動開始の予約 ---
+// /admin-api はフロントの nginx が /admin/api/ としてだけ公開する（管理者 IP 制限 + Basic 認証）。
+// /api と違い、外部から直接は届かない。
+app.get('/admin-api/tournament-schedules', async (req, res) => {
+  try {
+    const db = await getDb();
+    const rows = await db.all('SELECT * FROM tournament_schedules ORDER BY day_of_week, hour, minute, id');
+    const now = new Date();
+    res.json(rows.map(r => describeSchedule(r, now)));
+  } catch (err) {
+    console.error('Error fetching schedules:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/admin-api/tournament-schedules', async (req, res) => {
+  const s = {
+    day_of_week: Number(req.body?.day_of_week),
+    hour: Number(req.body?.hour),
+    minute: Number(req.body?.minute),
+  };
+  if (!validateSchedule(s)) {
+    return res.status(400).json({ error: '曜日・時刻の指定が正しくありません。' });
+  }
+  try {
+    const db = await getDb();
+    const dup = await db.get(
+      'SELECT id FROM tournament_schedules WHERE day_of_week = ? AND hour = ? AND minute = ?',
+      [s.day_of_week, s.hour, s.minute]
+    );
+    if (dup) return res.status(409).json({ error: '同じ曜日・時刻の予約がすでにあります。' });
+    // 登録した時点で直近の回が実行対象にならないよう、直前の回を処理済みとして記録しておく
+    const lastKey = jstKey(prevOccurrence(s, new Date()));
+    const result = await db.run(
+      'INSERT INTO tournament_schedules (day_of_week, hour, minute, enabled, last_run_key) VALUES (?, ?, ?, 1, ?)',
+      [s.day_of_week, s.hour, s.minute, lastKey]
+    );
+    const row = await db.get('SELECT * FROM tournament_schedules WHERE id = ?', [result.lastID]);
+    res.status(201).json(describeSchedule(row, new Date()));
+  } catch (err) {
+    console.error('Error creating schedule:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.patch('/admin-api/tournament-schedules/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || typeof req.body?.enabled !== 'boolean') {
+    return res.status(400).json({ error: 'Invalid request.' });
+  }
+  try {
+    const db = await getDb();
+    const row = await db.get('SELECT * FROM tournament_schedules WHERE id = ?', [id]);
+    if (!row) return res.status(404).json({ error: 'Not found.' });
+    // 再開したときに、止めていた間の直近の回をさかのぼって実行しないようにする
+    const lastKey = req.body.enabled ? jstKey(prevOccurrence(row, new Date())) : row.last_run_key;
+    await db.run('UPDATE tournament_schedules SET enabled = ?, last_run_key = ? WHERE id = ?',
+      [req.body.enabled ? 1 : 0, lastKey, id]);
+    const updated = await db.get('SELECT * FROM tournament_schedules WHERE id = ?', [id]);
+    res.json(describeSchedule(updated, new Date()));
+  } catch (err) {
+    console.error('Error updating schedule:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.delete('/admin-api/tournament-schedules/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.' });
+  try {
+    const db = await getDb();
+    await db.run('DELETE FROM tournament_schedules WHERE id = ?', [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error deleting schedule:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
+
+  // 予約したイベントを自動で開始する。
+  // 予定時刻に待機室が 0 人ならスキップ（参加者のいない大会記録を作らない）。
+  startScheduler({
+    getDb,
+    tryStart: async () => {
+      if (tournamentState.status === 'active') return { result: 'skipped_active' };
+      if (Object.keys(tournamentLobbyPlayers).length === 0) return { result: 'skipped_empty' };
+      return { result: await startTournament() };
+    },
+    onRun: (info) => io.to('admin_room').emit('tournamentScheduleRun', info),
+  });
 });

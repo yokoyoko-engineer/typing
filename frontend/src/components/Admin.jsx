@@ -97,6 +97,193 @@ function TournamentLobbyMonitor({ socket, onStartTournament }) {
   );
 }
 
+const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+const SCHEDULE_API = '/admin/api/tournament-schedules';
+
+const SCHEDULE_RESULT_LABELS = {
+  started: { text: '開始しました', color: '#2e7d32' },
+  skipped_empty: { text: 'スキップ（待機室が 0 人）', color: '#ef6c00' },
+  skipped_active: { text: 'スキップ（すでに開催中）', color: '#ef6c00' },
+  running: { text: '開始処理中', color: '#666' },
+  error: { text: 'エラー', color: '#c62828' },
+};
+
+// 日時を日本時間の「10/12(月) 12:00」形式にする
+function formatJst(iso) {
+  if (!iso) return '—';
+  const d = new Date(new Date(iso).getTime() + 9 * 60 * 60 * 1000);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}(${DAY_LABELS[d.getUTCDay()]}) ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
+}
+
+function TournamentScheduleManager({ socket }) {
+  const [schedules, setSchedules] = useState([]);
+  const [dayOfWeek, setDayOfWeek] = useState('1');
+  const [time, setTime] = useState('12:00');
+  const [message, setMessage] = useState(null); // { type: 'error' | 'ok', text }
+
+  const load = async () => {
+    try {
+      const res = await fetch(SCHEDULE_API);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setSchedules(await res.json());
+    } catch (err) {
+      console.error(err);
+      setMessage({ type: 'error', text: '予約一覧を取得できませんでした。' });
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // 次回・前回の表示を最新に保つ
+    const timer = setInterval(load, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // 予約が実行されたら（開始・スキップ）すぐ表示を更新する
+  useEffect(() => {
+    if (!socket) return;
+    const handleRun = () => load();
+    socket.on('tournamentScheduleRun', handleRun);
+    return () => socket.off('tournamentScheduleRun', handleRun);
+  }, [socket]);
+
+  const handleAdd = async () => {
+    const [hour, minute] = time.split(':').map(Number);
+    if (!Number.isInteger(hour) || !Number.isInteger(minute)) {
+      setMessage({ type: 'error', text: '時刻を入力してください。' });
+      return;
+    }
+    try {
+      const res = await fetch(SCHEDULE_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ day_of_week: Number(dayOfWeek), hour, minute }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage({ type: 'error', text: data.error || '予約を追加できませんでした。' });
+        return;
+      }
+      setMessage({ type: 'ok', text: `「${data.label}」を追加しました。次回は ${formatJst(data.next_run_at)} です。` });
+      load();
+    } catch (err) {
+      console.error(err);
+      setMessage({ type: 'error', text: '予約を追加できませんでした。' });
+    }
+  };
+
+  const handleToggle = async (s) => {
+    try {
+      const res = await fetch(`${SCHEDULE_API}/${s.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !s.enabled }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setMessage({ type: 'ok', text: `「${s.label}」を${s.enabled ? '停止' : '再開'}しました。` });
+      load();
+    } catch (err) {
+      console.error(err);
+      setMessage({ type: 'error', text: '予約を更新できませんでした。' });
+    }
+  };
+
+  const handleDelete = async (s) => {
+    if (!window.confirm(`「${s.label}」の予約を削除しますか？`)) return;
+    try {
+      const res = await fetch(`${SCHEDULE_API}/${s.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setMessage({ type: 'ok', text: `「${s.label}」を削除しました。` });
+      load();
+    } catch (err) {
+      console.error(err);
+      setMessage({ type: 'error', text: '予約を削除できませんでした。' });
+    }
+  };
+
+  const cell = { padding: '8px 10px', borderBottom: '1px solid #eee', textAlign: 'left' };
+  const smallBtn = { padding: '5px 12px', border: 'none', borderRadius: '5px', cursor: 'pointer', fontSize: '0.9em' };
+
+  return (
+    <div style={{ background: '#fff3e0', padding: '20px', borderRadius: '10px', marginBottom: '30px', borderLeft: '5px solid #ff9800' }}>
+      <h3 style={{ marginTop: 0, color: '#e65100' }}>イベントの自動開始（毎週）</h3>
+      <p style={{ color: '#666', marginTop: 0 }}>
+        指定した曜日・時刻（日本時間）になると、イベント（5分間）を自動で開始します。手動の「開始する」ボタンも今までどおり使えます。
+        予定時刻に待機室が 0 人のとき、またはイベント開催中のときは、その回はスキップします。サーバが停止している時間帯の予約は実行されません。
+      </p>
+
+      <div style={{ background: '#fff', padding: '15px', borderRadius: '8px', marginBottom: '15px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ fontWeight: 'bold', color: '#2c3e50' }}>毎週</span>
+        <select value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value)} style={{ padding: '6px' }}>
+          {DAY_LABELS.map((d, i) => <option key={i} value={i}>{d}曜日</option>)}
+        </select>
+        <input type="time" value={time} onChange={(e) => setTime(e.target.value)} step="60" style={{ padding: '5px' }} />
+        <span style={{ color: '#666' }}>に開始</span>
+        <button onClick={handleAdd} style={{ ...smallBtn, background: '#ff9800', color: '#fff', fontWeight: 'bold', padding: '8px 18px' }}>
+          予約を追加
+        </button>
+      </div>
+
+      {message && (
+        <div style={{ marginBottom: '15px', padding: '8px 12px', borderRadius: '6px',
+          background: message.type === 'error' ? '#ffebee' : '#e8f5e9',
+          color: message.type === 'error' ? '#c62828' : '#2e7d32' }}>
+          {message.text}
+        </div>
+      )}
+
+      <div style={{ background: '#fff', borderRadius: '8px', overflowX: 'auto' }}>
+        {schedules.length === 0 ? (
+          <p style={{ padding: '15px', margin: 0, color: '#aaa' }}>予約はまだありません。</p>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#fafafa' }}>
+                <th style={cell}>予約</th>
+                <th style={cell}>状態</th>
+                <th style={cell}>次回の予定</th>
+                <th style={cell}>前回の結果</th>
+                <th style={cell}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {schedules.map((s) => {
+                const last = SCHEDULE_RESULT_LABELS[s.last_result];
+                return (
+                  <tr key={s.id} style={{ opacity: s.enabled ? 1 : 0.55 }}>
+                    <td style={{ ...cell, fontWeight: 'bold' }}>{s.label}</td>
+                    <td style={cell}>
+                      <span style={{ padding: '2px 10px', borderRadius: '12px', fontSize: '0.85em',
+                        background: s.enabled ? '#e8f5e9' : '#eeeeee', color: s.enabled ? '#2e7d32' : '#757575' }}>
+                        {s.enabled ? '有効' : '停止中'}
+                      </span>
+                    </td>
+                    <td style={cell}>{s.enabled ? formatJst(s.next_run_at) : '—'}</td>
+                    <td style={cell}>
+                      {last ? (
+                        <span style={{ color: last.color }}>{formatJst(s.last_run_at)} {last.text}</span>
+                      ) : <span style={{ color: '#aaa' }}>未実行</span>}
+                    </td>
+                    <td style={{ ...cell, whiteSpace: 'nowrap' }}>
+                      <button onClick={() => handleToggle(s)} style={{ ...smallBtn, background: '#eceff1', color: '#37474f', marginRight: '6px' }}>
+                        {s.enabled ? '停止' : '再開'}
+                      </button>
+                      <button onClick={() => handleDelete(s)} style={{ ...smallBtn, background: '#ffebee', color: '#c62828' }}>
+                        削除
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Admin() {
   const [activeTab, setActiveTab] = useState('analysis'); // 'analysis', 'tournament', or 'users'
 
@@ -1149,6 +1336,9 @@ export default function Admin() {
         <div>
           {/* 大会開催パネル */}
           <TournamentLobbyMonitor socket={socket} onStartTournament={handleStartTournament} />
+
+          {/* 毎週の自動開始（予約） */}
+          <TournamentScheduleManager socket={socket} />
 
           {/* 大会履歴パネル */}
           <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>

@@ -55,6 +55,19 @@ export async function getDb() {
         cohort TEXT NOT NULL
       );
 
+      -- イベントの毎週自動開始の予約（曜日・時刻は日本時間）
+      CREATE TABLE IF NOT EXISTS tournament_schedules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        day_of_week INTEGER NOT NULL,   -- 0=日 1=月 ... 6=土
+        hour INTEGER NOT NULL,
+        minute INTEGER NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        last_run_key TEXT,              -- 最後に処理した回 'YYYY-MM-DD HH:MM'（二重開始防止）
+        last_result TEXT,               -- started / skipped_active / skipped_empty / error
+        last_run_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
       CREATE INDEX IF NOT EXISTS idx_scores_user_id ON scores(user_id);
       CREATE INDEX IF NOT EXISTS idx_scores_score ON scores(score);
       CREATE INDEX IF NOT EXISTS idx_scores_play_date ON scores(play_date);
