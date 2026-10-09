@@ -1,5 +1,7 @@
 version: '3.8'
 
+# 80/443 は持たず、入口は共有 nginx（arch-test-app/edge-proxy）が担う。
+# 前提: docker network create edge
 services:
   backend:
     build:
@@ -17,16 +19,23 @@ services:
   frontend:
     build:
       context: ./frontend
-    ports:
-      - "80:80"
-      - "443:443"
+    expose:
+      - "80"
     depends_on:
       - backend
     volumes:
-      - /etc/letsencrypt:/etc/letsencrypt:ro
       # 管理者画面のBasic認証ファイル（secrets/.htpasswd）。リポジトリには含めない
       - ./secrets:/etc/nginx/secrets:ro
+    networks:
+      default: {}
+      edge:
+        aliases:
+          - typing-frontend   # edge-proxy からはこの名前で到達する
     restart: always
 
 volumes:
   typing_data:
+
+networks:
+  edge:
+    external: true

@@ -65,11 +65,16 @@ Linux、ネットワーク、サーバー、セキュリティなど、実践的
 Docker環境があれば、以下のコマンドで全コンテナ（フロント・バック）を起動できます。
 
 ### 本番起動
+本番（EC2）では archeck と同じサーバに同居しており、80/443 は共有の入口 nginx
+（arch-test-app リポジトリの `edge-proxy/`）が持っています。typing はポートを公開せず、
+Docker ネットワーク `edge` 経由で `typing-frontend` として受け付けます。
+
 ```bash
+docker network create edge   # 初回のみ（作成済みならエラーになるが問題なし）
 docker compose up -d --build
 ```
-ブラウザで **http://localhost:8080** にアクセスします。
-（管理者画面は **http://localhost:8080/admin**）
+- `secrets/.htpasswd`（管理画面の Basic 認証）はリポジトリに含まれないため、サーバに別途配置する
+- 構成と移行手順の詳細: arch-test-app の `edge-proxy/README.md`
 
 > **Note**: 外部公開時は `docker-compose.yml` の `ALLOWED_ORIGIN` を実際のドメインに変更してください。
 
