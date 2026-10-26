@@ -1367,19 +1367,31 @@ export default function Admin() {
                       <tr>
                         <th style={{ padding: '12px', borderBottom: '2px solid #ddd' }}>順位</th>
                         <th style={{ padding: '12px', borderBottom: '2px solid #ddd' }}>社員番号</th>
+                        <th style={{ padding: '12px', borderBottom: '2px solid #ddd' }}>職種</th>
                         <th style={{ padding: '12px', borderBottom: '2px solid #ddd', textAlign: 'right' }}>スコア</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {tournamentScores.map((row, index) => (
+                      {tournamentScores.map((row, index) => {
+                        // 大会時に記録した職種を優先し、無い古い記録はユーザ管理の職種で補う
+                        const job = row.job_type || dbCohortMap[row.user_id]?.job_type || '';
+                        return (
                         <tr key={index} style={{ borderBottom: '1px solid #eee', background: index < 3 ? '#fffdf0' : '#fff' }}>
                           <td style={{ padding: '12px', fontWeight: 'bold', color: index === 0 ? '#d4af37' : index === 1 ? '#9e9e9e' : index === 2 ? '#cd7f32' : '#555' }}>
                             {index + 1}
                           </td>
                           <td style={{ padding: '12px', fontWeight: 'bold', color: '#2c3e50' }}>{row.user_id}</td>
+                          <td style={{ padding: '12px' }}>
+                            {job ? (
+                              <span style={{ background: JOB_COLORS[job] || '#888', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.85em', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                                {job}
+                              </span>
+                            ) : <span style={{ color: '#aaa' }}>—</span>}
+                          </td>
                           <td style={{ padding: '12px', textAlign: 'right', fontWeight: 'bold', color: '#e8734a' }}>{row.score}</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 ) : (
