@@ -437,6 +437,17 @@ function sanitizePlayerName(name) {
   return null;
 }
 
+// 氏名（表示名）: 前後の空白を除いて 1〜20 文字。改行などの制御文字と < > は受け付けない
+const DISPLAY_NAME_MAX = 20;
+function sanitizeDisplayName(name) {
+  if (typeof name !== 'string') return null;
+  const str = name.normalize('NFC').replace(/\s+/g, ' ').trim();
+  const len = [...str].length;
+  if (len < 1 || len > DISPLAY_NAME_MAX) return null;
+  if (/[\u0000-\u001f\u007f<>]/.test(str)) return null;
+  return str;
+}
+
 function isValidRoomId(roomId) {
   return typeof roomId === 'string' && /^([1-9]|10)$/.test(roomId);
 }
@@ -489,7 +500,7 @@ function emitTournamentLobbyUpdate() {
     lobbyUpdateTimer = null;
     io.to('admin_room').emit('tournamentLobbyUpdate', {
       count: Object.keys(tournamentLobbyPlayers).length,
-      players: Object.values(tournamentLobbyPlayers).map(p => p.name).slice(0, 20)
+      players: Object.values(tournamentLobbyPlayers).map(lobbyPlayerLabel).slice(0, 20)
     });
   }, 500);
 }
@@ -554,16 +565,30 @@ async function startTournament() {
 }
 
 let liveRankingUpdateTimer = null;
+// 社員番号 → 氏名（参加時に本人が入力したもの）。リアルタイムランキングの表示用
+const playerDisplayNames = new Map();
+
+// 管理画面の待機室一覧用の表示（氏名があれば「氏名（社員番号）」）
+function lobbyPlayerLabel(p) {
+  return p.displayName ? `${p.displayName}（${p.name}）` : p.name;
+}
+
+// リアルタイムランキング（上位 100 件）。氏名が分かる人は氏名を付ける
+function buildLiveRanking() {
+  return Object.entries(tournamentState.participants)
+    .map(([user_id, data]) => ({
+      user_id, name: playerDisplayNames.get(user_id) || null,
+      score: data.score, jobType: data.jobType,
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 100);
+}
+
 function emitTournamentLiveRanking() {
   if (liveRankingUpdateTimer) return;
   liveRankingUpdateTimer = setTimeout(() => {
     liveRankingUpdateTimer = null;
-    const sorted = Object.entries(tournamentState.participants)
-      .map(([user_id, data]) => ({ user_id, score: data.score, jobType: data.jobType }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 100);
-      
-    io.to('tournament_lobby').emit('tournamentLiveRanking', sorted);
+    io.to('tournament_lobby').emit('tournamentLiveRanking', buildLiveRanking());
   }, 500);
 }
 
@@ -586,14 +611,31 @@ io.on('connection', (socket) => {
   // 接続時にロビー一覧を送信
   sendLobbiesState(socket);
 
-  socket.on('joinTournament', ({ playerName, jobType }) => {
+  socket.on('joinTournament', ({ playerName, displayName, jobType }) => {
     const safeName = sanitizePlayerName(playerName);
     if (!safeName) {
       socket.emit('error', 'Invalid player name.');
       return;
     }
+    // 氏名（任意項目として受ける: 古い画面から氏名なしで参加した場合は社員番号で表示）
+    let safeDisplayName = null;
+    if (displayName !== undefined && displayName !== null && displayName !== '') {
+      safeDisplayName = sanitizeDisplayName(displayName);
+      if (!safeDisplayName) {
+        socket.emit('error', 'Invalid display name.');
+        return;
+      }
+      playerDisplayNames.set(safeName, safeDisplayName);
+      // 管理画面で後から見られるよう保存する（氏名はログに出さない）
+      getDb()
+        .then(db => db.run(
+          `INSERT INTO player_names (user_id, name, updated_at) VALUES (?, ?, datetime('now'))
+           ON CONFLICT(user_id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at`,
+          [safeName, safeDisplayName]))
+        .catch(err => console.error('Failed to save player name:', err.message));
+    }
     socket.join('tournament_lobby');
-    tournamentLobbyPlayers[socket.id] = { name: safeName, jobType: jobType || '' };
+    tournamentLobbyPlayers[socket.id] = { name: safeName, displayName: safeDisplayName, jobType: jobType || '' };
     emitTournamentLobbyUpdate();
     emitTournamentLiveRanking();
     
@@ -604,7 +646,7 @@ io.on('connection', (socket) => {
     socket.join('admin_room');
     socket.emit('tournamentLobbyUpdate', {
       count: Object.keys(tournamentLobbyPlayers).length,
-      players: Object.values(tournamentLobbyPlayers).map(p => p.name).slice(0, 20)
+      players: Object.values(tournamentLobbyPlayers).map(lobbyPlayerLabel).slice(0, 20)
     });
   });
 
@@ -613,11 +655,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('getTournamentLiveRanking', () => {
-    const sorted = Object.entries(tournamentState.participants)
-      .map(([user_id, data]) => ({ user_id, score: data.score, jobType: data.jobType }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 100);
-    socket.emit('tournamentLiveRanking', sorted);
+    socket.emit('tournamentLiveRanking', buildLiveRanking());
   });
 
   socket.on('tournamentUpdateScore', ({ playerName, score, jobType }) => {
@@ -629,11 +667,7 @@ io.on('connection', (socket) => {
       tournamentState.participants[safeName] = { score, jobType: jobType || '' };
       emitTournamentLiveRanking();
     } else {
-      const sorted = Object.entries(tournamentState.participants)
-        .map(([user_id, data]) => ({ user_id, score: data.score, jobType: data.jobType }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 100);
-      socket.emit('tournamentLiveRanking', sorted);
+      socket.emit('tournamentLiveRanking', buildLiveRanking());
     }
   });
 
@@ -778,6 +812,30 @@ io.on('connection', (socket) => {
       sendLobbiesState();
     }
   });
+});
+
+// --- 管理者用 API: 過去のイベントの最終ランキング（氏名付き） ---
+// 氏名を含むので /api ではなく /admin-api（管理者 IP + Basic 認証の /admin/api/ からだけ届く）に置く
+app.get('/admin-api/tournaments/:id/scores', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.' });
+  try {
+    const db = await getDb();
+    const rows = await db.all(`
+      SELECT ts.user_id, pn.name,
+             COALESCE(NULLIF(ts.job_type, ''), u.job_type, '') AS job_type,
+             ts.score
+      FROM tournament_scores ts
+      LEFT JOIN player_names pn ON pn.user_id = ts.user_id
+      LEFT JOIN users u ON u.user_id = ts.user_id
+      WHERE ts.tournament_id = ?
+      ORDER BY ts.score DESC
+    `, [id]);
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching tournament scores (admin):', err.message);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // --- 管理者用 API: イベントの毎週自動開始の予約 ---

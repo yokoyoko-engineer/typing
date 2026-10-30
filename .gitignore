@@ -9,3 +9,9 @@ build/
 
 # 管理者画面のBasic認証ファイル（パスワードハッシュ）
 secrets/
+
+# 本番・開発のデータ（社員番号・スコア・氏名を含むので git に入れない）
+backend/data/*.sqlite
+backend/data/*.sqlite-wal
+backend/data/*.sqlite-shm
+backend/data/rankings.json

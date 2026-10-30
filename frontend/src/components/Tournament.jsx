@@ -57,7 +57,7 @@ function TournamentRanking({ socket, playerName, jobType, globalLegends, highest
                                             </td>
                                             <td style={{ padding: '8px 5px', color: isLegendBeat ? '#000' : 'inherit', wordBreak: 'break-all' }}>
                                                 {isLegendBeat && <span style={{marginRight: '5px'}}>👑</span>}
-                                                {entry.jobType ? `[${entry.jobType}] ` : ''}{entry.user_id}
+                                                {entry.jobType ? `[${entry.jobType}] ` : ''}{entry.name || entry.user_id}
                                             </td>
                                             <td style={{ padding: '8px 5px', width: '95px', textAlign: 'center', fontWeight: 'bold', color: isLegendBeat ? '#000' : '#ff9800' }}>
                                                 {getEvaluationLevel(entry.score)}
@@ -431,9 +431,24 @@ function TournamentBattle({
 }
 
 // 3. Parent Component (Fixed overall size and overflow controller)
+// 氏名は入り直しのたびに打たなくて済むよう、タブを閉じるまでだけ覚えておく
+// （研修室の共用 PC で次の人に残らないよう、localStorage ではなく sessionStorage）
+const DISPLAY_NAME_KEY = 'typing.displayName';
+const DISPLAY_NAME_MAX = 20;
+const loadDisplayName = () => { try { return sessionStorage.getItem(DISPLAY_NAME_KEY) || ''; } catch { return ''; } };
+const saveDisplayName = (v) => { try { sessionStorage.setItem(DISPLAY_NAME_KEY, v); } catch { /* 保存できなくても参加はできる */ } };
+// サーバと同じ条件: 前後の空白を除いて 1〜20 文字、制御文字と < > は不可
+const normalizeDisplayName = (v) => v.replace(/\s+/g, ' ').trim();
+const isValidDisplayName = (v) => {
+    const s = normalizeDisplayName(v);
+    const len = [...s].length;
+    return len >= 1 && len <= DISPLAY_NAME_MAX && !/[\u0000-\u001f\u007f<>]/.test(s);
+};
+
 export default function Tournament({ socket, onBackToHome }) {
     const [playerName, setPlayerName] = useState('');
     const [nameInput, setNameInput] = useState('');
+    const [displayNameInput, setDisplayNameInput] = useState(loadDisplayName);
     const [jobType, setJobType] = useState('CL');
     const [cpuLevel, setCpuLevel] = useState(5);
     const [gameState, setGameState] = useState('setup'); // setup, waiting, ready, countdown, playing, intermission, spectating, finished
@@ -496,15 +511,23 @@ export default function Tournament({ socket, onBackToHome }) {
         };
     }, [socket, gameState]);
 
+    const canJoin = /^[0-9]{1,7}$/.test(nameInput.trim()) && isValidDisplayName(displayNameInput);
+
     const handleJoin = () => {
         const trimmed = nameInput.trim();
-        if (/^[0-9]{1,7}$/.test(trimmed)) {
-            setPlayerName(trimmed);
-            socket.emit('joinTournament', { playerName: trimmed, jobType });
-            setGameState('waiting');
-        } else {
+        if (!/^[0-9]{1,7}$/.test(trimmed)) {
             alert('社員番号は1〜7桁の数字で入力してください');
+            return;
         }
+        if (!isValidDisplayName(displayNameInput)) {
+            alert(`氏名を入力してください（${DISPLAY_NAME_MAX}文字以内、< > は使えません）`);
+            return;
+        }
+        const displayName = normalizeDisplayName(displayNameInput);
+        saveDisplayName(displayName);
+        setPlayerName(trimmed);
+        socket.emit('joinTournament', { playerName: trimmed, displayName, jobType });
+        setGameState('waiting');
     };
 
     // Global Tournament Timer
@@ -576,7 +599,7 @@ export default function Tournament({ socket, onBackToHome }) {
                             </div>
                         </div>
                     )}
-                    <p style={{ color: '#888', marginBottom: '20px', textAlign: 'center' }}>社員番号を入力してイベントに参加してください</p>
+                    <p style={{ color: '#888', marginBottom: '20px', textAlign: 'center' }}>社員番号と氏名を入力してイベントに参加してください</p>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', maxWidth: '400px', margin: '0 auto' }}>
                         <input
                             type="number"
@@ -591,6 +614,22 @@ export default function Tournament({ socket, onBackToHome }) {
                                 border: '2px solid #ddd', borderRadius: '10px', textAlign: 'center', outline: 'none'
                             }}
                         />
+                        <input
+                            type="text"
+                            value={displayNameInput}
+                            maxLength={DISPLAY_NAME_MAX}
+                            onChange={(e) => setDisplayNameInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleJoin(); }}
+                            placeholder="氏名（例: 山田 太郎）"
+                            autoComplete="name"
+                            style={{
+                                width: '100%', padding: '15px 20px', fontSize: '1.3em',
+                                border: '2px solid #ddd', borderRadius: '10px', textAlign: 'center', outline: 'none'
+                            }}
+                        />
+                        <p style={{ margin: '-8px 0 0', fontSize: '0.85em', color: '#999', textAlign: 'center' }}>
+                            氏名はリアルタイムランキングに表示されます
+                        </p>
                         <select
                             value={jobType}
                             onChange={(e) => setJobType(e.target.value)}
@@ -610,7 +649,7 @@ export default function Tournament({ socket, onBackToHome }) {
                         <button
                             className="action-btn"
                             onClick={handleJoin}
-                            disabled={!/^[0-9]{1,7}$/.test(nameInput.trim())}
+                            disabled={!canJoin}
                             style={{ width: '100%', height: '55px', fontSize: '1.2em' }}
                         >
                             待機室へ入る

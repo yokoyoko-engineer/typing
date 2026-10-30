@@ -551,7 +551,8 @@ export default function Admin() {
 
   useEffect(() => {
     if (selectedTournament) {
-      fetch(`/api/tournaments/${selectedTournament}/scores`)
+      // 氏名を含むので、管理者 IP + Basic 認証で保護された /admin/api から取得する
+      fetch(`/admin/api/tournaments/${selectedTournament}/scores`)
         .then(res => res.json())
         .then(data => setTournamentScores(data))
         .catch(err => console.error(err));
@@ -1367,6 +1368,7 @@ export default function Admin() {
                       <tr>
                         <th style={{ padding: '12px', borderBottom: '2px solid #ddd' }}>順位</th>
                         <th style={{ padding: '12px', borderBottom: '2px solid #ddd' }}>社員番号</th>
+                        <th style={{ padding: '12px', borderBottom: '2px solid #ddd' }}>氏名</th>
                         <th style={{ padding: '12px', borderBottom: '2px solid #ddd' }}>職種</th>
                         <th style={{ padding: '12px', borderBottom: '2px solid #ddd', textAlign: 'right' }}>スコア</th>
                       </tr>
@@ -1381,6 +1383,9 @@ export default function Admin() {
                             {index + 1}
                           </td>
                           <td style={{ padding: '12px', fontWeight: 'bold', color: '#2c3e50' }}>{row.user_id}</td>
+                          <td style={{ padding: '12px' }}>
+                            {row.name || <span style={{ color: '#aaa' }} title="氏名入力の導入前の記録、または氏名なしで参加">—</span>}
+                          </td>
                           <td style={{ padding: '12px' }}>
                             {job ? (
                               <span style={{ background: JOB_COLORS[job] || '#888', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.85em', fontWeight: 'bold', whiteSpace: 'nowrap' }}>

@@ -55,6 +55,15 @@ export async function getDb() {
         cohort TEXT NOT NULL
       );
 
+      -- イベント参加時に本人が入力した氏名（社員番号ごとに最新の 1 件）。
+      -- 個人情報なので、表示はリアルタイムランキングと管理画面（管理者 IP + Basic 認証）に限る。
+      -- ログ・rankings.json・git には出さない。
+      CREATE TABLE IF NOT EXISTS player_names (
+        user_id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
       -- イベントの毎週自動開始の予約（曜日・時刻は日本時間）
       CREATE TABLE IF NOT EXISTS tournament_schedules (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
