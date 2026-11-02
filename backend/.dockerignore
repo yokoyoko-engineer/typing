@@ -4,3 +4,10 @@ npm-debug.log
 Dockerfile
 .git
 .gitignore
+
+# 本番・開発のデータ（社員番号・スコア・氏名）をイメージに焼き込まない
+data/*.sqlite
+data/*.sqlite-wal
+data/*.sqlite-shm
+data/rankings.json
+.env

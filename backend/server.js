@@ -11,6 +11,9 @@ import { CATEGORIES } from './words.js';
 import {
   startScheduler, describeSchedule, validateSchedule, jstKey, prevOccurrence,
 } from './scheduler.js';
+import {
+  initNameCrypto, hasNameKey, encryptName, decryptName, isEncryptedName,
+} from './nameCrypto.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -626,13 +629,16 @@ io.on('connection', (socket) => {
         return;
       }
       playerDisplayNames.set(safeName, safeDisplayName);
-      // 管理画面で後から見られるよう保存する（氏名はログに出さない）
-      getDb()
-        .then(db => db.run(
-          `INSERT INTO player_names (user_id, name, updated_at) VALUES (?, ?, datetime('now'))
-           ON CONFLICT(user_id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at`,
-          [safeName, safeDisplayName]))
-        .catch(err => console.error('Failed to save player name:', err.message));
+      // 管理画面で後から見られるよう、暗号化して保存する（氏名はログに出さない）。
+      // 鍵が無ければ保存しない（平文では保存しない）
+      if (hasNameKey()) {
+        getDb()
+          .then(db => db.run(
+            `INSERT INTO player_names (user_id, name, updated_at) VALUES (?, ?, datetime('now'))
+             ON CONFLICT(user_id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at`,
+            [safeName, encryptName(safeName, safeDisplayName)]))
+          .catch(err => console.error('Failed to save player name:', err.message));
+      }
     }
     socket.join('tournament_lobby');
     tournamentLobbyPlayers[socket.id] = { name: safeName, displayName: safeDisplayName, jobType: jobType || '' };
@@ -822,7 +828,7 @@ app.get('/admin-api/tournaments/:id/scores', async (req, res) => {
   try {
     const db = await getDb();
     const rows = await db.all(`
-      SELECT ts.user_id, pn.name,
+      SELECT ts.user_id, pn.name AS enc_name,
              COALESCE(NULLIF(ts.job_type, ''), u.job_type, '') AS job_type,
              ts.score
       FROM tournament_scores ts
@@ -831,7 +837,8 @@ app.get('/admin-api/tournaments/:id/scores', async (req, res) => {
       WHERE ts.tournament_id = ?
       ORDER BY ts.score DESC
     `, [id]);
-    res.json(rows);
+    // 氏名は DB では暗号化されているので、返す直前に復号する（鍵違い・改ざんは null）
+    res.json(rows.map(({ enc_name, ...r }) => ({ ...r, name: decryptName(r.user_id, enc_name) })));
   } catch (err) {
     console.error('Error fetching tournament scores (admin):', err.message);
     res.status(500).json({ error: 'Database error' });
@@ -917,8 +924,38 @@ app.delete('/admin-api/tournament-schedules/:id', async (req, res) => {
   }
 });
 
+// 氏名の暗号化鍵を読み込む（無ければ氏名は保存しない）
+initNameCrypto();
+
+// 暗号化を入れる前に平文で保存された氏名があれば、鍵がある起動時に暗号化し直す
+async function encryptLegacyPlainNames() {
+  try {
+    const db = await getDb();
+    const rows = await db.all('SELECT user_id, name FROM player_names');
+    const plain = rows.filter(r => !isEncryptedName(r.name));
+    if (plain.length === 0) return;
+    if (!hasNameKey()) {
+      console.warn(`[nameCrypto] 暗号化されていない氏名が ${plain.length} 件あります。NAME_ENCRYPTION_KEY を設定して再起動すると暗号化されます`);
+      return;
+    }
+    // 上書きしただけでは古い平文が DB ファイルの空き領域や WAL に残るため、
+    // secure_delete で消去しつつ書き換え、最後に WAL を空にして DB を作り直す
+    await db.exec('PRAGMA secure_delete = ON');
+    for (const r of plain) {
+      await db.run('UPDATE player_names SET name = ? WHERE user_id = ?', [encryptName(r.user_id, r.name), r.user_id]);
+    }
+    await db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+    await db.exec('VACUUM');
+    await db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+    console.log(`[nameCrypto] 平文で保存されていた氏名 ${plain.length} 件を暗号化しました`);
+  } catch (err) {
+    console.error('[nameCrypto] 既存の氏名の暗号化に失敗しました:', err.message);
+  }
+}
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
+  encryptLegacyPlainNames();
 
   // 予約したイベントを自動で開始する。
   // 予定時刻に待機室が 0 人ならスキップ（参加者のいない大会記録を作らない）。

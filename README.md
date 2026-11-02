@@ -78,6 +78,9 @@ docker network create edge   # 初回のみ（作成済みならエラーにな�
 docker compose up -d --build
 ```
 - `secrets/.htpasswd`（管理画面の Basic 認証）はリポジトリに含まれないため、サーバに別途配置する
+- イベント参加時に入力された氏名は、DB に **AES-256-GCM で暗号化**して保存する。
+  鍵はサーバの `.env` の `NAME_ENCRYPTION_KEY` に置く（`.env.example` 参照。`openssl rand -base64 32` で作成）。
+  鍵が無いと氏名は保存されない（リアルタイムランキングの表示はできる）。**鍵をなくすと保存済みの氏名は復号できない**ので、パスワード管理ツールなどに別途保管すること
 - 構成と移行手順の詳細: arch-test-app の `edge-proxy/README.md`
 
 > **Note**: 外部公開時は `docker-compose.yml` の `ALLOWED_ORIGIN` を実際のドメインに変更してください。

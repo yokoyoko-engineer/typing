@@ -12,6 +12,9 @@ services:
     environment:
       - NODE_ENV=production
       - ALLOWED_ORIGIN=http://localhost
+      # 氏名を DB に暗号化して保存するための鍵（サーバの .env に置く。git には入れない）
+      # 作り方: openssl rand -base64 32
+      - NAME_ENCRYPTION_KEY=${NAME_ENCRYPTION_KEY:-}
     volumes:
       - typing_data:/app/data
     restart: always
