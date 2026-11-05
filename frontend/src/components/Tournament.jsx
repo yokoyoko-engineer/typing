@@ -520,7 +520,7 @@ export default function Tournament({ socket, onBackToHome }) {
             return;
         }
         if (!isValidDisplayName(displayNameInput)) {
-            alert(`氏名を入力してください（${DISPLAY_NAME_MAX}文字以内、< > は使えません）`);
+            alert(`氏名（ニックネーム）を入力してください（${DISPLAY_NAME_MAX}文字以内、< > は使えません）`);
             return;
         }
         const displayName = normalizeDisplayName(displayNameInput);
@@ -599,7 +599,7 @@ export default function Tournament({ socket, onBackToHome }) {
                             </div>
                         </div>
                     )}
-                    <p style={{ color: '#888', marginBottom: '20px', textAlign: 'center' }}>社員番号と氏名を入力してイベントに参加してください</p>
+                    <p style={{ color: '#888', marginBottom: '20px', textAlign: 'center' }}>社員番号と氏名（ニックネーム）を入力してイベントに参加してください</p>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', maxWidth: '400px', margin: '0 auto' }}>
                         <input
                             type="number"
@@ -620,7 +620,7 @@ export default function Tournament({ socket, onBackToHome }) {
                             maxLength={DISPLAY_NAME_MAX}
                             onChange={(e) => setDisplayNameInput(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleJoin(); }}
-                            placeholder="氏名（例: 山田 太郎）"
+                            placeholder="氏名（ニックネーム）"
                             autoComplete="name"
                             style={{
                                 width: '100%', padding: '15px 20px', fontSize: '1.3em',
@@ -628,7 +628,7 @@ export default function Tournament({ socket, onBackToHome }) {
                             }}
                         />
                         <p style={{ margin: '-8px 0 0', fontSize: '0.85em', color: '#999', textAlign: 'center' }}>
-                            氏名はリアルタイムランキングに表示されます
+                            氏名（ニックネーム）はリアルタイムランキングに表示されます
                         </p>
                         <select
                             value={jobType}
