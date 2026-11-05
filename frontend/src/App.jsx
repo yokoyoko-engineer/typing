@@ -16,6 +16,7 @@ function MainGame() {
   const [lobbies, setLobbies] = useState([])
   const [myId, setMyId] = useState(null)
   const [gameMode, setGameMode] = useState('home') // 'home', 'online', 'cpu'
+  const [cpuHiddenCategories, setCpuHiddenCategories] = useState([])
 
   useEffect(() => {
     // Viteのプロキシを経由するため、ホスト名やポートの指定をなくします
@@ -37,6 +38,11 @@ function MainGame() {
     // 管理画面で追加された出題文を、CPU 対戦とイベントの問題に足す
     newSocket.on('customWords', (list) => {
       if (Array.isArray(list)) setCustomWords(list)
+    })
+
+    // 管理画面でオフにされたカテゴリは CPU 対戦の選択肢から外す
+    newSocket.on('cpuHiddenCategories', (list) => {
+      if (Array.isArray(list)) setCpuHiddenCategories(list)
     })
 
     newSocket.on('error', (msg) => {
@@ -72,7 +78,7 @@ function MainGame() {
       )}
 
       {gameMode === 'cpu' && (
-        <CPUGame onBackToHome={() => setGameMode('home')} />
+        <CPUGame hiddenCategories={cpuHiddenCategories} onBackToHome={() => setGameMode('home')} />
       )}
 
       {gameMode === 'tournament' && (

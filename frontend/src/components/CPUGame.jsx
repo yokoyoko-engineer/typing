@@ -35,7 +35,7 @@ const levelLabel = (level) => SPECIAL_LEVELS.find(s => s.level === level)?.label
 // API calls will now automatically be routed through the Vite/Nginx proxy
 
 
-export default function CPUGame({ onBackToHome }) {
+export default function CPUGame({ hiddenCategories = [], onBackToHome }) {
     const [playerName, setPlayerName] = useState('');
     const [nameInput, setNameInput] = useState('');
     const [jobType, setJobType] = useState('CL');
@@ -467,6 +467,7 @@ export default function CPUGame({ onBackToHome }) {
 
         // Category selection
         if (selectionStep === 'category') {
+            const visibleCategories = Object.values(CATEGORIES).filter(cat => !hiddenCategories.includes(cat));
             return (
                 <div className="game-container">
                     <p style={{ color: '#5c6bc0', fontWeight: 'bold', marginBottom: '5px' }}>プレイヤー: {playerName}</p>
@@ -474,7 +475,10 @@ export default function CPUGame({ onBackToHome }) {
                     <div className="genre-grid" style={{
                         display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '20px', maxWidth: '400px', margin: '20px auto'
                     }}>
-                        {Object.values(CATEGORIES).map((cat) => (
+                        {visibleCategories.length === 0 && (
+                            <p style={{ color: '#888', textAlign: 'center' }}>現在選択できるカテゴリはありません</p>
+                        )}
+                        {visibleCategories.map((cat) => (
                             <button
                                 key={cat}
                                 className="action-btn"

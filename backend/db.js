@@ -85,6 +85,11 @@ export async function getDb() {
         UNIQUE (genre, text)
       );
 
+      -- CPU 対戦のカテゴリ選択画面で隠すカテゴリ（行がなければ表示）
+      CREATE TABLE IF NOT EXISTS cpu_hidden_categories (
+        category TEXT PRIMARY KEY
+      );
+
       CREATE INDEX IF NOT EXISTS idx_scores_user_id ON scores(user_id);
       CREATE INDEX IF NOT EXISTS idx_scores_score ON scores(score);
       CREATE INDEX IF NOT EXISTS idx_scores_play_date ON scores(play_date);

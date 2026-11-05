@@ -9,6 +9,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { CATEGORIES, WORDS_BY_GENRE, setCustomWords } from './words.js';
 import { validateCustomWord } from './customWords.js';
+import { getHiddenCpuCategories, setCpuCategoryVisible } from './cpuCategories.js';
 import {
   startScheduler, describeSchedule, validateSchedule, jstKey, prevOccurrence,
 } from './scheduler.js';
@@ -585,6 +586,7 @@ io.on('connection', (socket) => {
 
   // CPU 対戦とイベントの問題はブラウザ側で選ぶので、追加された出題文も渡しておく
   socket.emit('customWords', customWords);
+  socket.emit('cpuHiddenCategories', hiddenCpuCategories);
 
   socket.on('joinTournament', ({ playerName, displayName, jobType }) => {
     const safeName = sanitizePlayerName(playerName);
@@ -966,6 +968,34 @@ app.delete('/admin-api/custom-words/:id', async (req, res) => {
   }
 });
 
+// --- 管理者用 API: CPU 対戦のカテゴリ表示 ---
+let hiddenCpuCategories = [];
+
+// DB の内容を読み直し、開いている画面にも配る
+async function reloadCpuCategories() {
+  hiddenCpuCategories = await getHiddenCpuCategories(await getDb());
+  io.emit('cpuHiddenCategories', hiddenCpuCategories);
+}
+
+app.get('/admin-api/cpu-categories', (req, res) => {
+  res.json({ hidden: hiddenCpuCategories });
+});
+
+app.patch('/admin-api/cpu-categories', async (req, res) => {
+  const { category, visible } = req.body ?? {};
+  if (!Object.values(CATEGORIES).includes(category) || typeof visible !== 'boolean') {
+    return res.status(400).json({ error: 'カテゴリの指定が正しくありません。' });
+  }
+  try {
+    await setCpuCategoryVisible(await getDb(), category, visible);
+    await reloadCpuCategories();
+    res.json({ hidden: hiddenCpuCategories });
+  } catch (err) {
+    console.error('Error updating CPU categories:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // 氏名の暗号化鍵を読み込む（無ければ氏名は保存しない）
 initNameCrypto();
 
@@ -999,6 +1029,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
   encryptLegacyPlainNames();
   reloadCustomWords().catch(err => console.error('Error loading custom words:', err));
+  reloadCpuCategories().catch(err => console.error('Error loading CPU categories:', err));
 
   // 予約したイベントを自動で開始する。
   // 予定時刻に待機室が 0 人ならスキップ（参加者のいない大会記録を作らない）。
