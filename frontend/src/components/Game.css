@@ -87,7 +87,8 @@
 
 .ranking-preview-panel {
   width: 320px;
-  max-height: 500px;
+  /* 記録の件数で高さが変わるとページがずれ、カーソルの下のボタンが入れ替わって画面が揺れる */
+  height: 500px;
   overflow-y: auto;
   background: #f8f9fa;
   border: 1px solid #e0e0e0;
