@@ -144,7 +144,19 @@ export const GENRES_BY_CATEGORY = {
   [CATEGORIES.CLOUD]: Object.values(CLOUD_GENRES),
 };
 
-export const ALL_WORDS = Object.values(WORDS_BY_GENRE).flat();
+export let ALL_WORDS = Object.values(WORDS_BY_GENRE).flat();
+
+// 管理画面から追加された出題文を、プログラムに書かれた問題に足す
+// （呼ぶたびに作り直すので、削除された問題は出題されなくなる）
+const BUILT_IN_WORDS_BY_GENRE = { ...WORDS_BY_GENRE };
+
+export function setCustomWords(list) {
+  for (const [genre, words] of Object.entries(BUILT_IN_WORDS_BY_GENRE)) {
+    const added = list.filter(w => w.genre === genre).map(({ text, ruby }) => ({ text, ruby }));
+    WORDS_BY_GENRE[genre] = added.length > 0 ? [...words, ...added] : words;
+  }
+  ALL_WORDS = Object.values(WORDS_BY_GENRE).flat();
+}
 
 // pool 内のユニークな text 数（同じ text が複数あると使用済み判定がずれるため）
 const uniqueTextCountCache = new WeakMap();

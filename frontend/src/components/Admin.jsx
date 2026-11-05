@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { io } from 'socket.io-client';
 import { JOB_TYPES } from '../jobTypes';
+import CustomWordManager from './CustomWordManager';
 
 const COHORT_202604 = {
   CL: [3319, 5905, 5906, 5907, 5908, 5909, 5910, 5911, 5912, 5913, 5914, 5915, 5916, 5917, 5918, 5919, 5920, 5921, 5922, 5923, 5924, 5944, 5964, 5980, 5981],
@@ -1066,6 +1067,12 @@ export default function Admin() {
         >
           👤 ユーザー管理
         </button>
+        <button 
+          onClick={() => setActiveTab('words')}
+          style={{ padding: '10px 20px', fontSize: '1.1em', background: activeTab === 'words' ? '#00897b' : '#eee', color: activeTab === 'words' ? '#fff' : '#333', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
+        >
+          ⌨️ 出題文の管理
+        </button>
       </div>
 
       {activeTab === 'analysis' && (
@@ -2034,6 +2041,8 @@ export default function Admin() {
           </div>
         </div>
       )}
+
+      {activeTab === 'words' && <CustomWordManager />}
 
       {activeTab === 'users' && (
         <div style={{ animation: 'fadeIn 0.3s ease-in-out' }}>

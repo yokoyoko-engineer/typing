@@ -7,6 +7,7 @@ import Home from './components/Home'
 import CPUGame from './components/CPUGame'
 import Tournament from './components/Tournament'
 import Admin from './components/Admin'
+import { setCustomWords } from './words'
 import './App.css'
 
 function MainGame() {
@@ -31,6 +32,11 @@ function MainGame() {
 
     newSocket.on('roomState', (state) => {
       setRoomState(state)
+    })
+
+    // 管理画面で追加された出題文を、CPU 対戦とイベントの問題に足す
+    newSocket.on('customWords', (list) => {
+      if (Array.isArray(list)) setCustomWords(list)
     })
 
     newSocket.on('error', (msg) => {

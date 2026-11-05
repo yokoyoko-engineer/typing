@@ -7,7 +7,8 @@ import { fileURLToPath } from 'url';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { CATEGORIES } from './words.js';
+import { CATEGORIES, WORDS_BY_GENRE, setCustomWords } from './words.js';
+import { validateCustomWord } from './customWords.js';
 import {
   startScheduler, describeSchedule, validateSchedule, jstKey, prevOccurrence,
 } from './scheduler.js';
@@ -614,6 +615,9 @@ io.on('connection', (socket) => {
   // 接続時にロビー一覧を送信
   sendLobbiesState(socket);
 
+  // CPU 対戦とイベントの問題はブラウザ側で選ぶので、追加された出題文も渡しておく
+  socket.emit('customWords', customWords);
+
   socket.on('joinTournament', ({ playerName, displayName, jobType }) => {
     const safeName = sanitizePlayerName(playerName);
     if (!safeName) {
@@ -924,6 +928,62 @@ app.delete('/admin-api/tournament-schedules/:id', async (req, res) => {
   }
 });
 
+// --- 管理者用 API: 出題文の追加 ---
+let customWords = [];
+
+// DB の内容をサーバの出題に反映し、開いている画面にも配る
+async function reloadCustomWords() {
+  const db = await getDb();
+  customWords = await db.all('SELECT id, genre, text, ruby, created_at FROM custom_words ORDER BY id DESC');
+  setCustomWords(customWords);
+  io.emit('customWords', customWords);
+}
+
+app.get('/admin-api/custom-words', (req, res) => {
+  res.json(customWords);
+});
+
+app.post('/admin-api/custom-words', async (req, res) => {
+  const genre = req.body?.genre;
+  if (typeof genre !== 'string' || !Object.hasOwn(WORDS_BY_GENRE, genre)) {
+    return res.status(400).json({ error: 'ジャンルを選択してください。' });
+  }
+  const word = validateCustomWord({ text: req.body?.text, ruby: req.body?.ruby });
+  if (!word.ok) return res.status(400).json({ error: word.error });
+  if (WORDS_BY_GENRE[genre].some(w => w.text === word.text)) {
+    return res.status(409).json({ error: 'このジャンルに同じ問題文がすでにあります。' });
+  }
+  try {
+    const db = await getDb();
+    const result = await db.run(
+      'INSERT INTO custom_words (genre, text, ruby) VALUES (?, ?, ?)',
+      [genre, word.text, word.ruby]
+    );
+    await reloadCustomWords();
+    res.status(201).json({ id: result.lastID, genre, text: word.text, ruby: word.ruby });
+  } catch (err) {
+    if (err.code === 'SQLITE_CONSTRAINT') {
+      return res.status(409).json({ error: 'このジャンルに同じ問題文がすでにあります。' });
+    }
+    console.error('Error adding custom word:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.delete('/admin-api/custom-words/:id', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.' });
+  try {
+    const db = await getDb();
+    await db.run('DELETE FROM custom_words WHERE id = ?', [id]);
+    await reloadCustomWords();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Error deleting custom word:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // 氏名の暗号化鍵を読み込む（無ければ氏名は保存しない）
 initNameCrypto();
 
@@ -956,6 +1016,7 @@ async function encryptLegacyPlainNames() {
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
   encryptLegacyPlainNames();
+  reloadCustomWords().catch(err => console.error('Error loading custom words:', err));
 
   // 予約したイベントを自動で開始する。
   // 予定時刻に待機室が 0 人ならスキップ（参加者のいない大会記録を作らない）。

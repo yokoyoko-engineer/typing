@@ -77,6 +77,16 @@ export async function getDb() {
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
 
+      -- 管理画面から追加した出題文（プログラムに書かれた問題に足して出題する）
+      CREATE TABLE IF NOT EXISTS custom_words (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        genre TEXT NOT NULL,
+        text TEXT NOT NULL,
+        ruby TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (genre, text)
+      );
+
       CREATE INDEX IF NOT EXISTS idx_scores_user_id ON scores(user_id);
       CREATE INDEX IF NOT EXISTS idx_scores_score ON scores(score);
       CREATE INDEX IF NOT EXISTS idx_scores_play_date ON scores(play_date);
