@@ -11,7 +11,7 @@ const TOURNAMENT_GENRE = CATEGORIES.BUSINESS;
 // 歴代・過去3か月のTOP5の表
 function TopBoard({ title, rows, background, boxShadow, emptyText }) {
     return (
-        <div style={{ background, boxShadow, padding: '15px', borderRadius: '10px', color: '#000', maxWidth: '400px', width: '100%', boxSizing: 'border-box', margin: '0 auto 20px auto' }}>
+        <div style={{ background, boxShadow, padding: '15px', borderRadius: '10px', color: '#000', maxWidth: '400px', width: '100%', boxSizing: 'border-box', margin: '0 auto' }}>
             <h3 style={{ margin: '0 0 10px 0', textAlign: 'center', fontSize: '1.2em', textShadow: '1px 1px 2px rgba(255,255,255,0.5)' }}>{title}</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', background: 'rgba(255,255,255,0.5)', padding: '10px', borderRadius: '5px' }}>
                 {rows.length === 0 && <div style={{ textAlign: 'center', color: '#555' }}>{emptyText}</div>}
@@ -607,128 +607,133 @@ export default function Tournament({ socket, onBackToHome }) {
 
     if (gameState === 'setup') {
         return (
-            <div className="game-container" style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: '40px', maxWidth: '1000px', width: '90%' }}>
-                <div style={{ flex: '1 1 340px', minWidth: 0 }}>
-                    <h2>イベントモード（一斉バトル）</h2>
-                    {globalLegends.length > 0 && (
-                        <TopBoard
-                            title="👑 歴代TOP5"
-                            rows={globalLegends}
-                            background="linear-gradient(135deg, #FFD700 0%, #FDB931 100%)"
-                            boxShadow="0 4px 15px rgba(255,215,0,0.4)"
-                        />
-                    )}
-                    <p style={{ color: '#888', marginBottom: '20px', textAlign: 'center' }}>社員番号と氏名（ニックネーム）を入力してイベントに参加してください</p>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', maxWidth: '400px', margin: '0 auto' }}>
-                        <input
-                            type="number"
-                            min="1"
-                            max="9999999"
-                            value={nameInput}
-                            onChange={(e) => setNameInput(e.target.value.slice(0, 7))}
-                            onKeyDown={(e) => { if (e.key === 'Enter') handleJoin(); }}
-                            placeholder="社員番号 (1〜9999999)"
-                            style={{
-                                width: '100%', padding: '15px 20px', fontSize: '1.3em',
-                                border: '2px solid #ddd', borderRadius: '10px', textAlign: 'center', outline: 'none'
-                            }}
-                        />
-                        <input
-                            type="text"
-                            value={displayNameInput}
-                            maxLength={DISPLAY_NAME_MAX}
-                            onChange={(e) => setDisplayNameInput(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleJoin(); }}
-                            placeholder="氏名（ニックネーム）"
-                            autoComplete="name"
-                            style={{
-                                width: '100%', padding: '15px 20px', fontSize: '1.3em',
-                                border: '2px solid #ddd', borderRadius: '10px', textAlign: 'center', outline: 'none'
-                            }}
-                        />
-                        <p style={{ margin: '-8px 0 0', fontSize: '0.85em', color: '#999', textAlign: 'center' }}>
-                            氏名（ニックネーム）はランキングと過去の結果に表示されます
-                        </p>
-                        <select
-                            value={jobType}
-                            onChange={(e) => setJobType(e.target.value)}
-                            style={{
-                                width: '100%',
-                                padding: '15px 20px',
-                                fontSize: '1.2em',
-                                border: '2px solid #ddd',
-                                borderRadius: '10px',
-                                outline: 'none'
-                            }}
-                        >
-                            {JOB_TYPES.map(job => (
-                                <option key={job} value={job}>{job}</option>
-                            ))}
-                        </select>
-                        <button
-                            className="action-btn"
-                            onClick={handleJoin}
-                            disabled={!canJoin}
-                            style={{ width: '100%', height: '55px', fontSize: '1.2em' }}
-                        >
-                            待機室へ入る
-                        </button>
-                    </div>
-                    <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '40px', background: '#e0e0e0', color: '#2c3e50' }}>
-                        Back to Home
+            <div className="game-container" style={{ maxWidth: '900px', width: '90%' }}>
+                <h2>イベントモード（一斉バトル）</h2>
+                <p style={{ color: '#888', marginBottom: '20px', textAlign: 'center' }}>社員番号と氏名（ニックネーム）を入力してイベントに参加してください</p>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', width: '100%', maxWidth: '400px', margin: '0 auto' }}>
+                    <input
+                        type="number"
+                        min="1"
+                        max="9999999"
+                        value={nameInput}
+                        onChange={(e) => setNameInput(e.target.value.slice(0, 7))}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleJoin(); }}
+                        placeholder="社員番号 (1〜9999999)"
+                        style={{
+                            width: '100%', padding: '15px 20px', fontSize: '1.3em',
+                            border: '2px solid #ddd', borderRadius: '10px', textAlign: 'center', outline: 'none'
+                        }}
+                    />
+                    <input
+                        type="text"
+                        value={displayNameInput}
+                        maxLength={DISPLAY_NAME_MAX}
+                        onChange={(e) => setDisplayNameInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleJoin(); }}
+                        placeholder="氏名（ニックネーム）"
+                        autoComplete="name"
+                        style={{
+                            width: '100%', padding: '15px 20px', fontSize: '1.3em',
+                            border: '2px solid #ddd', borderRadius: '10px', textAlign: 'center', outline: 'none'
+                        }}
+                    />
+                    <p style={{ margin: '-8px 0 0', fontSize: '0.85em', color: '#999', textAlign: 'center' }}>
+                        氏名（ニックネーム）はランキングと過去の結果に表示されます
+                    </p>
+                    <select
+                        value={jobType}
+                        onChange={(e) => setJobType(e.target.value)}
+                        style={{
+                            width: '100%',
+                            padding: '15px 20px',
+                            fontSize: '1.2em',
+                            border: '2px solid #ddd',
+                            borderRadius: '10px',
+                            outline: 'none'
+                        }}
+                    >
+                        {JOB_TYPES.map(job => (
+                            <option key={job} value={job}>{job}</option>
+                        ))}
+                    </select>
+                    <button
+                        className="action-btn"
+                        onClick={handleJoin}
+                        disabled={!canJoin}
+                        style={{ width: '100%', height: '55px', fontSize: '1.2em' }}
+                    >
+                        待機室へ入る
                     </button>
                 </div>
-                
-                <div style={{ flex: '1 1 340px', minWidth: 0 }}>
-                <TopBoard
-                    title="🏅 過去3か月のTOP5"
-                    rows={recentTop}
-                    background="linear-gradient(135deg, #CFD8DC 0%, #90A4AE 100%)"
-                    boxShadow="0 4px 15px rgba(96,125,139,0.3)"
-                    emptyText="過去3か月の記録はありません"
-                />
-                <div style={{ background: '#f5f5f5', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-                    <h3 style={{ marginTop: 0, color: '#2c3e50' }}>📜 過去5回の結果</h3>
-                    {pastTournaments.length > 0 ? (
-                        <>
-                            <select 
-                                value={selectedPastId} 
-                                onChange={(e) => setSelectedPastId(e.target.value)}
-                                style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '1.1em' }}
-                            >
-                                {pastTournaments.map(t => (
-                                    <option key={t.id} value={t.id}>{t.name} ({t.date})</option>
-                                ))}
-                            </select>
-                            <div style={{ maxHeight: '300px', overflowY: 'auto', background: '#fff', borderRadius: '5px', border: '1px solid #ddd' }}>
-                                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                                    <thead style={{ position: 'sticky', top: 0, background: '#eee' }}>
-                                        <tr>
-                                            <th style={{ padding: '10px', borderBottom: '1px solid #ddd' }}>順位</th>
-                                            <th style={{ padding: '10px', borderBottom: '1px solid #ddd' }}>社員番号</th>
-                                            <th style={{ padding: '10px', borderBottom: '1px solid #ddd' }}>ニックネーム</th>
-                                            <th style={{ padding: '10px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>スコア</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {pastScores.map((row, idx) => (
-                                            <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                                                <td style={{ padding: '10px', fontWeight: 'bold', color: idx === 0 ? '#d4af37' : idx === 1 ? '#9e9e9e' : idx === 2 ? '#cd7f32' : '#555' }}>
-                                                    {idx + 1}
-                                                </td>
-                                                <td style={{ padding: '10px', fontWeight: 'bold', color: '#2c3e50' }}>{row.user_id}</td>
-                                                <td style={{ padding: '10px', color: '#2c3e50', overflowWrap: 'anywhere' }}>{row.name || '—'}</td>
-                                                <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold', color: '#e8734a' }}>{row.score}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '20px', background: '#e0e0e0', color: '#2c3e50' }}>
+                    Back to Home
+                </button>
+
+                {/* 参加の入力欄が主役なので、記録は入力欄の下にまとめる */}
+                <div style={{ width: '100%', maxWidth: '820px', marginTop: '40px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
+                        {globalLegends.length > 0 && (
+                            <div style={{ flex: '1 1 340px', minWidth: 0 }}>
+                                <TopBoard
+                                    title="👑 歴代TOP5"
+                                    rows={globalLegends}
+                                    background="linear-gradient(135deg, #FFD700 0%, #FDB931 100%)"
+                                    boxShadow="0 4px 15px rgba(255,215,0,0.4)"
+                                />
                             </div>
-                        </>
-                    ) : (
-                        <p style={{ color: '#888', textAlign: 'center', marginTop: '50px' }}>過去のイベント履歴がありません。</p>
-                    )}
-                </div>
+                        )}
+                        <div style={{ flex: '1 1 340px', minWidth: 0 }}>
+                            <TopBoard
+                                title="🏅 過去3か月のTOP5"
+                                rows={recentTop}
+                                background="linear-gradient(135deg, #CFD8DC 0%, #90A4AE 100%)"
+                                boxShadow="0 4px 15px rgba(96,125,139,0.3)"
+                                emptyText="過去3か月の記録はありません"
+                            />
+                        </div>
+                    </div>
+                    <div style={{ background: '#f5f5f5', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                        <h3 style={{ marginTop: 0, color: '#2c3e50' }}>📜 過去5回の結果</h3>
+                        {pastTournaments.length > 0 ? (
+                            <>
+                                <select 
+                                    value={selectedPastId} 
+                                    onChange={(e) => setSelectedPastId(e.target.value)}
+                                    style={{ width: '100%', padding: '10px', marginBottom: '15px', borderRadius: '5px', border: '1px solid #ccc', fontSize: '1.1em' }}
+                                >
+                                    {pastTournaments.map(t => (
+                                        <option key={t.id} value={t.id}>{t.name} ({t.date})</option>
+                                    ))}
+                                </select>
+                                <div style={{ maxHeight: '300px', overflowY: 'auto', background: '#fff', borderRadius: '5px', border: '1px solid #ddd' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                                        <thead style={{ position: 'sticky', top: 0, background: '#eee' }}>
+                                            <tr>
+                                                <th style={{ padding: '10px', borderBottom: '1px solid #ddd' }}>順位</th>
+                                                <th style={{ padding: '10px', borderBottom: '1px solid #ddd' }}>社員番号</th>
+                                                <th style={{ padding: '10px', borderBottom: '1px solid #ddd' }}>ニックネーム</th>
+                                                <th style={{ padding: '10px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>スコア</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {pastScores.map((row, idx) => (
+                                                <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
+                                                    <td style={{ padding: '10px', fontWeight: 'bold', color: idx === 0 ? '#d4af37' : idx === 1 ? '#9e9e9e' : idx === 2 ? '#cd7f32' : '#555' }}>
+                                                        {idx + 1}
+                                                    </td>
+                                                    <td style={{ padding: '10px', fontWeight: 'bold', color: '#2c3e50' }}>{row.user_id}</td>
+                                                    <td style={{ padding: '10px', color: '#2c3e50', overflowWrap: 'anywhere' }}>{row.name || '—'}</td>
+                                                    <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold', color: '#e8734a' }}>{row.score}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </>
+                        ) : (
+                            <p style={{ color: '#888', textAlign: 'center', marginTop: '50px' }}>過去のイベント履歴がありません。</p>
+                        )}
+                    </div>
                 </div>
             </div>
         );
