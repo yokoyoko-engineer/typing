@@ -14,17 +14,14 @@ let dbPromise = null;
 export async function getDb() {
   if (dbPromise) return dbPromise;
 
-  // Ensure data directory exists
-  try {
-    await fs.mkdir(dbDir, { recursive: true });
-  } catch (err) {
+  // 起動直後に同時に呼ばれると接続が複数開いて SQLITE_BUSY になるので、
+  // await の前に dbPromise を設定して全員で 1 つの接続を共有する
+  dbPromise = fs.mkdir(dbDir, { recursive: true }).catch((err) => {
     console.error("Failed to create data directory:", err);
-  }
-
-  dbPromise = open({
+  }).then(() => open({
     filename: dbPath,
     driver: sqlite3.Database
-    }).then(async (db) => {
+    })).then(async (db) => {
     await db.exec(`PRAGMA journal_mode = WAL;`);
     await db.exec(`PRAGMA busy_timeout = 5000;`);
     await db.exec(`
@@ -56,7 +53,8 @@ export async function getDb() {
       );
 
       -- イベント参加時に本人が入力した氏名（社員番号ごとに最新の 1 件）。
-      -- 個人情報なので、表示はリアルタイムランキングと管理画面（管理者 IP + Basic 認証）に限る。
+      -- 個人情報なので、表示はイベント画面のランキング・結果表（社内 IP の socket）と
+      -- 管理画面（管理者 IP + Basic 認証）に限る。
       -- ログ・rankings.json・git には出さない。
       CREATE TABLE IF NOT EXISTS player_names (
         user_id TEXT PRIMARY KEY,
