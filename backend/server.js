@@ -13,8 +13,9 @@ import {
   startScheduler, describeSchedule, validateSchedule, jstKey, prevOccurrence,
 } from './scheduler.js';
 import {
-  initNameCrypto, hasNameKey, encryptName, decryptName, isEncryptedName,
+  initNameCrypto, hasNameKey, encryptName, isEncryptedName,
 } from './nameCrypto.js';
+import { getTournamentScores, getTopScores, monthsAgoDate } from './tournamentBoard.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -232,22 +233,6 @@ app.get('/api/tournaments', async (req, res) => {
   }
 });
 
-app.get('/api/tournaments/:id/scores', async (req, res) => {
-  try {
-    const db = await getDb();
-    const rows = await db.all(`
-      SELECT user_id, job_type, score 
-      FROM tournament_scores 
-      WHERE tournament_id = ? 
-      ORDER BY score DESC
-    `, [req.params.id]);
-    res.json(rows);
-  } catch (err) {
-    console.error("Error fetching tournament scores:", err);
-    res.status(500).json({ error: 'Database error' });
-  }
-});
-
 app.get('/api/tournaments/scores/admin', async (req, res) => {
   const { min_user, max_user, start_date, end_date, job_type, start_tournament_id, end_tournament_id } = req.query;
   
@@ -299,23 +284,6 @@ app.get('/api/tournaments/scores/admin', async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error("Error fetching tournament scores for admin:", err);
-    res.status(500).json({ error: 'Database error' });
-  }
-});
-
-app.get('/api/tournaments/legends', async (req, res) => {
-  try {
-    const db = await getDb();
-    const rows = await db.all(`
-      SELECT user_id, MAX(job_type) as job_type, MAX(score) as score 
-      FROM tournament_scores 
-      GROUP BY user_id 
-      ORDER BY score DESC 
-      LIMIT 5
-    `);
-    res.json(rows);
-  } catch (err) {
-    console.error("Error fetching legends:", err);
     res.status(500).json({ error: 'Database error' });
   }
 });
@@ -668,6 +636,32 @@ io.on('connection', (socket) => {
     socket.emit('tournamentLiveRanking', buildLiveRanking());
   });
 
+  // イベント画面の結果表（ニックネーム付き）。氏名を /api に出さないよう socket で渡す
+  socket.on('getTournamentBoard', async (ack) => {
+    if (typeof ack !== 'function') return;
+    try {
+      const db = await getDb();
+      ack({
+        allTime: await getTopScores(db),
+        recent: await getTopScores(db, monthsAgoDate(3)),
+      });
+    } catch (err) {
+      console.error('Error fetching tournament board:', err.message);
+      ack({ allTime: [], recent: [] });
+    }
+  });
+
+  socket.on('getTournamentScores', async (id, ack) => {
+    if (typeof ack !== 'function') return;
+    if (!Number.isInteger(id)) return ack([]);
+    try {
+      ack(await getTournamentScores(await getDb(), id));
+    } catch (err) {
+      console.error('Error fetching tournament scores:', err.message);
+      ack([]);
+    }
+  });
+
   socket.on('tournamentUpdateScore', ({ playerName, score, jobType }) => {
     const safeName = sanitizePlayerName(playerName);
     if (!safeName || tournamentState.status !== 'active') return;
@@ -830,19 +824,7 @@ app.get('/admin-api/tournaments/:id/scores', async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id.' });
   try {
-    const db = await getDb();
-    const rows = await db.all(`
-      SELECT ts.user_id, pn.name AS enc_name,
-             COALESCE(NULLIF(ts.job_type, ''), u.job_type, '') AS job_type,
-             ts.score
-      FROM tournament_scores ts
-      LEFT JOIN player_names pn ON pn.user_id = ts.user_id
-      LEFT JOIN users u ON u.user_id = ts.user_id
-      WHERE ts.tournament_id = ?
-      ORDER BY ts.score DESC
-    `, [id]);
-    // 氏名は DB では暗号化されているので、返す直前に復号する（鍵違い・改ざんは null）
-    res.json(rows.map(({ enc_name, ...r }) => ({ ...r, name: decryptName(r.user_id, enc_name) })));
+    res.json(await getTournamentScores(await getDb(), id));
   } catch (err) {
     console.error('Error fetching tournament scores (admin):', err.message);
     res.status(500).json({ error: 'Database error' });

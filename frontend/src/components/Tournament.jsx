@@ -8,6 +8,24 @@ import './Game.css';
 const TOTAL_WORDS = 20;
 const TOURNAMENT_GENRE = CATEGORIES.BUSINESS;
 
+// 歴代・過去3か月のTOP5の表
+function TopBoard({ title, rows, background, boxShadow, emptyText }) {
+    return (
+        <div style={{ background, boxShadow, padding: '15px', borderRadius: '10px', color: '#000', maxWidth: '400px', width: '100%', boxSizing: 'border-box', margin: '0 auto 20px auto' }}>
+            <h3 style={{ margin: '0 0 10px 0', textAlign: 'center', fontSize: '1.2em', textShadow: '1px 1px 2px rgba(255,255,255,0.5)' }}>{title}</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', background: 'rgba(255,255,255,0.5)', padding: '10px', borderRadius: '5px' }}>
+                {rows.length === 0 && <div style={{ textAlign: 'center', color: '#555' }}>{emptyText}</div>}
+                {rows.map((l, i) => (
+                    <div key={l.user_id} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', fontWeight: 'bold', borderBottom: i < rows.length - 1 ? '1px dashed rgba(0,0,0,0.1)' : 'none', paddingBottom: '3px' }}>
+                        <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{i+1}位: {l.user_id}{l.name ? ` ${l.name}` : ''}</span>
+                        <span>{l.score}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 // 1. Live Ranking Component (Optimized to update independently and scrollable)
 function TournamentRanking({ socket, playerName, jobType, globalLegends, highestScore }) {
     const [liveRanking, setLiveRanking] = useState([]);
@@ -462,6 +480,7 @@ export default function Tournament({ socket, onBackToHome }) {
     const [selectedPastId, setSelectedPastId] = useState('');
     const [pastScores, setPastScores] = useState([]);
     const [globalLegends, setGlobalLegends] = useState([]);
+    const [recentTop, setRecentTop] = useState([]);
 
     // Socket Event Listeners
     useEffect(() => {
@@ -563,41 +582,37 @@ export default function Tournament({ socket, onBackToHome }) {
                 })
                 .catch(err => console.error(err));
                 
-            fetch('/api/tournaments/legends')
-                .then(res => res.json())
-                .then(data => setGlobalLegends(data))
-                .catch(err => console.error(err));
+            socket?.emit('getTournamentBoard', ({ allTime, recent }) => {
+                setGlobalLegends(allTime);
+                setRecentTop(recent);
+            });
         }
-    }, [gameState]);
+    }, [gameState, socket]);
 
     useEffect(() => {
-        if (selectedPastId) {
-            fetch(`/api/tournaments/${selectedPastId}/scores`)
-                .then(res => res.json())
-                .then(data => setPastScores(data))
-                .catch(err => console.error(err));
-        } else {
+        if (!selectedPastId || !socket) {
             setPastScores([]);
+            return;
         }
-    }, [selectedPastId]);
+        let stale = false;
+        socket.emit('getTournamentScores', Number(selectedPastId), (rows) => {
+            if (!stale) setPastScores(rows);
+        });
+        return () => { stale = true; };
+    }, [selectedPastId, socket]);
 
     if (gameState === 'setup') {
         return (
-            <div className="game-container" style={{ display: 'flex', gap: '40px', maxWidth: '1000px', width: '90%' }}>
-                <div style={{ flex: 1 }}>
+            <div className="game-container" style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: '40px', maxWidth: '1000px', width: '90%' }}>
+                <div style={{ flex: '1 1 340px', minWidth: 0 }}>
                     <h2>イベントモード（一斉バトル）</h2>
                     {globalLegends.length > 0 && (
-                        <div style={{ background: 'linear-gradient(135deg, #FFD700 0%, #FDB931 100%)', padding: '15px', borderRadius: '10px', marginBottom: '20px', color: '#000', boxShadow: '0 4px 15px rgba(255,215,0,0.4)', maxWidth: '400px', margin: '0 auto 20px auto' }}>
-                            <h3 style={{ margin: '0 0 10px 0', textAlign: 'center', fontSize: '1.2em', textShadow: '1px 1px 2px rgba(255,255,255,0.5)' }}>👑 歴代TOP5</h3>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', background: 'rgba(255,255,255,0.5)', padding: '10px', borderRadius: '5px' }}>
-                                {globalLegends.map((l, i) => (
-                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', borderBottom: i < globalLegends.length - 1 ? '1px dashed rgba(0,0,0,0.1)' : 'none', paddingBottom: '3px' }}>
-                                        <span>{i+1}位: {l.user_id}</span>
-                                        <span>{l.score}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                        <TopBoard
+                            title="👑 歴代TOP5"
+                            rows={globalLegends}
+                            background="linear-gradient(135deg, #FFD700 0%, #FDB931 100%)"
+                            boxShadow="0 4px 15px rgba(255,215,0,0.4)"
+                        />
                     )}
                     <p style={{ color: '#888', marginBottom: '20px', textAlign: 'center' }}>社員番号と氏名（ニックネーム）を入力してイベントに参加してください</p>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', maxWidth: '400px', margin: '0 auto' }}>
@@ -628,7 +643,7 @@ export default function Tournament({ socket, onBackToHome }) {
                             }}
                         />
                         <p style={{ margin: '-8px 0 0', fontSize: '0.85em', color: '#999', textAlign: 'center' }}>
-                            氏名（ニックネーム）はリアルタイムランキングに表示されます
+                            氏名（ニックネーム）はランキングと過去の結果に表示されます
                         </p>
                         <select
                             value={jobType}
@@ -660,7 +675,15 @@ export default function Tournament({ socket, onBackToHome }) {
                     </button>
                 </div>
                 
-                <div style={{ flex: 1, background: '#f5f5f5', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                <div style={{ flex: '1 1 340px', minWidth: 0 }}>
+                <TopBoard
+                    title="🏅 過去3か月のTOP5"
+                    rows={recentTop}
+                    background="linear-gradient(135deg, #CFD8DC 0%, #90A4AE 100%)"
+                    boxShadow="0 4px 15px rgba(96,125,139,0.3)"
+                    emptyText="過去3か月の記録はありません"
+                />
+                <div style={{ background: '#f5f5f5', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                     <h3 style={{ marginTop: 0, color: '#2c3e50' }}>📜 過去5回の結果</h3>
                     {pastTournaments.length > 0 ? (
                         <>
@@ -679,6 +702,7 @@ export default function Tournament({ socket, onBackToHome }) {
                                         <tr>
                                             <th style={{ padding: '10px', borderBottom: '1px solid #ddd' }}>順位</th>
                                             <th style={{ padding: '10px', borderBottom: '1px solid #ddd' }}>社員番号</th>
+                                            <th style={{ padding: '10px', borderBottom: '1px solid #ddd' }}>ニックネーム</th>
                                             <th style={{ padding: '10px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>スコア</th>
                                         </tr>
                                     </thead>
@@ -689,6 +713,7 @@ export default function Tournament({ socket, onBackToHome }) {
                                                     {idx + 1}
                                                 </td>
                                                 <td style={{ padding: '10px', fontWeight: 'bold', color: '#2c3e50' }}>{row.user_id}</td>
+                                                <td style={{ padding: '10px', color: '#2c3e50', overflowWrap: 'anywhere' }}>{row.name || '—'}</td>
                                                 <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold', color: '#e8734a' }}>{row.score}</td>
                                             </tr>
                                         ))}
@@ -699,6 +724,7 @@ export default function Tournament({ socket, onBackToHome }) {
                     ) : (
                         <p style={{ color: '#888', textAlign: 'center', marginTop: '50px' }}>過去のイベント履歴がありません。</p>
                     )}
+                </div>
                 </div>
             </div>
         );
