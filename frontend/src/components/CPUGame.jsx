@@ -20,14 +20,14 @@ const CPU_DIFFICULTY = {
     // スコア = 正しく打った打鍵数/分 × 正確率³。CPU は 1 分あたり 60000/ms 打鍵するので、
     // 勝つにはそれ以上の打鍵数（＝その数値以上のスコアを出せる速さ）が必要
     11: 150, // 鬼:   400 打鍵/分 → スコア 400 相当
-    12: 120  // 超鬼: 500 打鍵/分 → スコア 500 相当
+    12: 120  // 裏鬼: 500 打鍵/分 → スコア 500 相当
 };
 
-// 通常レベル（Lv.1〜10）と、特別モード（鬼・超鬼）
+// 通常レベル（Lv.1〜10）と、特別モード（鬼・裏鬼）
 const NORMAL_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const SPECIAL_LEVELS = [
-    { level: 11, label: '鬼', note: 'スコア400相当', color: '#b71c1c' },
-    { level: 12, label: '超鬼', note: 'スコア500相当', color: '#311b92' },
+    { level: 11, label: '鬼', color: '#b71c1c' },
+    { level: 12, label: '裏鬼', color: '#311b92' },
 ];
 const ALL_LEVELS = [...NORMAL_LEVELS, ...SPECIAL_LEVELS.map(s => s.level)];
 const levelLabel = (level) => SPECIAL_LEVELS.find(s => s.level === level)?.label || `Lv.${level}`;
@@ -145,7 +145,7 @@ export default function CPUGame({ onBackToHome }) {
     const fetchAllRankings = async (g) => {
         try {
             const newRankings = {};
-            // 全レベル（Lv.1〜10・鬼・超鬼）のランキングを並列で取得
+            // 全レベル（Lv.1〜10・鬼・裏鬼）のランキングを並列で取得
             const promises = ALL_LEVELS.map(async (level) => {
                 const res = await fetch(`/api/rankings/${encodeURIComponent(g)}/${level}`);
                 if (res.ok) {
@@ -564,9 +564,9 @@ export default function CPUGame({ onBackToHome }) {
                                 )
                             })}
                         </div>
-                        {/* 特別モード: 鬼・超鬼 */}
+                        {/* 特別モード: 鬼・裏鬼 */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginTop: '14px' }}>
-                            {SPECIAL_LEVELS.map(({ level, label, note, color }) => {
+                            {SPECIAL_LEVELS.map(({ level, label, color }) => {
                                 const levelRankings = allRankings[level] || [];
                                 const bestEntry = levelRankings.length > 0 ? levelRankings[0] : null;
                                 return (
@@ -575,11 +575,9 @@ export default function CPUGame({ onBackToHome }) {
                                         className={`action-btn ${previewLevel === level ? 'preview-active' : ''}`}
                                         onClick={() => startBattle(level)}
                                         onMouseEnter={() => setPreviewLevel(level)}
-                                        title={`CPU は 1 分あたり ${Math.round(60000 / CPU_DIFFICULTY[level])} 打鍵。${note}以上の速さでないと勝てません`}
                                         style={{ height: '80px', background: color, color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px' }}
                                     >
                                         <span style={{ fontWeight: 'bold', fontSize: '1.4em', letterSpacing: '0.1em' }}>👹 {label}</span>
-                                        <span style={{ fontSize: '0.75em', opacity: 0.9 }}>{note}</span>
                                         {bestEntry !== null && (
                                             <span style={{ fontSize: '0.7em', color: '#ffd54f' }}>
                                                 🏆 {bestEntry.score !== undefined && bestEntry.score !== null ? `★${bestEntry.score}` : `${bestEntry.time}s`}
