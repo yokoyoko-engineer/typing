@@ -17,8 +17,8 @@ export const DEFAULT_CHEER_SETTINGS = Object.freeze({
   spotlightEnabled: true,  // D. スポットライト
   meterEnabled: true,      // E. 盛り上がりメーター
   claimsEnabled: true,     // F. 主張スタンプ（本人がスコアの横に出す。ほかの人が「いいね」できる）
-  stamps: ['👏', '🎉', '🔥', '😲', '❤️'],
-  claims: ['自己ベスト更新！', '初250！', '初300！', '初トップ10！'],
+  stamps: ['👏', '🎉', '🔥', '😲', '❤️', '👍', '⚡', '👑'],
+  claims: ['自己ベスト更新！', '初250！', '初300！', '初350！', '初トップ10！', '初1位！', 'ノーミス！', 'リベンジ成功！'],
   // 盛り上がりメーター: Lv.1 までの目標 meterFirstGoal、以降 1 レベルごとに meterGoalStep ずつ増やす
   // （初期値は Lv.1=10, Lv.2=20, … Lv.10=100）。Lv.10 で打ち止め
   meterFirstGoal: 10,

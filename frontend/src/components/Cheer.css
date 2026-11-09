@@ -95,10 +95,10 @@
 
 /* F. 主張スタンプ */
 .cheer-claimbar { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.cheer-claimbar-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 560px; }
+.cheer-claimbar-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 8px; max-width: 600px; }
 .cheer-claim-btn {
-  padding: 6px 14px;
-  font-size: 0.95em;
+  padding: 4px 12px;
+  font-size: 0.9em;
   font-weight: bold;
   border: 2px solid #c5cae9;
   border-radius: 18px;
