@@ -86,7 +86,9 @@
 }
 
 .ranking-preview-panel {
-  width: 320px;
+  /* 行は 1 人 1 行で折り返さない（長い職種名は … で省略）。幅が足りなければ縮む */
+  width: 360px;
+  min-width: 0;
   /* 記録の件数で高さが変わるとページがずれ、カーソルの下のボタンが入れ替わって画面が揺れる */
   height: 500px;
   overflow-y: auto;

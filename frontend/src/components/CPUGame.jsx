@@ -527,9 +527,10 @@ export default function CPUGame({ hiddenCategories = [], onBackToHome }) {
         }
 
         // Difficulty selection + Ranking preview
+        // 右のランキングを 1 人 1 行で読める幅（360px）にするため、この画面だけ枠を広げる
         const previewRankings = allRankings[previewLevel] || [];
         return (
-            <div className="game-container" style={{ maxWidth: '900px' }}>
+            <div className="game-container" style={{ maxWidth: '1060px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '10px' }}>
                     <button onClick={() => {
                         if (category === CATEGORIES.KOTOWAZA || category === CATEGORIES.BUSINESS) {
@@ -606,18 +607,25 @@ export default function CPUGame({ hiddenCategories = [], onBackToHome }) {
                                 {previewRankings.slice(0, 10).map((entry, idx) => {
                                     const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
                                     return (
-                                        <div key={idx} className="ranking-row" style={{
+                                        // 1 人 1 行に収める。社員番号とスコアは切らず、長い職種名は … で省略する（カーソルを合わせると全文）
+                                        <div key={idx} className="ranking-row"
+                                            title={`${entry.jobType ? `[${entry.jobType}] ` : ''}${entry.username}  ★${entry.score ?? 0} (${entry.time}s)`}
+                                            style={{
                                             display: 'flex',
                                             alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                            padding: '8px 12px',
+                                            gap: '6px',
+                                            padding: '8px 10px',
                                             borderRadius: '8px',
                                             background: idx % 2 === 0 ? '#f9f9f9' : '#fff',
                                             border: '1px solid #eee',
+                                            whiteSpace: 'nowrap',
                                         }}>
-                                            <span style={{ minWidth: '35px', textAlign: 'center' }}>{medal}</span>
-                                            <span style={{ flex: 1, textAlign: 'left', paddingLeft: '10px', color: '#2c3e50' }}>{entry.jobType ? `[${entry.jobType}] ` : ''}{entry.username}</span>
-                                            <span style={{ fontWeight: 'bold', color: '#e8734a', minWidth: '100px', textAlign: 'right' }}>
+                                            <span style={{ flex: 'none', width: '28px', textAlign: 'center' }}>{medal}</span>
+                                            <span style={{ flex: 1, minWidth: 0, display: 'flex', gap: '5px', overflow: 'hidden', color: '#2c3e50' }}>
+                                                {entry.jobType && <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>[{entry.jobType}]</span>}
+                                                <span style={{ flex: 'none' }}>{entry.username}</span>
+                                            </span>
+                                            <span style={{ flex: 'none', fontWeight: 'bold', color: '#e8734a', textAlign: 'right' }}>
                                                 ★{entry.score ?? 0}
                                                 <span style={{ color: '#777', fontSize: '0.85em', marginLeft: '6px', fontWeight: 'normal' }}>
                                                     ({entry.time}s)
