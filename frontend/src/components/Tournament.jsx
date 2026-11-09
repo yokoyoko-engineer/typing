@@ -3,7 +3,7 @@ import { getRandomWord, CATEGORIES } from '../words';
 import { JOB_TYPES } from '../jobTypes';
 import { TypingSession, alignTextAndRuby, getEvaluationLevel } from '../utils/typingEngine';
 import MissFlash, { useMissFlash } from './MissFlash';
-import { useCheerState, useCooldown, CheerTelop, CheerMeter, StampBar, CheerEffects } from './Cheer';
+import { useCheerState, useCooldown, CheerTelop, CheerMeter, StampBar, ClaimBar, ClaimBadge, CheerEffects } from './Cheer';
 import './Game.css';
 
 const TOTAL_WORDS = 20;
@@ -28,44 +28,49 @@ function TopBoard({ title, rows, background, boxShadow, emptyText }) {
 }
 
 // 1. Live Ranking Component (Optimized to update independently and scrollable)
-// isTyping: 打っている最中（演出を動かさない） / canCheer: タイピングを終えて拍手を送れる
-function TournamentRanking({ socket, playerName, globalLegends, highestScore, isTyping, canCheer, cheerSettings, meter }) {
-    const [liveRanking, setLiveRanking] = useState([]);
+// isTyping: 打っている最中（演出を動かさない） / canCheer: タイピングを終えて拍手・いいねを送れる
+// liveRanking は親が受け取って渡す（自分の主張をスタンプ欄でも使うため）
+function TournamentRanking({ socket, playerName, globalLegends, highestScore, isTyping, canCheer, cheerSettings, meter, liveRanking }) {
     const [clapCooling, runClap] = useCooldown();
+    const [likedKeys, setLikedKeys] = useState({}); // `${社員番号}:${主張の番号}` -> いいね済みか
     const clapOn = !!cheerSettings?.clapEnabled;
-    const myClaps = liveRanking.find(e => e.user_id === playerName)?.claps || 0;
+    const claimOn = !!cheerSettings?.claimsEnabled;
+    const myEntry = liveRanking.find(e => e.user_id === playerName);
+    const myClaps = myEntry?.claps || 0;
+    const myLikes = myEntry?.claim?.likes || 0;
+    const myClaimSeq = myEntry?.claim?.seq || 0;
 
-    // 自分への拍手が増えたら、打っていないときだけ「届きました」と知らせる（打っている間は数字だけ変わる）
-    const prevClapsRef = useRef(myClaps);
+    // 自分への拍手・いいねが増えたら、打っていないときだけ「届きました」と知らせる（打っている間は数字だけ変わる）
+    const prevRef = useRef({ claps: myClaps, likes: myLikes, seq: myClaimSeq });
     const isTypingRef = useRef(isTyping);
     isTypingRef.current = isTyping;
     const noticeTimerRef = useRef(null);
-    const [clapNotice, setClapNotice] = useState(0);
+    const [notice, setNotice] = useState(null); // { seq, text }
     useEffect(() => {
-        const prev = prevClapsRef.current;
-        prevClapsRef.current = myClaps;
-        if (myClaps <= prev || isTypingRef.current) return;
-        setClapNotice(n => n + 1);
+        const prev = prevRef.current;
+        prevRef.current = { claps: myClaps, likes: myLikes, seq: myClaimSeq };
+        if (isTypingRef.current) return;
+        let text = null;
+        if (myClaps > prev.claps) text = `👏 拍手が届きました！（合計 ${myClaps}）`;
+        else if (myClaimSeq === prev.seq && myLikes > prev.likes) text = `👍 いいねが届きました！（合計 ${myLikes}）`;
+        if (!text) return;
+        setNotice(n => ({ seq: (n?.seq || 0) + 1, text }));
         clearTimeout(noticeTimerRef.current);
-        noticeTimerRef.current = setTimeout(() => setClapNotice(0), 3000);
-    }, [myClaps]);
+        noticeTimerRef.current = setTimeout(() => setNotice(null), 3000);
+    }, [myClaps, myLikes, myClaimSeq]);
     useEffect(() => () => clearTimeout(noticeTimerRef.current), []);
 
-    useEffect(() => {
-        if (!socket) return;
+    const like = (entry) => {
+        const { seq } = entry.claim;
+        socket?.emit('likeClaim', { userId: entry.user_id, seq }, (res) => {
+            if (res) setLikedKeys(prev => ({ ...prev, [`${entry.user_id}:${seq}`]: res.liked }));
+        });
+    };
 
-        socket.emit('getTournamentLiveRanking');
-
-        const handleUpdate = (ranking) => {
-            setLiveRanking(ranking);
-        };
-
-        socket.on('tournamentLiveRanking', handleUpdate);
-
-        return () => {
-            socket.off('tournamentLiveRanking', handleUpdate);
-        };
-    }, [socket]);
+    const summary = [
+        clapOn ? `もらった拍手 👏 ${myClaps}` : null,
+        claimOn && myEntry?.claim ? `「${myEntry.claim.text}」へのいいね 👍 ${myLikes}` : null,
+    ].filter(Boolean).join('　');
 
     return (
         <div style={{ width: '480px', flex: 'none', paddingLeft: '20px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
@@ -83,6 +88,7 @@ function TournamentRanking({ socket, playerName, globalLegends, highestScore, is
                                     const isMe = entry.user_id === playerName;
                                     const legendThreshold = globalLegends.length >= 5 ? globalLegends[4].score : 0;
                                     const isLegendBeat = entry.score > legendThreshold && entry.score > 0;
+                                    const claim = claimOn ? entry.claim : null;
                                     
                                     return (
                                         <tr key={idx} style={{ 
@@ -96,7 +102,7 @@ function TournamentRanking({ socket, playerName, globalLegends, highestScore, is
                                             <td style={{ padding: '8px 5px', width: '35px', color: isLegendBeat ? '#000' : (idx < 3 ? '#e8734a' : '#888'), borderRadius: '5px 0 0 5px' }}>
                                                 {idx + 1}.
                                             </td>
-                                            <td title={`${entry.jobType ? `[${entry.jobType}] ` : ''}${entry.user_id}${entry.name ? ` ${entry.name}` : ''}`} style={{ padding: '8px 5px', color: isLegendBeat ? '#000' : 'inherit' }}>
+                                            <td title={`${entry.jobType ? `[${entry.jobType}] ` : ''}${entry.user_id}${entry.name ? ` ${entry.name}` : ''}${claim ? `「${claim.text}」` : ''}`} style={{ padding: '8px 5px', color: isLegendBeat ? '#000' : 'inherit' }}>
                                                 {/* 改行せず 1 行に収める。社員番号は切らず、長い職種名やニックネームは … で省略する */}
                                                 <div style={{ display: 'flex', justifyContent: 'center', gap: '5px', whiteSpace: 'nowrap' }}>
                                                     {isLegendBeat && <span style={{ flex: 'none' }}>👑</span>}
@@ -104,6 +110,17 @@ function TournamentRanking({ socket, playerName, globalLegends, highestScore, is
                                                     <span style={{ flex: 'none' }}>{entry.user_id}</span>
                                                     {entry.name && <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.name}</span>}
                                                 </div>
+                                                {/* 主張スタンプは名前の下、スコアに近い右端に置く（1 行に詰めると社員番号や文言が切れるため） */}
+                                                {claim && (
+                                                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '3px' }}>
+                                                        <ClaimBadge
+                                                            claim={claim}
+                                                            canLike={canCheer && !isMe}
+                                                            liked={!!likedKeys[`${entry.user_id}:${claim.seq}`]}
+                                                            onLike={() => like(entry)}
+                                                        />
+                                                    </div>
+                                                )}
                                             </td>
                                             <td style={{ padding: '8px 5px', width: '95px', textAlign: 'center', fontWeight: 'bold', color: isLegendBeat ? '#000' : '#ff9800' }}>
                                                 {getEvaluationLevel(entry.score)}
@@ -112,7 +129,7 @@ function TournamentRanking({ socket, playerName, globalLegends, highestScore, is
                                                 {entry.score}
                                             </td>
                                             {clapOn && (
-                                                <td style={{ padding: '8px 5px', width: '62px', textAlign: 'center', borderRadius: '0 5px 5px 0' }}>
+                                                <td style={{ padding: '8px 4px', width: '56px', textAlign: 'center', borderRadius: '0 5px 5px 0' }}>
                                                     {canCheer && !isMe ? (
                                                         <button
                                                             type="button"
@@ -137,14 +154,14 @@ function TournamentRanking({ socket, playerName, globalLegends, highestScore, is
                         <p style={{ textAlign: 'center', color: '#aaa', marginTop: '50px' }}>まだスコアがありません</p>
                     )}
                 </div>
-                <div key={clapNotice || 'idle'} className={clapNotice ? 'cheer-clap-received' : undefined} style={{ marginTop: '15px', padding: '10px', background: '#e8eaf6', borderRadius: '8px', textAlign: 'center' }}>
+                <div key={notice?.seq || 'idle'} className={notice ? 'cheer-clap-received' : undefined} style={{ marginTop: '15px', padding: '10px', background: '#e8eaf6', borderRadius: '8px', textAlign: 'center' }}>
                     <div style={{ fontSize: '0.9em', color: '#666' }}>あなたの最高スコア</div>
                     <div style={{ fontSize: '1.5em', fontWeight: 'bold', color: '#2c3e50' }}>
                         {highestScore} <span style={{ fontSize: '0.7em', color: '#ff9800', marginLeft: '8px' }}>({getEvaluationLevel(highestScore)})</span>
                     </div>
-                    {clapOn && (
-                        <div style={{ fontSize: '0.9em', color: '#e65100', fontWeight: 'bold', height: '1.4em' }}>
-                            {clapNotice ? `👏 拍手が届きました！（合計 ${myClaps}）` : `もらった拍手 👏 ${myClaps}`}
+                    {(clapOn || claimOn) && (
+                        <div style={{ fontSize: '0.9em', color: '#e65100', fontWeight: 'bold', height: '1.4em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {notice ? notice.text : summary}
                         </div>
                     )}
                 </div>
@@ -166,7 +183,8 @@ function TournamentBattle({
     highestScore,
     setHighestScore,
     onBackToHome,
-    cheerSettings
+    cheerSettings,
+    myClaimText
 }) {
     const [wordCount, setWordCount] = useState(0);
     const [currentWord, setCurrentWord] = useState(null);
@@ -446,7 +464,7 @@ function TournamentBattle({
                             CLEAR! 🎉
                         </h2>
                         {lastResult && (
-                            <div style={{ fontSize: '1.4em', margin: '20px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ fontSize: '1.4em', margin: '12px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
                                 <div>今回のスコア: <span style={{ fontWeight: 'bold', color: '#5c6bc0', fontSize: '1.5em' }}>{lastResult.score}</span></div>
                                 <div style={{ fontSize: '1.1em' }}>レベル: <span style={{ fontWeight: 'bold', color: '#ff9800', fontSize: '1.3em' }}>{getEvaluationLevel(lastResult.score)}</span></div>
                                 {lastResult.elapsed && (
@@ -456,7 +474,7 @@ function TournamentBattle({
                                 )}
                             </div>
                         )}
-                        <div style={{ display: 'flex', gap: '20px', marginTop: '30px' }}>
+                        <div style={{ display: 'flex', gap: '20px', marginTop: '18px' }}>
                             <button className="action-btn" onClick={() => {
                                 setGameState('ready');
                             }}>
@@ -469,6 +487,7 @@ function TournamentBattle({
                             </button>
                         </div>
                         <StampBar socket={socket} settings={cheerSettings} />
+                        <ClaimBar socket={socket} settings={cheerSettings} current={myClaimText} />
                     </div>
                 )}
 
@@ -482,6 +501,7 @@ function TournamentBattle({
                             もう一度挑戦する
                         </button>
                         <StampBar socket={socket} settings={cheerSettings} />
+                        <ClaimBar socket={socket} settings={cheerSettings} current={myClaimText} />
                     </div>
                 )}
 
@@ -548,6 +568,7 @@ export default function Tournament({ socket, onBackToHome }) {
     const joinSeqRef = useRef(0);
     const [connected, setConnected] = useState(() => (socket ? socket.connected : true));
     const { settings: cheerSettings, meter: cheerMeter } = useCheerState(socket);
+    const [liveRanking, setLiveRanking] = useState([]);
 
     // サーバから受け取ったイベントの状態を画面に反映する（待機中のときだけ画面を進める）
     const applyTournamentState = (state) => {
@@ -640,6 +661,19 @@ export default function Tournament({ socket, onBackToHome }) {
             socket.off('disconnect', onDisconnect);
         };
     }, [socket]);
+
+    // リアルタイムランキング（ランキング欄と、スタンプ欄の「今出している主張」で使う）
+    useEffect(() => {
+        if (!socket) return;
+        const onRanking = (ranking) => setLiveRanking(Array.isArray(ranking) ? ranking : []);
+        socket.on('tournamentLiveRanking', onRanking);
+        return () => socket.off('tournamentLiveRanking', onRanking);
+    }, [socket]);
+    // 対戦画面に入ったら最新のランキングをもらう（前回のイベントの表示を残さない）
+    const inBattle = gameState !== 'setup' && gameState !== 'waiting';
+    useEffect(() => {
+        if (inBattle && socket) socket.emit('getTournamentLiveRanking');
+    }, [inBattle, socket]);
 
     // 待機中は数秒おきにイベントの状態を確かめる。開始の通知を取りこぼしても、ここで開始に気づける。
     // 返事が来なければ接続し直す（つながり直すと参加も送り直す）
@@ -906,6 +940,7 @@ export default function Tournament({ socket, onBackToHome }) {
                     setHighestScore={setHighestScore}
                     onBackToHome={onBackToHome}
                     cheerSettings={cheerSettings}
+                    myClaimText={liveRanking.find(e => e.user_id === playerName)?.claim?.text || null}
                 />
                 <TournamentRanking
                     socket={socket}
@@ -916,6 +951,7 @@ export default function Tournament({ socket, onBackToHome }) {
                     canCheer={canCheer}
                     cheerSettings={cheerSettings}
                     meter={cheerMeter}
+                    liveRanking={liveRanking}
                 />
             </div>
         </div>

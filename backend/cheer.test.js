@@ -73,7 +73,7 @@ test('スタンプは 1 接続あたり 1 秒に 1 回まで。0.5 秒ごとに�
   assert.equal(hub.stamp('c', 99), false);   // 無いスタンプ
   assert.equal(sent.length, 0);
   advance(BURST_INTERVAL_MS);
-  assert.deepEqual(sent, [['cheerBurst', { stamps: [1, 0, 1], meter: { value: 2, goal: 300, level: 0 } }]]);
+  assert.deepEqual(sent, [['cheerBurst', { stamps: [1, 0, 1], meter: { value: 2, goal: DEFAULT_CHEER_SETTINGS.meterGoal, level: 0 } }]]);
   advance(SEND_INTERVAL_MS);
   assert.equal(hub.stamp('a', 0), true);     // 1 秒たてばまた送れる
 });
@@ -146,4 +146,49 @@ test('1 位の交代と 3 位以内への浮上をテロップにする', () => 
   const many = { a: s(500), b: s(400), c: s(300), d: s(200) };
   assert.equal(rankChangeTelop(many, { ...many, e: s(100) }, 'e'), null); // 4 位以下
   assert.deepEqual(rankChangeTelop(many, { ...many, d: s(350) }, 'd'), { key: 'rankUp', rank: 3 });
+});
+
+test('主張スタンプの文言を確かめる', () => {
+  assert.equal(validateCheerSettings({ ...validInput(), claims: [] }).ok, false);
+  assert.equal(validateCheerSettings({ ...validInput(), claims: ['あ'.repeat(16)] }).ok, false);
+  assert.equal(validateCheerSettings({ ...validInput(), claims: ['初300！', '初300！'] }).ok, false);
+  assert.equal(validateCheerSettings({ ...validInput(), claims: ['<b>'] }).ok, false);
+  assert.deepEqual(validateCheerSettings({ ...validInput(), claims: [' 初 400！ '] }).settings.claims, ['初 400！']);
+  // 主張スタンプの項目が無い古い保存内容でも、初期値で補って使える
+  assert.deepEqual(loadCheerSettings({ stamps: ['👏'] }).claims, DEFAULT_CHEER_SETTINGS.claims);
+});
+
+test('主張は 1 人 1 つ。別の主張で置き換わり、同じ主張の押し直しは何もしない', () => {
+  const { hub, sent, advance } = makeHub();
+  assert.equal(hub.postClaim('a', '100', 1), '初250！');
+  assert.deepEqual(hub.claimOf('100'), { seq: 1, text: '初250！', likes: 0 });
+  advance(SEND_INTERVAL_MS);
+  assert.equal(hub.postClaim('a', '100', 1), null);
+  assert.equal(hub.postClaim('a', '100', 9), null);
+  assert.equal(hub.postClaim('a', '100', 2), '初300！');
+  assert.equal(hub.claimOf('100').seq, 2);
+  assert.equal(hub.claimOf('200'), null);
+  assert.equal(sent.filter(([ev]) => ev === 'cheerTelop').length, 0); // 主張のテロップはサーバ側（server.js）で出す
+});
+
+test('いいねは 1 つの主張に 1 人 1 回。押し直すと取り消し、メーターには 1 人 1 回だけ足す', () => {
+  const { hub, advance } = makeHub();
+  hub.postClaim('a', '100', 0);
+  const meter0 = hub.meterState().value;
+  assert.deepEqual(hub.toggleLike('b', '200', '100', 1), { liked: true, likes: 1 });
+  advance(300);
+  assert.deepEqual(hub.toggleLike('b', '200', '100', 1), { liked: false, likes: 0 });
+  advance(300);
+  assert.deepEqual(hub.toggleLike('b2', '200', '100', 1), { liked: true, likes: 1 }); // 別のタブからでも同じ人は 1 回
+  assert.equal(hub.meterState().value, meter0 + 1);
+  advance(300);
+  assert.equal(hub.toggleLike('a', '100', '100', 1), null);  // 自分の主張には押せない
+  assert.equal(hub.toggleLike('c', '300', '100', 99), null); // 置き換わった後の古い主張
+  assert.equal(hub.toggleLike('c', '300', '999', 1), null);  // 主張していない人
+  // 別の主張に置き換えると、いいねは 0 から
+  advance(SEND_INTERVAL_MS);
+  hub.postClaim('a', '100', 3);
+  assert.equal(hub.claimOf('100').likes, 0);
+  hub.reset();
+  assert.equal(hub.claimOf('100'), null);
 });

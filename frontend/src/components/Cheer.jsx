@@ -110,7 +110,10 @@ export function StampBar({ socket, settings }) {
     if (!settings || !settings.stampsEnabled || !settings.stamps?.length) return null;
     return (
         <div className="cheer-stampbar">
-            <div className="cheer-stampbar-label">スタンプを送る</div>
+            <div className="cheer-stampbar-label">
+                スタンプを送る
+                {settings.clapEnabled && <small>右のランキングの 👏 で、その人に拍手</small>}
+            </div>
             <div className="cheer-stampbar-buttons">
                 {settings.stamps.map((s, i) => (
                     <button
@@ -125,10 +128,58 @@ export function StampBar({ socket, settings }) {
                     </button>
                 ))}
             </div>
-            {settings.clapEnabled && (
-                <div className="cheer-stampbar-hint">右のランキングの 👏 を押すと、その人に拍手を送れます</div>
-            )}
         </div>
+    );
+}
+
+// F. 主張スタンプを出すボタン（タイピングを終えた人の画面）。押すとランキングの自分のスコアの横に付く。
+// current: いま出している主張（押し直しても何も起きないので、選択中として見せる）
+export function ClaimBar({ socket, settings, current }) {
+    const [cooling, run] = useCooldown();
+    if (!settings || !settings.claimsEnabled || !settings.claims?.length) return null;
+    return (
+        <div className="cheer-claimbar">
+            <div className="cheer-stampbar-label">ランキングで主張する</div>
+            <div className="cheer-claimbar-buttons">
+                {settings.claims.map((c, i) => {
+                    const selected = c === current;
+                    return (
+                        <button
+                            key={`${i}-${c}`}
+                            type="button"
+                            className={`cheer-claim-btn${selected ? ' is-selected' : ''}`}
+                            aria-pressed={selected}
+                            aria-disabled={cooling && !selected}
+                            onClick={() => { if (!selected) run(() => socket?.emit('sendClaim', i)); }}
+                        >
+                            {selected ? '✓ ' : ''}{c}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+// ランキングの主張バッジ。canLike のときは押して「いいね」（もう一度押すと取り消し）
+export function ClaimBadge({ claim, canLike, liked, onLike }) {
+    const body = (
+        <>
+            <span className="cheer-claim-text">{claim.text}</span>
+            <span className="cheer-claim-likes">👍{claim.likes}</span>
+        </>
+    );
+    if (!canLike) return <span className="cheer-claim">{body}</span>;
+    return (
+        <button
+            type="button"
+            className={`cheer-claim is-button${liked ? ' is-liked' : ''}`}
+            aria-pressed={liked}
+            aria-label={`「${claim.text}」に${liked ? 'いいね済み（押すと取り消し）' : 'いいねする'}`}
+            onClick={onLike}
+        >
+            {body}
+        </button>
     );
 }
 

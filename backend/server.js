@@ -582,7 +582,7 @@ function buildLiveRanking() {
   return Object.entries(tournamentState.participants)
     .map(([user_id, data]) => ({
       user_id, name: playerDisplayNames.get(user_id) || null,
-      score: data.score, jobType: data.jobType, claps: cheer.clapsOf(user_id),
+      score: data.score, jobType: data.jobType, claps: cheer.clapsOf(user_id), claim: cheer.claimOf(user_id),
     }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 100);
@@ -754,6 +754,28 @@ io.on('connection', (socket) => {
     if (!me || !target || target === me.name || tournamentState.status !== 'active') return;
     if (!tournamentState.participants[target]) return;
     if (cheer.clap(socket.id, target) !== null) emitTournamentLiveRanking();
+  });
+
+  // F. 主張スタンプ（「自己ベスト更新！」など）。条件は確かめず、本人が押せば出す。ランキングのスコアの横に付く
+  socket.on('sendClaim', (index) => {
+    const me = tournamentLobbyPlayers[socket.id];
+    if (!me || tournamentState.status !== 'active') return;
+    const text = cheer.postClaim(socket.id, me.name, index);
+    if (text === null) return;
+    emitTournamentLiveRanking();
+    cheer.telop('claim', { name: playerDisplayNames.get(me.name) || me.name, id: me.name, claim: text });
+  });
+
+  // 主張への「いいね」（1 つの主張に 1 人 1 回。もう一度押すと取り消し）。返事で押した後の状態を返す
+  socket.on('likeClaim', (payload, ack) => {
+    const reply = typeof ack === 'function' ? ack : () => {};
+    const me = tournamentLobbyPlayers[socket.id];
+    const { userId, seq } = payload || {};
+    const target = sanitizePlayerName(userId);
+    if (!me || !target || !Number.isInteger(seq) || tournamentState.status !== 'active') return reply(null);
+    const r = cheer.toggleLike(socket.id, me.name, target, seq);
+    if (r) emitTournamentLiveRanking();
+    reply(r);
   });
 
   // D. スポットライト（管理画面から）。開催中のランキングに載っている人を選ぶ

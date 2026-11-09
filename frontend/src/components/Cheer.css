@@ -42,13 +42,14 @@
 .cheer-meter-num { flex: none; color: #888; font-variant-numeric: tabular-nums; }
 
 /* B. スタンプを送るボタン */
-.cheer-stampbar { margin-top: 30px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.cheer-stampbar { margin-top: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .cheer-stampbar-label { color: #666; font-weight: bold; }
+.cheer-stampbar-label small { margin-left: 8px; font-weight: normal; color: #999; }
 .cheer-stampbar-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 .cheer-stamp-btn {
-  width: 56px;
-  height: 56px;
-  font-size: 1.8em;
+  width: 48px;
+  height: 48px;
+  font-size: 1.5em;
   line-height: 1;
   border: 2px solid #e0e0e0;
   border-radius: 50%;
@@ -84,6 +85,47 @@
   40% { transform: scale(1.06); }
   100% { transform: scale(1); }
 }
+
+/* F. 主張スタンプ */
+.cheer-claimbar { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.cheer-claimbar-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 560px; }
+.cheer-claim-btn {
+  padding: 6px 14px;
+  font-size: 0.95em;
+  font-weight: bold;
+  border: 2px solid #c5cae9;
+  border-radius: 18px;
+  background: #fff;
+  color: #3949ab;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cheer-claim-btn:hover { border-color: #5c6bc0; }
+.cheer-claim-btn:focus-visible { outline: 3px solid #5c6bc0; outline-offset: 2px; }
+.cheer-claim-btn.is-selected { background: #3949ab; border-color: #3949ab; color: #fff; cursor: default; }
+.cheer-claim-btn[aria-disabled='true'] { opacity: 0.45; cursor: default; }
+
+/* ランキングのスコアの横の主張バッジ（押せるときは「いいね」） */
+.cheer-claim {
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  font-size: 0.8em;
+  font-weight: bold;
+  border: 1px solid #c5cae9;
+  border-radius: 10px;
+  background: #e8eaf6;
+  color: #3949ab;
+  white-space: nowrap;
+}
+.cheer-claim-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cheer-claim-likes { flex: none; font-variant-numeric: tabular-nums; }
+.cheer-claim.is-button { cursor: pointer; font-family: inherit; }
+.cheer-claim.is-button:hover { border-color: #5c6bc0; }
+.cheer-claim.is-button:focus-visible { outline: 2px solid #5c6bc0; outline-offset: 1px; }
+.cheer-claim.is-liked { background: #3949ab; border-color: #3949ab; color: #fff; }
 
 /* 打っていない間だけ出す演出。クリックの邪魔をしないよう、操作は下の画面に通す */
 .cheer-effects { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }

@@ -9,7 +9,8 @@ const FEATURES = [
   { key: 'stampsEnabled', label: 'B. リアクションスタンプ', note: 'タイピングを終えた人がスタンプを送り、画面に浮かべる' },
   { key: 'clapEnabled', label: 'C. 宛先つき拍手', note: 'ランキングの人を選んで拍手を送る。本人に「拍手が届きました」と出る' },
   { key: 'spotlightEnabled', label: 'D. スポットライト', note: '管理画面で選んだ人を大きく表示する' },
-  { key: 'meterEnabled', label: 'E. 盛り上がりメーター', note: 'スタンプと拍手でたまり、満タンで紙吹雪' },
+  { key: 'meterEnabled', label: 'E. 盛り上がりメーター', note: 'スタンプ・拍手・主張・いいねでたまり、満タンで紙吹雪' },
+  { key: 'claimsEnabled', label: 'F. 主張スタンプ', note: '「自己ベスト更新！」などを本人がスコアの横に出し、ほかの人が「いいね」できる' },
 ];
 
 const TELOPS = [
@@ -19,6 +20,7 @@ const TELOPS = [
   { key: 'oneMinute', label: '残り1分', vars: '' },
   { key: 'meterFull', label: 'メーター満タン', vars: '{level}' },
   { key: 'spotlight', label: 'スポットライト', vars: '{name} {id} {score} {rank}' },
+  { key: 'claim', label: '主張スタンプを出したとき', vars: '{name} {id} {claim}' },
 ];
 
 const cardStyle = { textAlign: 'left', background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', marginBottom: '30px' };
@@ -125,6 +127,7 @@ export function CheerLivePanel({ socket }) {
                       <td style={{ width: '45px', padding: '6px', color: '#888' }}>{r.rank}位</td>
                       <td style={{ padding: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${r.user_id} ${r.name || ''}`}>
                         {r.jobType ? `[${r.jobType}] ` : ''}{r.user_id} {r.name || ''}
+                        {r.claim && <span style={{ marginLeft: '6px', fontSize: '0.85em', color: '#3949ab' }}>「{r.claim.text}」👍{r.claim.likes}</span>}
                       </td>
                       <td style={{ width: '60px', padding: '6px', textAlign: 'right', fontWeight: 'bold', color: '#e8734a' }}>{r.score}</td>
                       <td style={{ width: '55px', padding: '6px', textAlign: 'right', color: '#e65100' }}>👏{r.claps || 0}</td>
@@ -153,10 +156,12 @@ export function CheerSettingsPanel() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null); // { ok, text }
 
+  const [claimText, setClaimText] = useState('');
   const applyLoaded = (s) => {
     setSaved(s);
     setForm(s);
     setStampText(s.stamps.join(' '));
+    setClaimText(s.claims.join('\n'));
   };
 
   useEffect(() => {
@@ -178,7 +183,8 @@ export function CheerSettingsPanel() {
   }
 
   const stamps = stampText.split(/\s+/).filter(Boolean);
-  const draft = { ...form, stamps };
+  const claims = claimText.split('\n').map(c => c.trim()).filter(Boolean);
+  const draft = { ...form, stamps, claims };
   const dirty = saved && JSON.stringify(draft) !== JSON.stringify(saved);
   const set = (patch) => { setForm(f => ({ ...f, ...patch })); setMessage(null); };
   const setTelop = (key, value) => { setForm(f => ({ ...f, telops: { ...f.telops, [key]: value } })); setMessage(null); };
@@ -207,7 +213,7 @@ export function CheerSettingsPanel() {
     <div style={cardStyle}>
       <h3 style={{ marginTop: 0, color: '#2c3e50', textAlign: 'center' }}>🎉 にぎやかしの設定</h3>
       <p style={{ color: '#666', fontSize: '0.9em', marginTop: 0 }}>
-        動く演出は、タイピング中の人には出しません（ランキング欄のテロップと数字だけ変わります）。スタンプと拍手は 1 人 1 秒に 1 回までです。
+        動く演出は、タイピング中の人には出しません（ランキング欄のテロップと数字だけ変わります）。スタンプ・拍手・主張スタンプは 1 人 1 秒に 1 回まで、いいねは 1 つの主張に 1 人 1 回（もう一度押すと取り消し）です。
       </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '8px', marginBottom: '20px' }}>
@@ -235,10 +241,15 @@ export function CheerSettingsPanel() {
           <span style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px' }}>盛り上がりメーターの目標（スタンプ・拍手の回数、10〜10000）</span>
           <input type="number" min="10" max="10000" step="1" value={form.meterGoal} onChange={e => set({ meterGoal: e.target.value === '' ? '' : Number(e.target.value) })} style={inputStyle} />
           <span style={{ display: 'block', fontSize: '0.85em', color: '#777', marginTop: '4px' }}>
-            目安: 100 人が 1 秒に 1 回押すと、300 なら約 3 秒で満タン
+            目安: 20 人が 1 秒に 1 回押すと、50 なら約 3 秒で満タン
           </span>
         </label>
       </div>
+
+      <label style={{ display: 'block', marginBottom: '20px' }}>
+        <span style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px' }}>主張スタンプ（1 行に 1 つ・8 個まで・15 文字まで・上から順に並ぶ）</span>
+        <textarea value={claimText} onChange={e => { setClaimText(e.target.value); setMessage(null); }} rows={4} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} placeholder={'自己ベスト更新！\n初250！'} />
+      </label>
 
       <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>テロップの文言（空にするとそのテロップは出ません・60 文字まで）</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, max-content) minmax(0, 1fr)', gap: '8px 12px', alignItems: 'center', marginBottom: '20px' }}>
@@ -253,7 +264,7 @@ export function CheerSettingsPanel() {
         ))}
       </div>
       <p style={{ fontSize: '0.85em', color: '#777', marginTop: '-10px' }}>
-        {'{name}'} は氏名（未入力なら社員番号）、{'{id}'} は社員番号、{'{score}'} はスコア、{'{rank}'} は順位、{'{level}'} はメーターのレベルに置き換わります。
+        {'{name}'} は氏名（未入力なら社員番号）、{'{id}'} は社員番号、{'{score}'} はスコア、{'{rank}'} は順位、{'{level}'} はメーターのレベル、{'{claim}'} は主張スタンプの文言に置き換わります。
       </p>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>

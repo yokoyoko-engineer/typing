@@ -1,4 +1,4 @@
-// イベント BATTLE の「にぎやかし」機能（実況テロップ・スタンプ・拍手・スポットライト・盛り上がりメーター）。
+// イベント BATTLE の「にぎやかし」機能（実況テロップ・スタンプ・拍手・スポットライト・盛り上がりメーター・主張スタンプといいね）。
 //
 // 方針
 // - まだ打っている人の邪魔をしない: 演出を出すかどうかは画面側で決める（打っている間は出さない）。
@@ -8,7 +8,7 @@
 // - 氏名はテロップにだけ載せ、イベント画面（社内 IP だけがつながる socket）へ送る。ログには出さない。
 // - 設定（オンオフ・スタンプの種類・テロップの文言・メーターの目標）は管理画面から変える。
 
-export const TELOP_KEYS = ['start', 'leader', 'rankUp', 'oneMinute', 'meterFull', 'spotlight'];
+export const TELOP_KEYS = ['start', 'leader', 'rankUp', 'oneMinute', 'meterFull', 'spotlight', 'claim'];
 
 export const DEFAULT_CHEER_SETTINGS = Object.freeze({
   telopEnabled: true,      // A. 実況テロップ
@@ -16,8 +16,10 @@ export const DEFAULT_CHEER_SETTINGS = Object.freeze({
   clapEnabled: true,       // C. 宛先つき拍手
   spotlightEnabled: true,  // D. スポットライト
   meterEnabled: true,      // E. 盛り上がりメーター
+  claimsEnabled: true,     // F. 主張スタンプ（本人がスコアの横に出す。ほかの人が「いいね」できる）
   stamps: ['👏', '🎉', '🔥', '😲', '❤️'],
-  meterGoal: 300,
+  claims: ['自己ベスト更新！', '初250！', '初300！', '初トップ10！'],
+  meterGoal: 50,
   telops: {
     start: 'イベント開始！ 5分間の勝負です',
     leader: '{name} さんが1位に！ スコア {score}',
@@ -25,20 +27,26 @@ export const DEFAULT_CHEER_SETTINGS = Object.freeze({
     oneMinute: '残り1分！ ラストスパート！',
     meterFull: '盛り上がりメーター満タン！ Lv.{level} 達成',
     spotlight: '{name} さんにスポットライト！',
+    claim: '{name} さん「{claim}」',
   },
 });
 
 export const STAMP_MAX_COUNT = 8;
+export const CLAIM_MAX_COUNT = 8;
+export const CLAIM_MAX_LENGTH = 15;
 export const STAMP_MAX_LENGTH = 8;   // 1 つのスタンプの文字数（絵文字は複数の文字でできていることがある）
 export const TELOP_MAX_LENGTH = 60;
 export const METER_GOAL_MIN = 10;
 export const METER_GOAL_MAX = 10000;
 
-const FLAGS = ['telopEnabled', 'stampsEnabled', 'clapEnabled', 'spotlightEnabled', 'meterEnabled'];
+const FLAGS = ['telopEnabled', 'stampsEnabled', 'clapEnabled', 'spotlightEnabled', 'meterEnabled', 'claimsEnabled'];
 const BAD_CHARS = /[\u0000-\u001f\u007f<>]/;
 
 function cloneDefaults() {
-  return { ...DEFAULT_CHEER_SETTINGS, stamps: [...DEFAULT_CHEER_SETTINGS.stamps], telops: { ...DEFAULT_CHEER_SETTINGS.telops } };
+  return {
+    ...DEFAULT_CHEER_SETTINGS, stamps: [...DEFAULT_CHEER_SETTINGS.stamps],
+    claims: [...DEFAULT_CHEER_SETTINGS.claims], telops: { ...DEFAULT_CHEER_SETTINGS.telops },
+  };
 }
 
 function checkStamp(s) {
@@ -46,6 +54,14 @@ function checkStamp(s) {
   const t = s.normalize('NFC').trim();
   const len = [...t].length;
   if (len < 1 || len > STAMP_MAX_LENGTH || /\s/.test(t) || BAD_CHARS.test(t)) return null;
+  return t;
+}
+
+function checkClaim(s) {
+  if (typeof s !== 'string') return null;
+  const t = s.normalize('NFC').replace(/\s+/g, ' ').trim();
+  const len = [...t].length;
+  if (len < 1 || len > CLAIM_MAX_LENGTH || BAD_CHARS.test(t)) return null;
   return t;
 }
 
@@ -78,6 +94,17 @@ export function validateCheerSettings(input) {
     stamps.push(t);
   }
   settings.stamps = stamps;
+  if (!Array.isArray(input.claims) || input.claims.length < 1 || input.claims.length > CLAIM_MAX_COUNT) {
+    return { ok: false, error: `主張スタンプは 1〜${CLAIM_MAX_COUNT} 個で指定してください。` };
+  }
+  const claims = [];
+  for (const c of input.claims) {
+    const t = checkClaim(c);
+    if (!t) return { ok: false, error: `主張スタンプは 1 つあたり ${CLAIM_MAX_LENGTH} 文字以内で、< > は使えません。` };
+    if (claims.includes(t)) return { ok: false, error: `同じ主張スタンプ（${t}）が 2 回入っています。` };
+    claims.push(t);
+  }
+  settings.claims = claims;
   if (!Number.isInteger(input.meterGoal) || input.meterGoal < METER_GOAL_MIN || input.meterGoal > METER_GOAL_MAX) {
     return { ok: false, error: `メーターの目標は ${METER_GOAL_MIN}〜${METER_GOAL_MAX} の整数で指定してください。` };
   }
@@ -104,6 +131,10 @@ export function loadCheerSettings(saved) {
     const stamps = [...new Set(saved.stamps.map(checkStamp).filter(Boolean))].slice(0, STAMP_MAX_COUNT);
     if (stamps.length > 0) merged.stamps = stamps;
   }
+  if (Array.isArray(saved.claims)) {
+    const claims = [...new Set(saved.claims.map(checkClaim).filter(Boolean))].slice(0, CLAIM_MAX_COUNT);
+    if (claims.length > 0) merged.claims = claims;
+  }
   if (Number.isInteger(saved.meterGoal) && saved.meterGoal >= METER_GOAL_MIN && saved.meterGoal <= METER_GOAL_MAX) {
     merged.meterGoal = saved.meterGoal;
   }
@@ -120,17 +151,18 @@ export function loadCheerSettings(saved) {
 export function publicCheerSettings(s) {
   return {
     telopEnabled: s.telopEnabled, stampsEnabled: s.stampsEnabled, clapEnabled: s.clapEnabled,
-    spotlightEnabled: s.spotlightEnabled, meterEnabled: s.meterEnabled,
-    stamps: s.stamps, meterGoal: s.meterGoal,
+    spotlightEnabled: s.spotlightEnabled, meterEnabled: s.meterEnabled, claimsEnabled: s.claimsEnabled,
+    stamps: s.stamps, claims: s.claims, meterGoal: s.meterGoal,
   };
 }
 
-// テロップの文言の {name} {id} {score} {rank} {level} を差し込む
+// テロップの文言の {name} {id} {score} {rank} {level} {claim} を差し込む
 export function renderTelop(template, vars = {}) {
-  return String(template || '').replace(/\{(name|id|score|rank|level)\}/g, (_, k) => (vars[k] ?? '').toString());
+  return String(template || '').replace(/\{(name|id|score|rank|level|claim)\}/g, (_, k) => (vars[k] ?? '').toString());
 }
 
-export const SEND_INTERVAL_MS = 1000;  // スタンプ・拍手は 1 接続あたり 1 秒に 1 回まで
+export const SEND_INTERVAL_MS = 1000;  // スタンプ・拍手・主張は 1 接続あたり 1 秒に 1 回まで
+export const LIKE_INTERVAL_MS = 300;   // いいねは何人かに続けて押せるよう短めにする
 export const BURST_INTERVAL_MS = 500;  // スタンプをまとめて配る間隔
 export const TELOP_INTERVAL_MS = 2500; // テロップを配る最短の間隔
 export const TELOP_QUEUE_MAX = 3;      // 配りきれないテロップは新しいものを 3 件まで残す
@@ -146,7 +178,7 @@ export class CheerHub {
     this.getSettings = getSettings;
     this.now = now;
     this.timers = timers;
-    this.lastSend = new Map(); // `${socketId}:stamp|clap` -> 時刻
+    this.lastSend = new Map(); // `${socketId}:種類` -> 時刻
     this.burstTimer = null;
     this.telopTimer = null;
     this.reset();
@@ -158,6 +190,8 @@ export class CheerHub {
     this.meterDirty = false;
     this.meter = { value: 0, level: 0 };
     this.claps = new Map(); // 社員番号 -> もらった拍手の数
+    this.claims = new Map(); // 社員番号 -> { seq, text, likers: Set(いいねした社員番号), counted: Set(メーターに足した社員番号) }
+    this.claimSeq = 0;
     this.telopQueue = [];
     this.lastTelopAt = 0;
     this.lastSpotlightAt = 0;
@@ -171,16 +205,21 @@ export class CheerHub {
     return this.claps.get(userId) || 0;
   }
 
-  forget(socketId) {
-    this.lastSend.delete(`${socketId}:stamp`);
-    this.lastSend.delete(`${socketId}:clap`);
+  // ランキングに載せる主張（無ければ null）
+  claimOf(userId) {
+    const c = this.claims.get(userId);
+    return c ? { seq: c.seq, text: c.text, likes: c.likers.size } : null;
   }
 
-  // 1 秒に 1 回までの制限。送ってよければ true
-  allow(socketId, kind) {
+  forget(socketId) {
+    for (const kind of ['stamp', 'clap', 'claim', 'like']) this.lastSend.delete(`${socketId}:${kind}`);
+  }
+
+  // 送る間隔の制限（既定は 1 秒に 1 回まで）。送ってよければ true
+  allow(socketId, kind, interval = SEND_INTERVAL_MS) {
     const key = `${socketId}:${kind}`;
     const t = this.now();
-    if (t - (this.lastSend.get(key) || 0) < SEND_INTERVAL_MS) return false;
+    if (t - (this.lastSend.get(key) || 0) < interval) return false;
     this.lastSend.set(key, t);
     return true;
   }
@@ -205,6 +244,44 @@ export class CheerHub {
     this.addMeter(1);
     this.scheduleBurst();
     return total;
+  }
+
+  // F. 主張スタンプ。index は設定の主張の何番目か。出せたらその文言を返す（出せなければ null）。
+  // 1 人 1 つだけ表示し、別の主張を出すと置き換わる（いいねは 0 から）。同じ主張を押し直しても何もしない
+  postClaim(socketId, userId, index) {
+    const s = this.getSettings();
+    if (!s.claimsEnabled || !Number.isInteger(index) || index < 0 || index >= s.claims.length) return null;
+    const text = s.claims[index];
+    if (this.claims.get(userId)?.text === text) return null;
+    if (!this.allow(socketId, 'claim')) return null;
+    this.claims.set(userId, { seq: ++this.claimSeq, text, likers: new Set(), counted: new Set() });
+    this.addMeter(1);
+    this.scheduleBurst();
+    return text;
+  }
+
+  // 主張への「いいね」。1 つの主張に 1 人 1 回で、もう一度押すと取り消す。
+  // seq は押したときに見えていた主張（置き換わっていたら無効）。戻り値: { liked, likes } または null
+  toggleLike(socketId, likerId, targetId, seq) {
+    if (!this.getSettings().claimsEnabled || likerId === targetId) return null;
+    const c = this.claims.get(targetId);
+    if (!c || c.seq !== seq) return null;
+    if (!this.allow(socketId, 'like', LIKE_INTERVAL_MS)) return null;
+    let liked;
+    if (c.likers.has(likerId)) {
+      c.likers.delete(likerId);
+      liked = false;
+    } else {
+      c.likers.add(likerId);
+      liked = true;
+      // 押す・取り消すを繰り返してメーターをためられないよう、メーターには 1 人 1 回だけ足す
+      if (!c.counted.has(likerId)) {
+        c.counted.add(likerId);
+        this.addMeter(1);
+        this.scheduleBurst();
+      }
+    }
+    return { liked, likes: c.likers.size };
   }
 
   // D. スポットライト。続けて押されたときは 3 秒あける
