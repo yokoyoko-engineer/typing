@@ -537,6 +537,11 @@ async function startTournament() {
   return 'started';
 }
 
+// 画面に渡すイベントの状態
+function tournamentStatePayload() {
+  return { status: tournamentState.status, endTime: tournamentState.endTime, cpuLevel: tournamentState.cpuLevel };
+}
+
 let liveRankingUpdateTimer = null;
 // 社員番号 → 氏名（参加時に本人が入力したもの）。リアルタイムランキングの表示用
 const playerDisplayNames = new Map();
@@ -588,10 +593,19 @@ io.on('connection', (socket) => {
   socket.emit('customWords', customWords);
   socket.emit('cpuHiddenCategories', hiddenCpuCategories);
 
-  socket.on('joinTournament', ({ playerName, displayName, jobType }) => {
+  // イベントへの参加（再接続したときも画面から送り直される）。
+  // 新しい画面は ack（返事のコールバック）付きで送り、返事で今のイベント状態を受け取る。
+  // 返事が来なければ画面側で接続し直して送り直す（通信が詰まって届かなかった場合の対策）。
+  socket.on('joinTournament', (payload, ack) => {
+    const { playerName, displayName, jobType } = payload || {};
+    const reply = typeof ack === 'function' ? ack : null;
+    const fail = (message) => {
+      if (reply) reply({ error: message });
+      else socket.emit('error', message);
+    };
     const safeName = sanitizePlayerName(playerName);
     if (!safeName) {
-      socket.emit('error', 'Invalid player name.');
+      fail('Invalid player name.');
       return;
     }
     // 氏名（任意項目として受ける: 古い画面から氏名なしで参加した場合は社員番号で表示）
@@ -599,7 +613,7 @@ io.on('connection', (socket) => {
     if (displayName !== undefined && displayName !== null && displayName !== '') {
       safeDisplayName = sanitizeDisplayName(displayName);
       if (!safeDisplayName) {
-        socket.emit('error', 'Invalid display name.');
+        fail('Invalid display name.');
         return;
       }
       playerDisplayNames.set(safeName, safeDisplayName);
@@ -618,8 +632,14 @@ io.on('connection', (socket) => {
     tournamentLobbyPlayers[socket.id] = { name: safeName, displayName: safeDisplayName, jobType: jobType || '' };
     emitTournamentLobbyUpdate();
     emitTournamentLiveRanking();
-    
-    socket.emit('tournamentState', { status: tournamentState.status, endTime: tournamentState.endTime, cpuLevel: tournamentState.cpuLevel });
+
+    if (reply) reply(tournamentStatePayload());
+    else socket.emit('tournamentState', tournamentStatePayload()); // 古い画面向け
+  });
+
+  // 待機中の画面が数秒おきに今のイベント状態を確かめる（開始の通知を取りこぼしても進めるように）
+  socket.on('getTournamentState', (ack) => {
+    if (typeof ack === 'function') ack(tournamentStatePayload());
   });
 
   socket.on('adminGetLobby', () => {

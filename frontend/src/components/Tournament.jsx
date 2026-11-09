@@ -456,6 +456,10 @@ function TournamentBattle({
 // 3. Parent Component (Fixed overall size and overflow controller)
 // 氏名は入り直しのたびに打たなくて済むよう、タブを閉じるまでだけ覚えておく
 // （研修室の共用 PC で次の人に残らないよう、localStorage ではなく sessionStorage）
+// サーバの返事を待つ時間と、待機中にイベントの状態を確かめる間隔
+const SERVER_REPLY_TIMEOUT_MS = 8000;
+const WAITING_CHECK_INTERVAL_MS = 5000;
+
 const DISPLAY_NAME_KEY = 'typing.displayName';
 const DISPLAY_NAME_MAX = 20;
 const loadDisplayName = () => { try { return sessionStorage.getItem(DISPLAY_NAME_KEY) || ''; } catch { return ''; } };
@@ -487,53 +491,124 @@ export default function Tournament({ socket, onBackToHome }) {
     const [globalLegends, setGlobalLegends] = useState([]);
     const [recentTop, setRecentTop] = useState([]);
 
-    // Socket Event Listeners
-    useEffect(() => {
-        if (!socket) return;
+    // 参加情報と画面の状態は ref にも持つ（ソケットのイベント処理から常に最新の値を読むため）
+    const gameStateRef = useRef(gameState);
+    gameStateRef.current = gameState;
+    const highestScoreRef = useRef(highestScore);
+    highestScoreRef.current = highestScore;
+    const joinInfoRef = useRef(null); // { playerName, displayName, jobType }（参加ボタンを押したら入る）
+    const joinSeqRef = useRef(0);
+    const [connected, setConnected] = useState(() => (socket ? socket.connected : true));
 
-        socket.on('tournamentState', (state) => {
-            if (state.cpuLevel) {
-                setCpuLevel(state.cpuLevel);
-            }
-            if (state.status === 'active' && gameState === 'waiting') {
-                setEndTime(state.endTime);
-                const remainingMs = state.endTime - Date.now();
-                if (remainingMs > 0) {
-                    setTimeRemaining(Math.ceil(remainingMs / 1000));
-                    setGameState('ready'); // ready state
-                } else {
-                    setTimeRemaining(0);
-                    setGameState('finished');
-                }
-            } else if (state.status === 'finished') {
+    // サーバから受け取ったイベントの状態を画面に反映する（待機中のときだけ画面を進める）
+    const applyTournamentState = (state) => {
+        if (!state) return;
+        if (state.cpuLevel) setCpuLevel(state.cpuLevel);
+        if (gameStateRef.current !== 'waiting') return;
+        if (state.status === 'active' && state.endTime) {
+            const remainingMs = state.endTime - Date.now();
+            setEndTime(state.endTime);
+            if (remainingMs > 0) {
+                setTimeRemaining(Math.ceil(remainingMs / 1000));
+                setGameState('ready');
+            } else {
                 setTimeRemaining(0);
                 setGameState('finished');
             }
-        });
-
-        socket.on('tournamentStarted', (data) => {
-            if (data.cpuLevel) {
-                setCpuLevel(data.cpuLevel);
-            }
-            if (gameState === 'waiting') {
-                setEndTime(data.endTime);
-                const remainingMs = data.endTime - Date.now();
-                setTimeRemaining(Math.max(0, Math.ceil(remainingMs / 1000)));
-                setGameState('ready'); // ready
-            }
-        });
-
-        socket.on('tournamentFinished', () => {
+        } else if (state.status === 'finished') {
             setTimeRemaining(0);
             setGameState('finished');
+        }
+    };
+    const applyRef = useRef(applyTournamentState);
+    applyRef.current = applyTournamentState;
+
+    // サーバから返事が来ないときは、通信が途中で止まっているとみなして接続し直す
+    // （つながり直すと下の connect の処理で参加を送り直す）。
+    // 送ったときと別の接続にすでに替わっていれば何もしない（つなぎ直しを重ねない）
+    const reconnect = (sentOnId) => {
+        if (!socket || socket.id !== sentOnId) return;
+        socket.disconnect();
+        socket.connect();
+    };
+
+    // 参加をサーバに送る。返事で今のイベント状態を受け取る
+    const sendJoin = () => {
+        const info = joinInfoRef.current;
+        if (!socket || !info || !socket.connected) return; // 未接続ならつながったときに送る
+        const seq = ++joinSeqRef.current;
+        const sentOnId = socket.id;
+        socket.timeout(SERVER_REPLY_TIMEOUT_MS).emit('joinTournament', info, (err, res) => {
+            if (seq !== joinSeqRef.current || !joinInfoRef.current) return;
+            if (err) { reconnect(sentOnId); return; }
+            if (res && res.error) {
+                joinInfoRef.current = null;
+                alert(res.error);
+                setGameState('setup');
+                return;
+            }
+            applyRef.current(res);
         });
+    };
+    const sendJoinRef = useRef(sendJoin);
+    sendJoinRef.current = sendJoin;
+
+    // Socket Event Listeners（ソケットごとに 1 回だけ登録する）
+    useEffect(() => {
+        if (!socket) return;
+
+        const onState = (state) => applyRef.current(state);
+        const onStarted = (data) => applyRef.current({ ...data, status: 'active' });
+        const onFinished = () => {
+            setTimeRemaining(0);
+            setGameState('finished');
+        };
+        // 通信が切れてつながり直すと、サーバ側では別の接続として扱われ、イベントの参加者から外れる。
+        // 参加済みなら送り直し、開催中なら自分の最高スコアも送り直す（切れている間に送ったものが届いていないことがある）
+        const onConnect = () => {
+            setConnected(true);
+            const info = joinInfoRef.current;
+            if (!info) return;
+            sendJoinRef.current();
+            if (highestScoreRef.current > 0 && gameStateRef.current !== 'waiting' && gameStateRef.current !== 'finished') {
+                socket.emit('tournamentUpdateScore', { playerName: info.playerName, score: highestScoreRef.current, jobType: info.jobType });
+            }
+        };
+        const onDisconnect = () => setConnected(false);
+
+        socket.on('tournamentState', onState);
+        socket.on('tournamentStarted', onStarted);
+        socket.on('tournamentFinished', onFinished);
+        socket.on('connect', onConnect);
+        socket.on('disconnect', onDisconnect);
+        setConnected(socket.connected);
 
         return () => {
-            socket.off('tournamentState');
-            socket.off('tournamentStarted');
-            socket.off('tournamentFinished');
+            socket.off('tournamentState', onState);
+            socket.off('tournamentStarted', onStarted);
+            socket.off('tournamentFinished', onFinished);
+            socket.off('connect', onConnect);
+            socket.off('disconnect', onDisconnect);
         };
-    }, [socket, gameState]);
+    }, [socket]);
+
+    // 待機中は数秒おきにイベントの状態を確かめる。開始の通知を取りこぼしても、ここで開始に気づける。
+    // 返事が来なければ接続し直す（つながり直すと参加も送り直す）
+    useEffect(() => {
+        if (gameState !== 'waiting' || !socket) return;
+        const timer = setInterval(() => {
+            if (!socket.connected) return;
+            const sentOnId = socket.id;
+            socket.timeout(SERVER_REPLY_TIMEOUT_MS).emit('getTournamentState', (err, state) => {
+                if (err) { reconnect(sentOnId); return; }
+                applyRef.current(state);
+            });
+        }, WAITING_CHECK_INTERVAL_MS);
+        return () => clearInterval(timer);
+    }, [gameState, socket]);
+
+    // 画面を離れたら（退出）、再接続時に参加を送り直さない
+    useEffect(() => () => { joinInfoRef.current = null; }, []);
 
     const canJoin = /^[0-9]{1,7}$/.test(nameInput.trim()) && isValidDisplayName(displayNameInput);
 
@@ -550,8 +625,10 @@ export default function Tournament({ socket, onBackToHome }) {
         const displayName = normalizeDisplayName(displayNameInput);
         saveDisplayName(displayName);
         setPlayerName(trimmed);
-        socket.emit('joinTournament', { playerName: trimmed, displayName, jobType });
+        joinInfoRef.current = { playerName: trimmed, displayName, jobType };
+        gameStateRef.current = 'waiting'; // 返事が描画より先に届いても待機中として扱う
         setGameState('waiting');
+        sendJoin();
     };
 
     // Global Tournament Timer
@@ -745,6 +822,11 @@ export default function Tournament({ socket, onBackToHome }) {
             <div className="game-container">
                 <h2>待機中...</h2>
                 <p style={{ fontSize: '1.2em', color: '#5c6bc0' }}>管理者がイベントを開始するのをお待ちください</p>
+                {!connected && (
+                    <p role="status" style={{ color: '#e65100', fontWeight: 'bold', marginTop: '10px' }}>
+                        サーバとの通信が切れたため、つなぎ直しています。このままお待ちください。
+                    </p>
+                )}
                 <div style={{ marginTop: '50px' }} className="spinner"></div>
                 <button className="action-btn" onClick={onBackToHome} style={{ marginTop: '40px', background: '#e0e0e0', color: '#2c3e50' }}>
                     退出する
