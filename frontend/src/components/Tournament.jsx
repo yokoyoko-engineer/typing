@@ -3,6 +3,7 @@ import { getRandomWord, CATEGORIES } from '../words';
 import { JOB_TYPES } from '../jobTypes';
 import { TypingSession, alignTextAndRuby, getEvaluationLevel } from '../utils/typingEngine';
 import MissFlash, { useMissFlash } from './MissFlash';
+import { useCheerState, useCooldown, CheerTelop, CheerMeter, StampBar, CheerEffects } from './Cheer';
 import './Game.css';
 
 const TOTAL_WORDS = 20;
@@ -27,8 +28,28 @@ function TopBoard({ title, rows, background, boxShadow, emptyText }) {
 }
 
 // 1. Live Ranking Component (Optimized to update independently and scrollable)
-function TournamentRanking({ socket, playerName, jobType, globalLegends, highestScore }) {
+// isTyping: 打っている最中（演出を動かさない） / canCheer: タイピングを終えて拍手を送れる
+function TournamentRanking({ socket, playerName, globalLegends, highestScore, isTyping, canCheer, cheerSettings, meter }) {
     const [liveRanking, setLiveRanking] = useState([]);
+    const [clapCooling, runClap] = useCooldown();
+    const clapOn = !!cheerSettings?.clapEnabled;
+    const myClaps = liveRanking.find(e => e.user_id === playerName)?.claps || 0;
+
+    // 自分への拍手が増えたら、打っていないときだけ「届きました」と知らせる（打っている間は数字だけ変わる）
+    const prevClapsRef = useRef(myClaps);
+    const isTypingRef = useRef(isTyping);
+    isTypingRef.current = isTyping;
+    const noticeTimerRef = useRef(null);
+    const [clapNotice, setClapNotice] = useState(0);
+    useEffect(() => {
+        const prev = prevClapsRef.current;
+        prevClapsRef.current = myClaps;
+        if (myClaps <= prev || isTypingRef.current) return;
+        setClapNotice(n => n + 1);
+        clearTimeout(noticeTimerRef.current);
+        noticeTimerRef.current = setTimeout(() => setClapNotice(0), 3000);
+    }, [myClaps]);
+    useEffect(() => () => clearTimeout(noticeTimerRef.current), []);
 
     useEffect(() => {
         if (!socket) return;
@@ -49,9 +70,11 @@ function TournamentRanking({ socket, playerName, jobType, globalLegends, highest
     return (
         <div style={{ width: '480px', flex: 'none', paddingLeft: '20px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
             <div style={{ background: '#f5f5f5', borderRadius: '10px', padding: '15px', flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
-                <h3 style={{ margin: '0 0 15px 0', textAlign: 'center', color: '#2c3e50' }}>
+                <h3 style={{ margin: '0 0 10px 0', textAlign: 'center', color: '#2c3e50' }}>
                     🔥 リアルタイムランキング
                 </h3>
+                {cheerSettings?.telopEnabled && <CheerTelop socket={socket} animate={!isTyping} />}
+                {cheerSettings?.meterEnabled && <CheerMeter meter={meter} />}
                 <div style={{ flex: 1, overflowY: 'auto', paddingRight: '5px' }}>
                     {liveRanking.length > 0 ? (
                         <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: '0 5px' }}>
@@ -85,9 +108,26 @@ function TournamentRanking({ socket, playerName, jobType, globalLegends, highest
                                             <td style={{ padding: '8px 5px', width: '95px', textAlign: 'center', fontWeight: 'bold', color: isLegendBeat ? '#000' : '#ff9800' }}>
                                                 {getEvaluationLevel(entry.score)}
                                             </td>
-                                            <td style={{ padding: '8px 5px', width: '60px', textAlign: 'right', color: isLegendBeat ? '#000' : '#5c6bc0', borderRadius: '0 5px 5px 0' }}>
+                                            <td style={{ padding: '8px 5px', width: '60px', textAlign: 'right', color: isLegendBeat ? '#000' : '#5c6bc0', borderRadius: clapOn ? 0 : '0 5px 5px 0' }}>
                                                 {entry.score}
                                             </td>
+                                            {clapOn && (
+                                                <td style={{ padding: '8px 5px', width: '62px', textAlign: 'center', borderRadius: '0 5px 5px 0' }}>
+                                                    {canCheer && !isMe ? (
+                                                        <button
+                                                            type="button"
+                                                            className="cheer-clap-btn"
+                                                            aria-label={`${entry.user_id} に拍手を送る`}
+                                                            aria-disabled={clapCooling}
+                                                            onClick={() => runClap(() => socket?.emit('sendClap', entry.user_id))}
+                                                        >
+                                                            👏 {entry.claps || 0}
+                                                        </button>
+                                                    ) : (
+                                                        entry.claps > 0 && <span className="cheer-clap-count">👏 {entry.claps}</span>
+                                                    )}
+                                                </td>
+                                            )}
                                         </tr>
                                     );
                                 })}
@@ -97,11 +137,16 @@ function TournamentRanking({ socket, playerName, jobType, globalLegends, highest
                         <p style={{ textAlign: 'center', color: '#aaa', marginTop: '50px' }}>まだスコアがありません</p>
                     )}
                 </div>
-                <div style={{ marginTop: '15px', padding: '10px', background: '#e8eaf6', borderRadius: '8px', textAlign: 'center' }}>
+                <div key={clapNotice || 'idle'} className={clapNotice ? 'cheer-clap-received' : undefined} style={{ marginTop: '15px', padding: '10px', background: '#e8eaf6', borderRadius: '8px', textAlign: 'center' }}>
                     <div style={{ fontSize: '0.9em', color: '#666' }}>あなたの最高スコア</div>
                     <div style={{ fontSize: '1.5em', fontWeight: 'bold', color: '#2c3e50' }}>
                         {highestScore} <span style={{ fontSize: '0.7em', color: '#ff9800', marginLeft: '8px' }}>({getEvaluationLevel(highestScore)})</span>
                     </div>
+                    {clapOn && (
+                        <div style={{ fontSize: '0.9em', color: '#e65100', fontWeight: 'bold', height: '1.4em' }}>
+                            {clapNotice ? `👏 拍手が届きました！（合計 ${myClaps}）` : `もらった拍手 👏 ${myClaps}`}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -120,7 +165,8 @@ function TournamentBattle({
     setLastResult,
     highestScore,
     setHighestScore,
-    onBackToHome
+    onBackToHome,
+    cheerSettings
 }) {
     const [wordCount, setWordCount] = useState(0);
     const [currentWord, setCurrentWord] = useState(null);
@@ -422,6 +468,7 @@ function TournamentBattle({
                                 待機してランキングを見る
                             </button>
                         </div>
+                        <StampBar socket={socket} settings={cheerSettings} />
                     </div>
                 )}
 
@@ -434,6 +481,7 @@ function TournamentBattle({
                         }}>
                             もう一度挑戦する
                         </button>
+                        <StampBar socket={socket} settings={cheerSettings} />
                     </div>
                 )}
 
@@ -499,6 +547,7 @@ export default function Tournament({ socket, onBackToHome }) {
     const joinInfoRef = useRef(null); // { playerName, displayName, jobType }（参加ボタンを押したら入る）
     const joinSeqRef = useRef(0);
     const [connected, setConnected] = useState(() => (socket ? socket.connected : true));
+    const { settings: cheerSettings, meter: cheerMeter } = useCheerState(socket);
 
     // サーバから受け取ったイベントの状態を画面に反映する（待機中のときだけ画面を進める）
     const applyTournamentState = (state) => {
@@ -835,8 +884,14 @@ export default function Tournament({ socket, onBackToHome }) {
         );
     }
 
+    // まだ打っている人の邪魔をしないよう、打っている間（カウントダウン中も含む）は動く演出を出さない
+    const isTyping = gameState === 'countdown' || gameState === 'playing';
+    // スタンプと拍手を送れるのは、タイピングを終えて待っている間だけ
+    const canCheer = gameState === 'intermission' || gameState === 'spectating';
+
     return (
-        <div className="game-container battle-layout" style={{ maxWidth: '1200px', width: '95%', height: '700px', background: '#fff', border: '1px solid #e8e8e8', borderRadius: '16px', padding: '2rem', boxSizing: 'border-box' }}>
+        <div className="game-container battle-layout" style={{ position: 'relative', maxWidth: '1200px', width: '95%', height: '700px', background: '#fff', border: '1px solid #e8e8e8', borderRadius: '16px', padding: '2rem', boxSizing: 'border-box' }}>
+            {!isTyping && <CheerEffects socket={socket} settings={cheerSettings} />}
             <div style={{ display: 'flex', height: '100%', width: '100%', overflow: 'hidden' }}>
                 <TournamentBattle
                     socket={socket}
@@ -850,13 +905,17 @@ export default function Tournament({ socket, onBackToHome }) {
                     highestScore={highestScore}
                     setHighestScore={setHighestScore}
                     onBackToHome={onBackToHome}
+                    cheerSettings={cheerSettings}
                 />
                 <TournamentRanking
                     socket={socket}
                     playerName={playerName}
-                    jobType={jobType}
                     globalLegends={globalLegends}
                     highestScore={highestScore}
+                    isTyping={isTyping}
+                    canCheer={canCheer}
+                    cheerSettings={cheerSettings}
+                    meter={cheerMeter}
                 />
             </div>
         </div>

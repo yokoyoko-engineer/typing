@@ -4,6 +4,7 @@ import { io } from 'socket.io-client';
 import { JOB_TYPES } from '../jobTypes';
 import CustomWordManager from './CustomWordManager';
 import CpuCategorySettings from './CpuCategorySettings';
+import { CheerLivePanel, CheerSettingsPanel } from './CheerAdmin';
 
 const COHORT_202604 = {
   CL: [3319, 5905, 5906, 5907, 5908, 5909, 5910, 5911, 5912, 5913, 5914, 5915, 5916, 5917, 5918, 5919, 5920, 5921, 5922, 5923, 5924, 5944, 5964, 5980, 5981],
@@ -1346,8 +1347,14 @@ export default function Admin() {
           {/* 大会開催パネル */}
           <TournamentLobbyMonitor socket={socket} onStartTournament={handleStartTournament} />
 
+          {/* にぎやかし: 開催中の操作（スポットライト） */}
+          <CheerLivePanel socket={socket} />
+
           {/* 毎週の自動開始（予約） */}
           <TournamentScheduleManager socket={socket} />
+
+          {/* にぎやかしの設定 */}
+          <CheerSettingsPanel />
 
           {/* 大会履歴パネル */}
           <div style={{ background: '#fff', padding: '20px', borderRadius: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>

@@ -1,0 +1,175 @@
+/* イベント BATTLE の「にぎやかし」 */
+
+/* A. 実況テロップ: 高さを固定して、出入りで下のランキングが動かないようにする */
+.cheer-telop {
+  height: 34px;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #fff3e0;
+  overflow: hidden;
+}
+.cheer-telop-text {
+  max-width: 100%;
+  padding: 0 10px;
+  font-weight: bold;
+  color: #e65100;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cheer-telop-text.is-animated { animation: cheerTelopIn 0.4s ease-out; }
+@keyframes cheerTelopIn {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* E. 盛り上がりメーター */
+.cheer-meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 0.85em;
+  color: #5c6bc0;
+  white-space: nowrap;
+}
+.cheer-meter-label { flex: none; font-weight: bold; }
+.cheer-meter-track { flex: 1; min-width: 0; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
+.cheer-meter-fill { height: 100%; background: linear-gradient(90deg, #ff9800, #e53935); transition: width 0.4s ease; }
+.cheer-meter-num { flex: none; color: #888; font-variant-numeric: tabular-nums; }
+
+/* B. スタンプを送るボタン */
+.cheer-stampbar { margin-top: 30px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.cheer-stampbar-label { color: #666; font-weight: bold; }
+.cheer-stampbar-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.cheer-stamp-btn {
+  width: 56px;
+  height: 56px;
+  font-size: 1.8em;
+  line-height: 1;
+  border: 2px solid #e0e0e0;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  transition: transform 0.1s, border-color 0.1s;
+}
+.cheer-stamp-btn:hover { border-color: #ff9800; transform: scale(1.08); }
+.cheer-stamp-btn:active { transform: scale(0.95); }
+.cheer-stamp-btn:focus-visible { outline: 3px solid #5c6bc0; outline-offset: 2px; }
+.cheer-stamp-btn[aria-disabled='true'] { opacity: 0.45; cursor: default; transform: none; }
+.cheer-stampbar-hint { font-size: 0.85em; color: #999; }
+
+/* C. ランキングの拍手ボタン */
+.cheer-clap-btn {
+  padding: 2px 6px;
+  font-size: 0.9em;
+  border: 1px solid #ffcc80;
+  border-radius: 12px;
+  background: #fff8e1;
+  color: #e65100;
+  cursor: pointer;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.cheer-clap-btn:hover { background: #ffe0b2; }
+.cheer-clap-btn:focus-visible { outline: 2px solid #5c6bc0; outline-offset: 1px; }
+.cheer-clap-btn[aria-disabled='true'] { opacity: 0.45; cursor: default; }
+.cheer-clap-count { color: #e65100; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cheer-clap-received { animation: cheerClapPop 0.6s ease-out; background: #fff3e0 !important; }
+@keyframes cheerClapPop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+/* 打っていない間だけ出す演出。クリックの邪魔をしないよう、操作は下の画面に通す */
+.cheer-effects { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+.cheer-float {
+  position: absolute;
+  bottom: -40px;
+  font-size: 2em;
+  white-space: nowrap;
+  animation: cheerFloat 2.8s ease-out forwards;
+  opacity: 0;
+}
+@keyframes cheerFloat {
+  0% { transform: translateY(0) scale(0.8); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translateY(-420px) scale(1.15); opacity: 0; }
+}
+
+/* D. スポットライト: 左のタイピング欄の中央に出す */
+.cheer-spotlight {
+  position: absolute;
+  top: 50%;
+  left: calc((100% - 500px) / 2);
+  transform: translate(-50%, -50%);
+  max-width: calc(100% - 560px);
+  min-width: 320px;
+  padding: 20px 30px;
+  border-radius: 16px;
+  background: rgba(44, 62, 80, 0.92);
+  color: #fff;
+  text-align: center;
+  box-shadow: 0 0 0 4px #fdd835, 0 10px 30px rgba(0, 0, 0, 0.3);
+  animation: cheerSpotIn 0.5s ease-out;
+}
+.cheer-spotlight-eyebrow { color: #fdd835; font-weight: bold; letter-spacing: 0.05em; }
+.cheer-spotlight-name {
+  margin: 6px 0;
+  font-size: 2.2em;
+  font-weight: bold;
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.cheer-spotlight-job, .cheer-spotlight-id { font-size: 0.45em; color: #cfd8dc; flex: none; }
+.cheer-spotlight-stats { display: flex; justify-content: center; gap: 16px; color: #ffe082; font-size: 1.1em; }
+@keyframes cheerSpotIn {
+  from { transform: translate(-50%, -50%) scale(0.7); opacity: 0; }
+  to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+/* E. メーター満タンの紙吹雪 */
+.cheer-confetti {
+  position: absolute;
+  top: -20px;
+  width: 10px;
+  height: 16px;
+  border-radius: 2px;
+  animation: cheerConfetti 3s ease-in forwards;
+}
+@keyframes cheerConfetti {
+  to { top: 110%; opacity: 0.6; }
+}
+.cheer-meterfull {
+  position: absolute;
+  top: 90px;
+  left: calc((100% - 500px) / 2);
+  transform: translateX(-50%);
+  padding: 8px 20px;
+  border-radius: 20px;
+  background: #e53935;
+  color: #fff;
+  font-weight: bold;
+  white-space: nowrap;
+  animation: cheerTelopIn 0.4s ease-out;
+}
+
+/* 動きを減らす設定の人には、動かさずに出して消すだけにする */
+@media (prefers-reduced-motion: reduce) {
+  .cheer-telop-text.is-animated, .cheer-spotlight, .cheer-meterfull, .cheer-clap-received { animation: none; }
+  .cheer-float { animation: cheerFade 2.8s forwards; bottom: 20px; }
+  .cheer-confetti { display: none; }
+}
+@keyframes cheerFade {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  100% { opacity: 0; }
+}

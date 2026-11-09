@@ -18,6 +18,9 @@ import {
 } from './nameCrypto.js';
 import { getTournamentScores, getTopScores, monthsAgoDate } from './tournamentBoard.js';
 import { bestPerPlayer, addRecord } from './cpuRankings.js';
+import {
+  CheerHub, loadCheerSettings, validateCheerSettings, publicCheerSettings, rankChangeTelop,
+} from './cheer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -470,7 +473,17 @@ let tournamentState = {
 };
 
 let tournamentTimer = null;
+let tournamentOneMinuteTimer = null;
 const tournamentLobbyPlayers = {}; // socketId -> playerName
+
+// --- にぎやかし（実況テロップ・スタンプ・拍手・スポットライト・盛り上がりメーター） ---
+// 設定は管理画面から変える（DB の app_settings に保存）。参加者の画面と管理画面へ配る
+let cheerSettings = loadCheerSettings(null);
+const CHEER_ROOMS = ['tournament_lobby', 'admin_room'];
+const cheer = new CheerHub({
+  emit: (event, payload) => io.to(CHEER_ROOMS).emit(event, payload),
+  getSettings: () => cheerSettings,
+});
 
 let lobbyUpdateTimer = null;
 function emitTournamentLobbyUpdate() {
@@ -494,6 +507,7 @@ async function startTournament() {
   tournamentState.status = 'active';
   tournamentState.endTime = Date.now() + 5 * 60 * 1000; // 5 minutes
   tournamentState.participants = {};
+  cheer.reset();
 
   // Create DB record
   try {
@@ -510,8 +524,14 @@ async function startTournament() {
   }
 
   io.to('tournament_lobby').emit('tournamentStarted', { endTime: tournamentState.endTime });
+  cheer.telop('start');
 
   if (tournamentTimer) clearTimeout(tournamentTimer);
+  if (tournamentOneMinuteTimer) clearTimeout(tournamentOneMinuteTimer);
+  tournamentOneMinuteTimer = setTimeout(() => {
+    tournamentOneMinuteTimer = null;
+    if (tournamentState.status === 'active') cheer.telop('oneMinute');
+  }, 4 * 60 * 1000);
 
   tournamentTimer = setTimeout(async () => {
     tournamentState.status = 'finished';
@@ -562,7 +582,7 @@ function buildLiveRanking() {
   return Object.entries(tournamentState.participants)
     .map(([user_id, data]) => ({
       user_id, name: playerDisplayNames.get(user_id) || null,
-      score: data.score, jobType: data.jobType,
+      score: data.score, jobType: data.jobType, claps: cheer.clapsOf(user_id),
     }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 100);
@@ -572,7 +592,8 @@ function emitTournamentLiveRanking() {
   if (liveRankingUpdateTimer) return;
   liveRankingUpdateTimer = setTimeout(() => {
     liveRankingUpdateTimer = null;
-    io.to('tournament_lobby').emit('tournamentLiveRanking', buildLiveRanking());
+    // 管理画面（スポットライトを当てる人を選ぶ一覧）にも配る
+    io.to(['tournament_lobby', 'admin_room']).emit('tournamentLiveRanking', buildLiveRanking());
   }, 500);
 }
 
@@ -690,17 +711,69 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('tournamentUpdateScore', ({ playerName, score, jobType }) => {
+  socket.on('tournamentUpdateScore', ({ playerName, score, jobType } = {}) => {
     const safeName = sanitizePlayerName(playerName);
     if (!safeName || tournamentState.status !== 'active') return;
-    
+    // スコアはテロップの文言にも入るので、数値だけを受け付ける
+    if (typeof score !== 'number' || !Number.isFinite(score)) return;
+
     const currentMax = tournamentState.participants[safeName]?.score || 0;
     if (score > currentMax) {
+      const before = { ...tournamentState.participants };
       tournamentState.participants[safeName] = { score, jobType: jobType || '' };
       emitTournamentLiveRanking();
+      // 1 位の交代・3 位以内への浮上を実況テロップにする
+      const change = rankChangeTelop(before, tournamentState.participants, safeName);
+      if (change) {
+        cheer.telop(change.key, {
+          name: playerDisplayNames.get(safeName) || safeName, id: safeName, score: Math.round(score), rank: change.rank,
+        });
+      }
     } else {
       socket.emit('tournamentLiveRanking', buildLiveRanking());
     }
+  });
+
+  // --- にぎやかし ---
+  // 画面を開いたときの設定とメーターの値
+  socket.on('getCheerState', (ack) => {
+    if (typeof ack !== 'function') return;
+    ack({ settings: publicCheerSettings(cheerSettings), meter: cheer.meterState() });
+  });
+
+  // B. スタンプ（タイピングを終えた人の画面から）。イベント参加者が開催中に送ったものだけ数える
+  socket.on('sendCheerStamp', (index) => {
+    if (!tournamentLobbyPlayers[socket.id] || tournamentState.status !== 'active') return;
+    cheer.stamp(socket.id, index);
+  });
+
+  // C. 宛先つき拍手。ランキングに載っている人にだけ送れる。自分には送れない
+  socket.on('sendClap', (userId) => {
+    const me = tournamentLobbyPlayers[socket.id];
+    const target = sanitizePlayerName(userId);
+    if (!me || !target || target === me.name || tournamentState.status !== 'active') return;
+    if (!tournamentState.participants[target]) return;
+    if (cheer.clap(socket.id, target) !== null) emitTournamentLiveRanking();
+  });
+
+  // D. スポットライト（管理画面から）。開催中のランキングに載っている人を選ぶ
+  socket.on('adminSpotlight', (userId, ack) => {
+    const reply = typeof ack === 'function' ? ack : () => {};
+    const target = sanitizePlayerName(userId);
+    const data = target && tournamentState.participants[target];
+    if (tournamentState.status !== 'active') return reply({ error: 'イベントの開催中だけ使えます。' });
+    if (!data) return reply({ error: 'ランキングに載っている人を選んでください。' });
+    if (!cheer.canSpotlight()) {
+      return reply({ error: cheerSettings.spotlightEnabled ? '続けて使えません。3 秒ほどあけてください。' : 'スポットライトはオフになっています。' });
+    }
+    const ranking = buildLiveRanking();
+    const rank = ranking.findIndex(r => r.user_id === target) + 1 || null;
+    const name = playerDisplayNames.get(target) || null;
+    io.to(CHEER_ROOMS).emit('cheerSpotlight', {
+      user_id: target, name, jobType: data.jobType || '', score: data.score, rank, claps: cheer.clapsOf(target),
+    });
+    cheer.telop('spotlight', { name: name || target, id: target, score: Math.round(data.score), rank });
+    reply({ ok: true });
   });
 
   socket.on('joinRoom', ({ roomId, playerName, jobType }) => {
@@ -831,6 +904,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
+    cheer.forget(socket.id);
     if (tournamentLobbyPlayers[socket.id]) {
       delete tournamentLobbyPlayers[socket.id];
       emitTournamentLobbyUpdate();
@@ -1022,6 +1096,39 @@ app.patch('/admin-api/cpu-categories', async (req, res) => {
   }
 });
 
+// --- 管理者用 API: にぎやかしの設定 ---
+const CHEER_SETTINGS_KEY = 'cheer';
+
+async function reloadCheerSettings() {
+  const db = await getDb();
+  const row = await db.get('SELECT value FROM app_settings WHERE key = ?', [CHEER_SETTINGS_KEY]);
+  let saved = null;
+  try { saved = row ? JSON.parse(row.value) : null; } catch { saved = null; }
+  cheerSettings = loadCheerSettings(saved);
+  io.emit('cheerSettings', publicCheerSettings(cheerSettings));
+}
+
+app.get('/admin-api/cheer-settings', (req, res) => {
+  res.json(cheerSettings);
+});
+
+app.put('/admin-api/cheer-settings', async (req, res) => {
+  const r = validateCheerSettings(req.body);
+  if (!r.ok) return res.status(400).json({ error: r.error });
+  try {
+    const db = await getDb();
+    await db.run(
+      `INSERT INTO app_settings (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [CHEER_SETTINGS_KEY, JSON.stringify(r.settings)]);
+    await reloadCheerSettings();
+    res.json(cheerSettings);
+  } catch (err) {
+    console.error('Error saving cheer settings:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // 氏名の暗号化鍵を読み込む（無ければ氏名は保存しない）
 initNameCrypto();
 
@@ -1056,6 +1163,7 @@ server.listen(PORT, '0.0.0.0', () => {
   encryptLegacyPlainNames();
   reloadCustomWords().catch(err => console.error('Error loading custom words:', err));
   reloadCpuCategories().catch(err => console.error('Error loading CPU categories:', err));
+  reloadCheerSettings().catch(err => console.error('Error loading cheer settings:', err));
 
   // 予約したイベントを自動で開始する。
   // 予定時刻に待機室が 0 人ならスキップ（参加者のいない大会記録を作らない）。

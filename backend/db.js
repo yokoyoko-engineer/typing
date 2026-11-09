@@ -90,6 +90,12 @@ export async function getDb() {
         category TEXT PRIMARY KEY
       );
 
+      -- 管理画面で変える設定（key ごとに JSON で保存。例: cheer = にぎやかしの設定）
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+
       CREATE INDEX IF NOT EXISTS idx_scores_user_id ON scores(user_id);
       CREATE INDEX IF NOT EXISTS idx_scores_score ON scores(score);
       CREATE INDEX IF NOT EXISTS idx_scores_play_date ON scores(play_date);
