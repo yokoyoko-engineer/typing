@@ -47,7 +47,7 @@ function TournamentRanking({ socket, playerName, jobType, globalLegends, highest
     }, [socket]);
 
     return (
-        <div style={{ width: '440px', flex: 'none', paddingLeft: '20px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
+        <div style={{ width: '480px', flex: 'none', paddingLeft: '20px', display: 'flex', flexDirection: 'column', height: '100%', boxSizing: 'border-box' }}>
             <div style={{ background: '#f5f5f5', borderRadius: '10px', padding: '15px', flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
                 <h3 style={{ margin: '0 0 15px 0', textAlign: 'center', color: '#2c3e50' }}>
                     🔥 リアルタイムランキング
@@ -73,12 +73,13 @@ function TournamentRanking({ socket, playerName, jobType, globalLegends, highest
                                             <td style={{ padding: '8px 5px', width: '35px', color: isLegendBeat ? '#000' : (idx < 3 ? '#e8734a' : '#888'), borderRadius: '5px 0 0 5px' }}>
                                                 {idx + 1}.
                                             </td>
-                                            <td title={`${entry.jobType ? `[${entry.jobType}] ` : ''}${entry.name || entry.user_id}`} style={{ padding: '8px 5px', color: isLegendBeat ? '#000' : 'inherit' }}>
+                                            <td title={`${entry.jobType ? `[${entry.jobType}] ` : ''}${entry.user_id}${entry.name ? ` ${entry.name}` : ''}`} style={{ padding: '8px 5px', color: isLegendBeat ? '#000' : 'inherit' }}>
                                                 {/* 改行せず 1 行に収める。社員番号は切らず、長い職種名やニックネームは … で省略する */}
                                                 <div style={{ display: 'flex', justifyContent: 'center', gap: '5px', whiteSpace: 'nowrap' }}>
                                                     {isLegendBeat && <span style={{ flex: 'none' }}>👑</span>}
-                                                    {entry.jobType && <span style={{ flex: 'none', maxWidth: '38%', overflow: 'hidden', textOverflow: 'ellipsis' }}>[{entry.jobType}]</span>}
-                                                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.name || entry.user_id}</span>
+                                                    {entry.jobType && <span style={{ flex: 'none', maxWidth: '30%', overflow: 'hidden', textOverflow: 'ellipsis' }}>[{entry.jobType}]</span>}
+                                                    <span style={{ flex: 'none' }}>{entry.user_id}</span>
+                                                    {entry.name && <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.name}</span>}
                                                 </div>
                                             </td>
                                             <td style={{ padding: '8px 5px', width: '95px', textAlign: 'center', fontWeight: 'bold', color: isLegendBeat ? '#000' : '#ff9800' }}>
