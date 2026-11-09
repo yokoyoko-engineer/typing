@@ -17,6 +17,7 @@ import {
   initNameCrypto, hasNameKey, encryptName, isEncryptedName,
 } from './nameCrypto.js';
 import { getTournamentScores, getTopScores, monthsAgoDate } from './tournamentBoard.js';
+import { bestPerPlayer, addRecord } from './cpuRankings.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -106,9 +107,8 @@ app.get('/api/rankings/:genre/:level', async (req, res) => {
   const { genre, level } = req.params;
   const rankings = await getRankingsData();
   const key = `${genre}_lv${level}`;
-  const list = [...(rankings[key] || [])];
-  list.sort((a, b) => (b.score || 0) - (a.score || 0) || a.time - b.time);
-  res.json(list);
+  // 同じ社員番号は一番良い記録だけ（以前に保存された重複もここで 1 行にまとめる）
+  res.json(bestPerPlayer(rankings[key]));
 });
 
 app.post('/api/rankings/:genre/:level', async (req, res) => {
@@ -128,15 +128,10 @@ app.post('/api/rankings/:genre/:level', async (req, res) => {
     try {
       const rankings = await getRankingsData();
       const key = `${genre}_lv${level}`;
-      
-      if (!rankings[key]) {
-        rankings[key] = [];
-      }
-      
-      rankings[key].push({ username: safeName, time, date: new Date().toISOString(), jobType: jobType || '', score: score || 0 });
-      rankings[key].sort((a, b) => (b.score || 0) - (a.score || 0) || a.time - b.time);
-      rankings[key] = rankings[key].slice(0, 30); // TOP 30を維持
-      
+      // 同じ社員番号は一番良い記録だけを残して TOP 30 を維持する
+      rankings[key] = addRecord(rankings[key],
+        { username: safeName, time, date: new Date().toISOString(), jobType: jobType || '', score: score || 0 });
+
       await saveRankingsData(rankings);
       
       res.json(rankings[key]);

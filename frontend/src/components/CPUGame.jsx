@@ -698,7 +698,8 @@ export default function CPUGame({ hiddenCategories = [], onBackToHome }) {
                                 </h3>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.85em', maxHeight: '300px', overflowY: 'auto', paddingRight: '5px' }}>
                                     {latestRankings.slice(0, 30).map((entry, idx) => { // show up to top 30
-                                        const isMe = entry.score === stats.finalScore && entry.time === finalTime && entry.username === playerName;
+                                        // ランキングは 1 人 1 行（自己ベスト）なので、自分の行を強調する
+                                        const isMe = entry.username === playerName;
                                         const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
                                         return (
                                             <div key={idx} style={{
