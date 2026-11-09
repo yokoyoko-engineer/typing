@@ -40,8 +40,10 @@ test('スタンプの数・文字・重複、メーターの目標、テロッ�
   assert.equal(validateCheerSettings({ ...validInput(), stamps: ['👏', '👏'] }).ok, false);
   assert.equal(validateCheerSettings({ ...validInput(), stamps: ['<b>'] }).ok, false);
   assert.equal(validateCheerSettings({ ...validInput(), stamps: ['a b'] }).ok, false);
-  assert.equal(validateCheerSettings({ ...validInput(), meterGoal: 5 }).ok, false);
-  assert.equal(validateCheerSettings({ ...validInput(), meterGoal: 1.5 }).ok, false);
+  assert.equal(validateCheerSettings({ ...validInput(), meterFirstGoal: 0 }).ok, false);
+  assert.equal(validateCheerSettings({ ...validInput(), meterFirstGoal: 1.5 }).ok, false);
+  assert.equal(validateCheerSettings({ ...validInput(), meterGoalStep: -1 }).ok, false);
+  assert.equal(validateCheerSettings({ ...validInput(), meterGoalStep: 0 }).ok, true);
   assert.equal(validateCheerSettings({ ...validInput(), stampsEnabled: 'yes' }).ok, false);
   assert.equal(validateCheerSettings({ ...validInput(), telops: { ...validInput().telops, start: 'あ'.repeat(61) } }).ok, false);
   // 空のテロップは「そのテロップを出さない」として保存できる
@@ -51,11 +53,13 @@ test('スタンプの数・文字・重複、メーターの目標、テロッ�
 });
 
 test('保存済みの設定に無い項目や壊れた値は初期値で補う', () => {
-  const s = loadCheerSettings({ stampsEnabled: false, stamps: ['🍣', '', '🍣'], meterGoal: -1, telops: { start: 'はじめ' } });
+  const s = loadCheerSettings({ stampsEnabled: false, stamps: ['🍣', '', '🍣'], meterGoal: 300, meterFirstGoal: -1, telops: { start: 'はじめ' } });
   assert.equal(s.stampsEnabled, false);
   assert.equal(s.clapEnabled, true);
   assert.deepEqual(s.stamps, ['🍣']);
-  assert.equal(s.meterGoal, DEFAULT_CHEER_SETTINGS.meterGoal);
+  assert.equal(s.meterFirstGoal, 10);
+  assert.equal(s.meterGoalStep, 10);
+  assert.equal('meterGoal' in s, false); // 以前の 1 つの目標は使わない
   assert.equal(s.telops.start, 'はじめ');
   assert.equal(s.telops.leader, DEFAULT_CHEER_SETTINGS.telops.leader);
   assert.equal('telops' in publicCheerSettings(s), false);
@@ -73,7 +77,7 @@ test('スタンプは 1 接続あたり 1 秒に 1 回まで。0.5 秒ごとに�
   assert.equal(hub.stamp('c', 99), false);   // 無いスタンプ
   assert.equal(sent.length, 0);
   advance(BURST_INTERVAL_MS);
-  assert.deepEqual(sent, [['cheerBurst', { stamps: [1, 0, 1], meter: { value: 2, goal: DEFAULT_CHEER_SETTINGS.meterGoal, level: 0 } }]]);
+  assert.deepEqual(sent, [['cheerBurst', { stamps: [1, 0, 1], meter: { value: 2, goal: 10, level: 0, maxLevel: 10 } }]]);
   advance(SEND_INTERVAL_MS);
   assert.equal(hub.stamp('a', 0), true);     // 1 秒たてばまた送れる
 });
@@ -89,17 +93,34 @@ test('拍手は相手ごとに数え、メーターにも足す', () => {
   assert.equal(hub.clapsOf('100'), 0);
 });
 
-test('メーターが目標に届くと満タンを配り、0 から次のレベルへ', () => {
-  const { hub, sent, advance } = makeHub({ meterGoal: 10 });
+test('メーターは Lv.1 が 10、Lv.2 が 20 … と目標が増え、Lv.10 で打ち止め', () => {
+  const { hub, sent, advance } = makeHub();
   for (let i = 0; i < 10; i++) hub.stamp(`s${i}`, 0);
-  assert.deepEqual(sent.find(([ev]) => ev === 'cheerMeterFull'), ['cheerMeterFull', { level: 1 }]);
-  assert.deepEqual(sent.find(([ev]) => ev === 'cheerTelop'), ['cheerTelop', { text: '盛り上がりメーター満タン！ Lv.1 達成' }]);
+  assert.deepEqual(sent.find(([ev]) => ev === 'cheerMeterFull'), ['cheerMeterFull', { level: 1, maxLevel: 10 }]);
+  assert.deepEqual(sent.find(([ev]) => ev === 'cheerTelop'), ['cheerTelop', { text: '盛り上がり Lv.1 達成！' }]);
   advance(BURST_INTERVAL_MS);
-  assert.deepEqual(hub.meterState(), { value: 0, goal: 10, level: 1 });
+  assert.deepEqual(hub.meterState(), { value: 0, goal: 20, level: 1, maxLevel: 10 });
+  // 残りの目標（20 + 30 + … + 100 = 540）をためると Lv.10
+  for (let i = 0; i < 540; i++) hub.addMeter(1);
+  assert.equal(hub.meterState().level, 10);
+  assert.equal(hub.meterState().goal, null);
+  assert.deepEqual(sent.filter(([ev]) => ev === 'cheerMeterFull').map(([, p]) => p.level), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  hub.addMeter(100);
+  assert.deepEqual(hub.meterState(), { value: 0, goal: null, level: 10, maxLevel: 10 });
+});
+
+test('主張スタンプを出すと、浮かべる文言もまとめて配る', () => {
+  const { hub, sent, advance } = makeHub();
+  hub.postClaim('a', '100', 2);
+  hub.postClaim('b', '200', 2);
+  advance(BURST_INTERVAL_MS);
+  const burst = sent.find(([ev]) => ev === 'cheerBurst')[1];
+  assert.deepEqual(burst.claims, ['初300！', '初300！']);
+  assert.equal(burst.meter.value, 2);
 });
 
 test('オフにした機能は数えない', () => {
-  const { hub, sent, advance } = makeHub({ stampsEnabled: false, clapEnabled: false, meterEnabled: false, telopEnabled: false, spotlightEnabled: false });
+  const { hub, sent, advance } = makeHub({ stampsEnabled: false, clapEnabled: false, meterEnabled: false, telopEnabled: false, spotlightEnabled: false, claimsEnabled: false });
   assert.equal(hub.stamp('a', 0), false);
   assert.equal(hub.clap('a', '100'), null);
   assert.equal(hub.telop('start'), false);

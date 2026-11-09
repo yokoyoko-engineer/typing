@@ -9,8 +9,8 @@ const FEATURES = [
   { key: 'stampsEnabled', label: 'B. リアクションスタンプ', note: 'タイピングを終えた人がスタンプを送り、画面に浮かべる' },
   { key: 'clapEnabled', label: 'C. 宛先つき拍手', note: 'ランキングの人を選んで拍手を送る。本人に「拍手が届きました」と出る' },
   { key: 'spotlightEnabled', label: 'D. スポットライト', note: '管理画面で選んだ人を大きく表示する' },
-  { key: 'meterEnabled', label: 'E. 盛り上がりメーター', note: 'スタンプ・拍手・主張・いいねでたまり、満タンで紙吹雪' },
-  { key: 'claimsEnabled', label: 'F. 主張スタンプ', note: '「自己ベスト更新！」などを本人がスコアの横に出し、ほかの人が「いいね」できる' },
+  { key: 'meterEnabled', label: 'E. 盛り上がりメーター', note: 'スタンプ・拍手・主張・いいねでたまる。Lv.10 まで、レベルが上がるほど演出が豪華に' },
+  { key: 'claimsEnabled', label: 'F. 主張スタンプ', note: '「自己ベスト更新！」などを本人がランキングの自分の行に出し、ほかの人が「いいね」できる。出すと画面に浮かぶ' },
 ];
 
 const TELOPS = [
@@ -18,7 +18,7 @@ const TELOPS = [
   { key: 'leader', label: '1位が替わったとき', vars: '{name} {id} {score}' },
   { key: 'rankUp', label: '3位以内に浮上したとき', vars: '{name} {id} {score} {rank}' },
   { key: 'oneMinute', label: '残り1分', vars: '' },
-  { key: 'meterFull', label: 'メーター満タン', vars: '{level}' },
+  { key: 'meterFull', label: '盛り上がりのレベルアップ', vars: '{level}' },
   { key: 'spotlight', label: 'スポットライト', vars: '{name} {id} {score} {rank}' },
   { key: 'claim', label: '主張スタンプを出したとき', vars: '{name} {id} {claim}' },
 ];
@@ -85,9 +85,9 @@ export function CheerLivePanel({ socket }) {
           <h4 style={{ margin: '0 0 8px', color: '#5c6bc0' }}>盛り上がりメーター</h4>
           {meter ? (
             <div style={{ marginBottom: '15px' }}>
-              Lv.{meter.level}　{meter.value} / {meter.goal}
+              Lv.{meter.level}　{meter.goal == null ? 'MAX' : `${meter.value} / ${meter.goal}`}
               <div style={{ height: '8px', background: '#e0e0e0', borderRadius: '4px', overflow: 'hidden', marginTop: '5px' }}>
-                <div style={{ width: `${Math.min(100, (meter.value / Math.max(1, meter.goal)) * 100)}%`, height: '100%', background: '#ff9800' }} />
+                <div style={{ width: `${meter.goal == null ? 100 : Math.min(100, (meter.value / Math.max(1, meter.goal)) * 100)}%`, height: '100%', background: '#ff9800' }} />
               </div>
             </div>
           ) : <p style={{ color: '#aaa' }}>—</p>}
@@ -196,7 +196,7 @@ export function CheerSettingsPanel() {
       const res = await fetch(API, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...draft, meterGoal: Number(form.meterGoal) }),
+        body: JSON.stringify({ ...draft, meterFirstGoal: Number(form.meterFirstGoal), meterGoalStep: Number(form.meterGoalStep) }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
@@ -237,18 +237,29 @@ export function CheerSettingsPanel() {
             表示: {stamps.length ? stamps.join('　') : '—'}
           </span>
         </label>
-        <label>
-          <span style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px' }}>盛り上がりメーターの目標（スタンプ・拍手の回数、10〜10000）</span>
-          <input type="number" min="10" max="10000" step="1" value={form.meterGoal} onChange={e => set({ meterGoal: e.target.value === '' ? '' : Number(e.target.value) })} style={inputStyle} />
+        <div>
+          <span style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px' }}>盛り上がりメーターの目標（スタンプ・拍手・主張・いいねの回数）</span>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              Lv.1 まで
+              <input type="number" min="1" max="10000" step="1" value={form.meterFirstGoal} onChange={e => set({ meterFirstGoal: e.target.value === '' ? '' : Number(e.target.value) })} style={{ ...inputStyle, width: '90px' }} />
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              1 レベルごとに +
+              <input type="number" min="0" max="10000" step="1" value={form.meterGoalStep} onChange={e => set({ meterGoalStep: e.target.value === '' ? '' : Number(e.target.value) })} style={{ ...inputStyle, width: '90px' }} />
+            </label>
+          </div>
           <span style={{ display: 'block', fontSize: '0.85em', color: '#777', marginTop: '4px' }}>
-            目安: 20 人が 1 秒に 1 回押すと、50 なら約 3 秒で満タン
+            {Number.isInteger(form.meterFirstGoal) && Number.isInteger(form.meterGoalStep)
+              ? `Lv.1: ${form.meterFirstGoal}、Lv.2: ${form.meterFirstGoal + form.meterGoalStep}、… Lv.10: ${form.meterFirstGoal + form.meterGoalStep * 9}（Lv.10 まで合計 ${form.meterFirstGoal * 10 + form.meterGoalStep * 45} 回。Lv.10 で打ち止め）`
+              : '整数で入力してください'}
           </span>
-        </label>
+        </div>
       </div>
 
       <label style={{ display: 'block', marginBottom: '20px' }}>
         <span style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px' }}>主張スタンプ（1 行に 1 つ・8 個まで・15 文字まで・上から順に並ぶ）</span>
-        <textarea value={claimText} onChange={e => { setClaimText(e.target.value); setMessage(null); }} rows={4} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} placeholder={'自己ベスト更新！\n初250！'} />
+        <textarea value={claimText} onChange={e => { setClaimText(e.target.value); setMessage(null); }} rows={Math.max(5, claimText.split('\n').length + 1)} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} placeholder={'自己ベスト更新！\n初250！'} />
       </label>
 
       <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>テロップの文言（空にするとそのテロップは出ません・60 文字まで）</div>

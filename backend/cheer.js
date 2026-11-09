@@ -19,13 +19,16 @@ export const DEFAULT_CHEER_SETTINGS = Object.freeze({
   claimsEnabled: true,     // F. 主張スタンプ（本人がスコアの横に出す。ほかの人が「いいね」できる）
   stamps: ['👏', '🎉', '🔥', '😲', '❤️'],
   claims: ['自己ベスト更新！', '初250！', '初300！', '初トップ10！'],
-  meterGoal: 50,
+  // 盛り上がりメーター: Lv.1 までの目標 meterFirstGoal、以降 1 レベルごとに meterGoalStep ずつ増やす
+  // （初期値は Lv.1=10, Lv.2=20, … Lv.10=100）。Lv.10 で打ち止め
+  meterFirstGoal: 10,
+  meterGoalStep: 10,
   telops: {
     start: 'イベント開始！ 5分間の勝負です',
     leader: '{name} さんが1位に！ スコア {score}',
     rankUp: '{name} さんが{rank}位に浮上！ スコア {score}',
     oneMinute: '残り1分！ ラストスパート！',
-    meterFull: '盛り上がりメーター満タン！ Lv.{level} 達成',
+    meterFull: '盛り上がり Lv.{level} 達成！',
     spotlight: '{name} さんにスポットライト！',
     claim: '{name} さん「{claim}」',
   },
@@ -36,8 +39,16 @@ export const CLAIM_MAX_COUNT = 8;
 export const CLAIM_MAX_LENGTH = 15;
 export const STAMP_MAX_LENGTH = 8;   // 1 つのスタンプの文字数（絵文字は複数の文字でできていることがある）
 export const TELOP_MAX_LENGTH = 60;
-export const METER_GOAL_MIN = 10;
+export const METER_GOAL_MIN = 1;
 export const METER_GOAL_MAX = 10000;
+export const METER_STEP_MAX = 10000;
+export const METER_MAX_LEVEL = 10;
+
+// 次のレベル（level + 1）に上がるまでの目標。最大レベルなら null
+export function meterGoalFor(settings, level) {
+  if (level >= METER_MAX_LEVEL) return null;
+  return settings.meterFirstGoal + settings.meterGoalStep * level;
+}
 
 const FLAGS = ['telopEnabled', 'stampsEnabled', 'clapEnabled', 'spotlightEnabled', 'meterEnabled', 'claimsEnabled'];
 const BAD_CHARS = /[\u0000-\u001f\u007f<>]/;
@@ -105,10 +116,14 @@ export function validateCheerSettings(input) {
     claims.push(t);
   }
   settings.claims = claims;
-  if (!Number.isInteger(input.meterGoal) || input.meterGoal < METER_GOAL_MIN || input.meterGoal > METER_GOAL_MAX) {
-    return { ok: false, error: `メーターの目標は ${METER_GOAL_MIN}〜${METER_GOAL_MAX} の整数で指定してください。` };
+  if (!Number.isInteger(input.meterFirstGoal) || input.meterFirstGoal < METER_GOAL_MIN || input.meterFirstGoal > METER_GOAL_MAX) {
+    return { ok: false, error: `Lv.1 までの目標は ${METER_GOAL_MIN}〜${METER_GOAL_MAX} の整数で指定してください。` };
   }
-  settings.meterGoal = input.meterGoal;
+  if (!Number.isInteger(input.meterGoalStep) || input.meterGoalStep < 0 || input.meterGoalStep > METER_STEP_MAX) {
+    return { ok: false, error: `レベルごとに増やす数は 0〜${METER_STEP_MAX} の整数で指定してください。` };
+  }
+  settings.meterFirstGoal = input.meterFirstGoal;
+  settings.meterGoalStep = input.meterGoalStep;
   const telops = input.telops;
   if (!telops || typeof telops !== 'object') return { ok: false, error: 'テロップの文言の形式が正しくありません。' };
   for (const k of TELOP_KEYS) {
@@ -135,8 +150,12 @@ export function loadCheerSettings(saved) {
     const claims = [...new Set(saved.claims.map(checkClaim).filter(Boolean))].slice(0, CLAIM_MAX_COUNT);
     if (claims.length > 0) merged.claims = claims;
   }
-  if (Number.isInteger(saved.meterGoal) && saved.meterGoal >= METER_GOAL_MIN && saved.meterGoal <= METER_GOAL_MAX) {
-    merged.meterGoal = saved.meterGoal;
+  // 以前の「1 つの目標（meterGoal）」で保存した設定は読まない（新しい初期値 10, 20, … を使う）
+  if (Number.isInteger(saved.meterFirstGoal) && saved.meterFirstGoal >= METER_GOAL_MIN && saved.meterFirstGoal <= METER_GOAL_MAX) {
+    merged.meterFirstGoal = saved.meterFirstGoal;
+  }
+  if (Number.isInteger(saved.meterGoalStep) && saved.meterGoalStep >= 0 && saved.meterGoalStep <= METER_STEP_MAX) {
+    merged.meterGoalStep = saved.meterGoalStep;
   }
   if (saved.telops && typeof saved.telops === 'object') {
     for (const k of TELOP_KEYS) {
@@ -152,7 +171,8 @@ export function publicCheerSettings(s) {
   return {
     telopEnabled: s.telopEnabled, stampsEnabled: s.stampsEnabled, clapEnabled: s.clapEnabled,
     spotlightEnabled: s.spotlightEnabled, meterEnabled: s.meterEnabled, claimsEnabled: s.claimsEnabled,
-    stamps: s.stamps, claims: s.claims, meterGoal: s.meterGoal,
+    stamps: s.stamps, claims: s.claims,
+    meterFirstGoal: s.meterFirstGoal, meterGoalStep: s.meterGoalStep, meterMaxLevel: METER_MAX_LEVEL,
   };
 }
 
@@ -187,6 +207,7 @@ export class CheerHub {
   // イベント開始時に呼ぶ。拍手の数やメーターを 0 に戻す
   reset() {
     this.pendingStamps = [];
+    this.pendingClaims = []; // 0.5 秒の間に出された主張スタンプの文言（画面に浮かべる）
     this.meterDirty = false;
     this.meter = { value: 0, level: 0 };
     this.claps = new Map(); // 社員番号 -> もらった拍手の数
@@ -198,7 +219,7 @@ export class CheerHub {
   }
 
   meterState() {
-    return { value: this.meter.value, goal: this.getSettings().meterGoal, level: this.meter.level };
+    return { value: this.meter.value, goal: meterGoalFor(this.getSettings(), this.meter.level), level: this.meter.level, maxLevel: METER_MAX_LEVEL };
   }
 
   clapsOf(userId) {
@@ -255,6 +276,7 @@ export class CheerHub {
     if (this.claims.get(userId)?.text === text) return null;
     if (!this.allow(socketId, 'claim')) return null;
     this.claims.set(userId, { seq: ++this.claimSeq, text, likers: new Set(), counted: new Set() });
+    if (this.pendingClaims.length < 10) this.pendingClaims.push(text);
     this.addMeter(1);
     this.scheduleBurst();
     return text;
@@ -292,16 +314,19 @@ export class CheerHub {
     return true;
   }
 
-  // E. 盛り上がりメーター。目標に届いたら満タンの演出を配り、0 から次のレベルへ
+  // E. 盛り上がりメーター。目標に届いたらレベルアップの演出を配り、0 から次のレベルへ。
+  // 目標はレベルごとに増え、Lv.10 で打ち止め（それ以上はたまらない）
   addMeter(n) {
     const s = this.getSettings();
     if (!s.meterEnabled) return;
+    const goal = meterGoalFor(s, this.meter.level);
+    if (goal === null) return;
     this.meter.value += n;
     this.meterDirty = true;
-    if (this.meter.value >= s.meterGoal) {
+    if (this.meter.value >= goal) {
       this.meter.level += 1;
       this.meter.value = 0;
-      this.emit('cheerMeterFull', { level: this.meter.level });
+      this.emit('cheerMeterFull', { level: this.meter.level, maxLevel: METER_MAX_LEVEL });
       this.telop('meterFull', { level: this.meter.level });
     }
   }
@@ -316,11 +341,14 @@ export class CheerHub {
 
   flushBurst() {
     const stamps = this.pendingStamps;
+    const claims = this.pendingClaims;
     const hasStamps = stamps.some(n => n > 0);
-    if (!hasStamps && !this.meterDirty) return;
+    if (!hasStamps && claims.length === 0 && !this.meterDirty) return;
     this.pendingStamps = [];
+    this.pendingClaims = [];
     this.meterDirty = false;
     const payload = { stamps: Array.from(stamps, n => n || 0) };
+    if (claims.length > 0) payload.claims = claims;
     if (this.getSettings().meterEnabled) payload.meter = this.meterState();
     this.emit('cheerBurst', payload);
   }

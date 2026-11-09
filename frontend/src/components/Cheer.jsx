@@ -8,7 +8,6 @@ import './Cheer.css';
 export const SEND_COOLDOWN_MS = 1000; // サーバと同じ「1 秒に 1 回まで」
 const TELOP_SHOW_MS = 8000;
 const SPOTLIGHT_SHOW_MS = 8000;
-const CONFETTI_SHOW_MS = 3500;
 const MAX_FLOATING = 24;
 
 // 設定と盛り上がりメーターの値（画面を開いたとき・つながり直したときにサーバへ聞く）
@@ -41,9 +40,16 @@ export function useCheerState(socket) {
         };
     }, [socket]);
 
-    // メーターの目標は設定を変えたらすぐ反映する
-    const shownMeter = meter && settings ? { ...meter, goal: settings.meterGoal } : meter;
+    // メーターの目標は設定を変えたらすぐ反映する（Lv.1 は 10、Lv.2 は 20 … のようにレベルで変わる）
+    const shownMeter = meter && settings ? { ...meter, goal: meterGoalFor(settings, meter.level) } : meter;
     return { settings, meter: shownMeter };
+}
+
+// 次のレベル（level + 1）に上がるまでの目標。最大レベルなら null（サーバと同じ計算）
+export function meterGoalFor(settings, level) {
+    const max = settings.meterMaxLevel || 10;
+    if (level >= max) return null;
+    return settings.meterFirstGoal + settings.meterGoalStep * level;
 }
 
 // 1 秒に 1 回までの送信。押せない間は cooling が true
@@ -89,17 +95,19 @@ export function CheerTelop({ socket, animate }) {
     );
 }
 
-// E. 盛り上がりメーター（ランキング欄の上）
+// E. 盛り上がりメーター（ランキング欄の上）。レベルが上がるほどバーの色が派手になる
 export function CheerMeter({ meter }) {
     if (!meter) return null;
-    const pct = Math.min(100, Math.round((meter.value / Math.max(1, meter.goal)) * 100));
+    const isMax = meter.goal === null || meter.goal === undefined;
+    const pct = isMax ? 100 : Math.min(100, Math.round((meter.value / Math.max(1, meter.goal)) * 100));
+    const tier = Math.min(3, Math.floor(meter.level / 3)); // Lv.0-2 / 3-5 / 6-8 / 9-10
     return (
-        <div className="cheer-meter" title={`スタンプと拍手でたまります（${meter.value} / ${meter.goal}）`}>
+        <div className={`cheer-meter tier-${tier}`} title={isMax ? '盛り上がりは最高レベルです' : `スタンプ・拍手・主張・いいねでたまります（${meter.value} / ${meter.goal}）`}>
             <span className="cheer-meter-label">盛り上がり Lv.{meter.level}</span>
-            <div className="cheer-meter-track" role="meter" aria-valuemin={0} aria-valuemax={meter.goal} aria-valuenow={meter.value} aria-label="盛り上がりメーター">
+            <div className="cheer-meter-track" role="meter" aria-valuemin={0} aria-valuemax={isMax ? 1 : meter.goal} aria-valuenow={isMax ? 1 : meter.value} aria-label="盛り上がりメーター">
                 <div className="cheer-meter-fill" style={{ width: `${pct}%` }} />
             </div>
-            <span className="cheer-meter-num">{meter.value}/{meter.goal}</span>
+            <span className="cheer-meter-num">{isMax ? 'MAX' : `${meter.value}/${meter.goal}`}</span>
         </div>
     );
 }
@@ -183,12 +191,12 @@ export function ClaimBadge({ claim, canLike, liked, onLike }) {
     );
 }
 
-// 打っていない間だけ表示する演出（浮かぶスタンプ・スポットライト・紙吹雪）。
+// 打っていない間だけ表示する演出（浮かぶスタンプ・主張・スポットライト・レベルアップ）。
 // 表示している間だけ受け取るので、打っている間に届いた分はあとから出ない
 export function CheerEffects({ socket, settings }) {
     const [floating, setFloating] = useState([]); // { id, label, left, delay }
     const [spotlight, setSpotlight] = useState(null);
-    const [confetti, setConfetti] = useState(null); // { id, level }
+    const [levelUp, setLevelUp] = useState(null); // { id, level }
     const idRef = useRef(0);
     const settingsRef = useRef(settings);
     settingsRef.current = settings;
@@ -201,11 +209,14 @@ export function CheerEffects({ socket, settings }) {
             timers.add(t);
         };
 
-        const onBurst = ({ stamps } = {}) => {
+        const onBurst = ({ stamps, claims } = {}) => {
             const list = settingsRef.current?.stamps || [];
-            if (!Array.isArray(stamps)) return;
             const items = [];
-            stamps.forEach((n, i) => {
+            // 主張スタンプ（「初300！」など）も浮かべる。たくさん来ても 4 個まで
+            (Array.isArray(claims) ? claims : []).slice(0, 4).forEach(text => {
+                items.push({ id: ++idRef.current, label: text, claim: true, left: 5 + Math.random() * 75, delay: Math.random() * 400 });
+            });
+            (Array.isArray(stamps) ? stamps : []).forEach((n, i) => {
                 if (!n || !list[i]) return;
                 // 同じスタンプが大量に来ても 4 個までにして、残りは「×数」で見せる
                 const shown = Math.min(n, 4);
@@ -230,8 +241,8 @@ export function CheerEffects({ socket, settings }) {
         };
         const onFull = ({ level }) => {
             const id = ++idRef.current;
-            setConfetti({ id, level });
-            later(() => setConfetti(cur => (cur && cur.id === id ? null : cur)), CONFETTI_SHOW_MS);
+            setLevelUp({ id, level });
+            later(() => setLevelUp(cur => (cur && cur.id === id ? null : cur)), levelFx(level).duration);
         };
 
         socket.on('cheerBurst', onBurst);
@@ -248,9 +259,9 @@ export function CheerEffects({ socket, settings }) {
     return (
         <div className="cheer-effects" aria-hidden={!spotlight}>
             {floating.map(f => (
-                <span key={f.id} className="cheer-float" style={{ left: `${f.left}%`, animationDelay: `${f.delay}ms` }}>{f.label}</span>
+                <span key={f.id} className={`cheer-float${f.claim ? ' is-claim' : ''}`} style={{ left: `${f.left}%`, animationDelay: `${f.delay}ms` }}>{f.label}</span>
             ))}
-            {confetti && <Confetti key={confetti.id} level={confetti.level} />}
+            {levelUp && <LevelUp key={levelUp.id} level={levelUp.level} stamps={settings?.stamps || []} />}
             {spotlight && (
                 <div key={spotlight.id} className="cheer-spotlight" role="status">
                     <div className="cheer-spotlight-eyebrow">🔦 スポットライト</div>
@@ -270,20 +281,75 @@ export function CheerEffects({ socket, settings }) {
     );
 }
 
-const CONFETTI_COLORS = ['#ff9800', '#5c6bc0', '#e53935', '#43a047', '#fdd835', '#8e24aa'];
-function Confetti({ level }) {
-    const pieces = useRef(Array.from({ length: 40 }, (_, i) => ({
-        left: Math.random() * 100,
-        delay: Math.random() * 600,
-        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-        rotate: Math.round(Math.random() * 360),
-    }))).current;
+const FX_COLORS = ['#ff9800', '#5c6bc0', '#e53935', '#43a047', '#fdd835', '#8e24aa', '#00acc1', '#ec407a'];
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+// 盛り上がりのレベルごとの演出。レベルが上がるほど豪華にする
+//  Lv.1-2 紙吹雪と帯 / Lv.3- 花火 / Lv.5- 画面のふちが光る / Lv.6- スタンプの雨
+//  Lv.7- 中央に大きく「Lv.7」 / Lv.8- 金色 / Lv.10 虹色で「MAX」
+export function levelFx(level) {
+    const L = Math.max(1, Math.min(10, level || 1));
+    return {
+        level: L,
+        confetti: 12 + L * 12,                 // 24 … 132 枚
+        fireworks: L >= 3 ? Math.min(6, L - 2) : 0,
+        flash: L >= 5,
+        emojiRain: L >= 6 ? (L - 5) * 6 : 0,   // 6 … 30 個
+        big: L >= 7,
+        gold: L >= 8,
+        rainbow: L >= 10,
+        duration: 3000 + L * 400,              // 3.4 … 7 秒
+    };
+}
+
+function LevelUp({ level, stamps }) {
+    const fx = levelFx(level);
+    // 位置や色は最初の 1 回だけ決める（描き直しで散らばり方が変わらないように）
+    const parts = useRef(null);
+    if (!parts.current) {
+        const spread = Math.max(600, fx.duration - 3000); // 長い演出ほど後からも降らせる
+        parts.current = {
+            confetti: Array.from({ length: fx.confetti }, () => ({
+                left: Math.random() * 100, delay: Math.random() * spread,
+                color: fx.gold && Math.random() < 0.5 ? '#ffd700' : pick(FX_COLORS),
+                rotate: Math.round(Math.random() * 360), wide: Math.random() < 0.3,
+            })),
+            fireworks: Array.from({ length: fx.fireworks }, (_, i) => ({
+                left: 10 + Math.random() * 80, top: 12 + Math.random() * 40, delay: i * 450,
+                color: fx.gold ? '#ffd700' : pick(FX_COLORS),
+                sparks: Array.from({ length: 14 }, (_, k) => {
+                    const a = (Math.PI * 2 * k) / 14;
+                    const r = 60 + Math.random() * 40 + fx.level * 4;
+                    return { dx: Math.round(Math.cos(a) * r), dy: Math.round(Math.sin(a) * r) };
+                }),
+            })),
+            rain: Array.from({ length: fx.emojiRain }, () => ({
+                left: Math.random() * 95, delay: Math.random() * spread, label: stamps.length ? pick(stamps) : '🎉',
+            })),
+        };
+    }
+    const { confetti, fireworks, rain } = parts.current;
+    const isMax = fx.level >= 10;
     return (
-        <>
-            {pieces.map((p, i) => (
-                <span key={i} className="cheer-confetti" style={{ left: `${p.left}%`, background: p.color, animationDelay: `${p.delay}ms`, transform: `rotate(${p.rotate}deg)` }} />
+        <div className={`cheer-levelup lv-${fx.level}${fx.gold ? ' is-gold' : ''}${fx.rainbow ? ' is-rainbow' : ''}`}>
+            {fx.flash && <div className="cheer-levelup-flash" />}
+            {confetti.map((p, i) => (
+                <span key={`c${i}`} className="cheer-confetti" style={{ left: `${p.left}%`, background: p.color, animationDelay: `${p.delay}ms`, width: p.wide ? '14px' : '10px', transform: `rotate(${p.rotate}deg)` }} />
             ))}
-            <div className="cheer-meterfull">盛り上がりメーター満タン！ Lv.{level}</div>
-        </>
+            {fireworks.map((f, i) => (
+                <span key={`f${i}`} className="cheer-firework" style={{ left: `${f.left}%`, top: `${f.top}%` }}>
+                    {f.sparks.map((sp, k) => (
+                        <span key={k} className="cheer-spark" style={{ '--dx': `${sp.dx}px`, '--dy': `${sp.dy}px`, background: f.color, animationDelay: `${f.delay}ms` }} />
+                    ))}
+                </span>
+            ))}
+            {rain.map((r, i) => (
+                <span key={`r${i}`} className="cheer-rain" style={{ left: `${r.left}%`, animationDelay: `${r.delay}ms` }}>{r.label}</span>
+            ))}
+            {fx.big && <div className="cheer-levelup-big">{isMax ? 'MAX' : `Lv.${fx.level}`}</div>}
+            <div className="cheer-meterfull" style={{ fontSize: `${1 + fx.level * 0.1}em` }}>
+                {isMax ? '盛り上がり MAX！！ 最高潮です！' : `盛り上がり Lv.${fx.level}${fx.level >= 7 ? '！！' : '！'}`}
+            </div>
+        </div>
     );
 }
