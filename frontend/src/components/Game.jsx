@@ -308,7 +308,7 @@ export default function Game({ socket, roomState, myId, onLeaveRoom }) {
       </div>
 
       {me.hp > 0 ? (
-        <div className="typing-area">
+        <div className="typing-area notranslate" translate="no">
           <MissFlash seq={missSeq} />
           <div className="target-word-japanese">
             <div className="ruby" style={{ fontSize: '0.9em', color: '#888', marginBottom: '5px' }}>

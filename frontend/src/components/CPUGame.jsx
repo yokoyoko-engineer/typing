@@ -819,7 +819,7 @@ export default function CPUGame({ hiddenCategories = [], onBackToHome }) {
                 </div>
             </div>
 
-            <div className="typing-area">
+            <div className="typing-area notranslate" translate="no">
                 <MissFlash seq={missSeq} />
                 {playerInfo.hp > 0 ? (
                     <>

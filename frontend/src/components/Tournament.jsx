@@ -317,7 +317,7 @@ function TournamentBattle({
                 {gameState === 'playing' && (
                     <>
                         {/* Typing Area with Fixed Height and Flex Center */}
-                        <div className="typing-area" style={{ width: '100%', height: '350px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', padding: '2rem 1.5rem', boxSizing: 'border-box', background: '#f8f9fa', borderRadius: '12px', border: '1px solid #e8e8e8' }}>
+                        <div className="typing-area notranslate" translate="no" style={{ width: '100%', height: '350px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', padding: '2rem 1.5rem', boxSizing: 'border-box', background: '#f8f9fa', borderRadius: '12px', border: '1px solid #e8e8e8' }}>
                             <MissFlash seq={missSeq} />
                             {currentWord ? (
                                 <>
