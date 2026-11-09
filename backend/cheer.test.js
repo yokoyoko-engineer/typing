@@ -131,9 +131,9 @@ test('オフにした機能は数えない', () => {
 
 test('テロップは間隔をあけて 1 件ずつ配り、たまりすぎたら古いものを捨てる', () => {
   const { hub, sent, advance } = makeHub();
-  hub.telop('start');
+  hub.telop('start', { minutes: 10 });
   for (let i = 1; i <= 5; i++) hub.telop('leader', { name: `人${i}`, score: i });
-  assert.deepEqual(sent.map(([, p]) => p.text), ['イベント開始！ 5分間の勝負です']);
+  assert.deepEqual(sent.map(([, p]) => p.text), ['イベント開始！ 10分間の勝負です']);
   advance(TELOP_INTERVAL_MS);
   advance(TELOP_INTERVAL_MS);
   advance(TELOP_INTERVAL_MS);
@@ -212,4 +212,9 @@ test('いいねは 1 つの主張に 1 人 1 回。押し直すと取り消し�
   assert.equal(hub.claimOf('100').likes, 0);
   hub.reset();
   assert.equal(hub.claimOf('100'), null);
+});
+
+test('開始テロップが以前の初期値（5分間 固定）のままなら {minutes} 入りの初期値に置き換え、書き換えた文言はそのまま残す', () => {
+  assert.equal(loadCheerSettings({ telops: { start: 'イベント開始！ 5分間の勝負です' } }).telops.start, 'イベント開始！ {minutes}分間の勝負です');
+  assert.equal(loadCheerSettings({ telops: { start: 'スタート！' } }).telops.start, 'スタート！');
 });

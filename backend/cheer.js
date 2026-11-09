@@ -24,7 +24,7 @@ export const DEFAULT_CHEER_SETTINGS = Object.freeze({
   meterFirstGoal: 10,
   meterGoalStep: 10,
   telops: {
-    start: 'イベント開始！ 5分間の勝負です',
+    start: 'イベント開始！ {minutes}分間の勝負です',
     leader: '{name} さんが1位に！ スコア {score}',
     rankUp: '{name} さんが{rank}位に浮上！ スコア {score}',
     oneMinute: '残り1分！ ラストスパート！',
@@ -33,6 +33,8 @@ export const DEFAULT_CHEER_SETTINGS = Object.freeze({
     claim: '{name} さん「{claim}」',
   },
 });
+
+const LEGACY_START_TELOP = 'イベント開始！ 5分間の勝負です';
 
 export const STAMP_MAX_COUNT = 8;
 export const CLAIM_MAX_COUNT = 8;
@@ -162,6 +164,8 @@ export function loadCheerSettings(saved) {
       const t = checkTelop(saved.telops[k]);
       if (t !== null) merged.telops[k] = t;
     }
+    // イベントの時間を変えられるようにする前の初期値（「5分間」固定）のままなら、新しい初期値に置き換える
+    if (merged.telops.start === LEGACY_START_TELOP) merged.telops.start = DEFAULT_CHEER_SETTINGS.telops.start;
   }
   return merged;
 }
@@ -176,9 +180,9 @@ export function publicCheerSettings(s) {
   };
 }
 
-// テロップの文言の {name} {id} {score} {rank} {level} {claim} を差し込む
+// テロップの文言の {name} {id} {score} {rank} {level} {claim} {minutes} を差し込む
 export function renderTelop(template, vars = {}) {
-  return String(template || '').replace(/\{(name|id|score|rank|level|claim)\}/g, (_, k) => (vars[k] ?? '').toString());
+  return String(template || '').replace(/\{(name|id|score|rank|level|claim|minutes)\}/g, (_, k) => (vars[k] ?? '').toString());
 }
 
 export const SEND_INTERVAL_MS = 1000;  // スタンプ・拍手・主張は 1 接続あたり 1 秒に 1 回まで

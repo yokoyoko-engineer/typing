@@ -90,7 +90,7 @@ export async function getDb() {
         category TEXT PRIMARY KEY
       );
 
-      -- 管理画面で変える設定（key ごとに JSON で保存。例: cheer = にぎやかしの設定）
+      -- 管理画面で変える設定（key ごとに JSON で保存。例: cheer = にぎやかしの設定、tournament = イベントの時間）
       CREATE TABLE IF NOT EXISTS app_settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL

@@ -42,9 +42,49 @@ const JOB_COLORS = {
   '第三営業部（BP2課）': '#4527a0'
 };
 
-function TournamentLobbyMonitor({ socket, onStartTournament }) {
+const TOURNAMENT_SETTINGS_API = '/admin/api/tournament-settings';
+const DURATION_MIN = 1;
+const DURATION_MAX = 60;
+
+function TournamentLobbyMonitor({ socket, onStartTournament, durationMinutes, onDurationSaved }) {
   const [lobbyCount, setLobbyCount] = useState(0);
   const [lobbyPlayers, setLobbyPlayers] = useState([]);
+  const [durationInput, setDurationInput] = useState('');
+  const [durationSaving, setDurationSaving] = useState(false);
+  const [durationMessage, setDurationMessage] = useState(null); // { ok, text }
+
+  // 保存済みの値が届いたら入力欄に入れる
+  useEffect(() => {
+    if (durationMinutes != null) setDurationInput(String(durationMinutes));
+  }, [durationMinutes]);
+
+  const durationDirty = durationMinutes != null && durationInput !== String(durationMinutes);
+
+  const saveDuration = async () => {
+    const n = Number(durationInput);
+    if (!Number.isInteger(n) || n < DURATION_MIN || n > DURATION_MAX) {
+      setDurationMessage({ ok: false, text: `${DURATION_MIN}〜${DURATION_MAX} 分の整数で入力してください。` });
+      return;
+    }
+    setDurationSaving(true);
+    setDurationMessage(null);
+    try {
+      const res = await fetch(TOURNAMENT_SETTINGS_API, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ durationMinutes: n }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      onDurationSaved(data.durationMinutes);
+      setDurationMessage({ ok: true, text: `${data.durationMinutes}分に変更しました。次に開始するイベントから反映されます。` });
+    } catch (err) {
+      console.error(err);
+      setDurationMessage({ ok: false, text: `保存できませんでした。${err.message}` });
+    } finally {
+      setDurationSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (!socket) return;
@@ -88,7 +128,39 @@ function TournamentLobbyMonitor({ socket, onStartTournament }) {
         </div>
       </div>
 
-      <p style={{ color: '#666' }}>現在待機室にいるすべてのプレイヤーを対象にイベント（5分間）を開始します。</p>
+      <div style={{ background: '#fff', padding: '12px 15px', borderRadius: '8px', marginBottom: '15px', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <label htmlFor="tournament-duration" style={{ fontWeight: 'bold', color: '#2c3e50' }}>イベントの時間</label>
+        <input
+          id="tournament-duration"
+          type="number"
+          min={DURATION_MIN}
+          max={DURATION_MAX}
+          step="1"
+          value={durationInput}
+          disabled={durationMinutes == null}
+          onChange={(e) => { setDurationInput(e.target.value); setDurationMessage(null); }}
+          style={{ width: '70px', padding: '6px', fontSize: '1em' }}
+        />
+        <span style={{ color: '#666' }}>分（{DURATION_MIN}〜{DURATION_MAX}）</span>
+        <button
+          type="button"
+          onClick={saveDuration}
+          disabled={!durationDirty || durationSaving}
+          style={{ padding: '6px 16px', border: 'none', borderRadius: '5px', fontWeight: 'bold', color: '#fff', background: durationDirty ? '#ff9800' : '#ccc', cursor: durationDirty && !durationSaving ? 'pointer' : 'default' }}
+        >
+          {durationSaving ? '保存中…' : '保存'}
+        </button>
+        {durationDirty && !durationSaving && !durationMessage && <span style={{ color: '#e65100' }}>保存していない変更があります</span>}
+        {durationMessage && (
+          <span role={durationMessage.ok ? 'status' : 'alert'} style={{ fontWeight: 'bold', color: durationMessage.ok ? '#2e7d32' : '#c62828' }}>
+            {durationMessage.text}
+          </span>
+        )}
+      </div>
+
+      <p style={{ color: '#666' }}>
+        現在待機室にいるすべてのプレイヤーを対象にイベント（{durationMinutes ?? '—'}分間）を開始します。開催中に時間を変えても、その回の時間は変わりません。
+      </p>
       <button 
         onClick={onStartTournament}
         style={{ padding: '15px 30px', fontSize: '1.2em', background: '#ff9800', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
@@ -119,7 +191,7 @@ function formatJst(iso) {
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}(${DAY_LABELS[d.getUTCDay()]}) ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`;
 }
 
-function TournamentScheduleManager({ socket }) {
+function TournamentScheduleManager({ socket, durationMinutes }) {
   const [schedules, setSchedules] = useState([]);
   const [dayOfWeek, setDayOfWeek] = useState('1');
   const [time, setTime] = useState('12:00');
@@ -212,7 +284,7 @@ function TournamentScheduleManager({ socket }) {
     <div style={{ background: '#fff3e0', padding: '20px', borderRadius: '10px', marginBottom: '30px', borderLeft: '5px solid #ff9800' }}>
       <h3 style={{ marginTop: 0, color: '#e65100' }}>イベントの自動開始（毎週）</h3>
       <p style={{ color: '#666', marginTop: 0 }}>
-        指定した曜日・時刻（日本時間）になると、イベント（5分間）を自動で開始します。手動の「開始する」ボタンも今までどおり使えます。
+        指定した曜日・時刻（日本時間）になると、イベント（{durationMinutes ?? '—'}分間）を自動で開始します。手動の「開始する」ボタンも今までどおり使えます。
         予定時刻に待機室が 0 人のとき、またはイベント開催中のときは、その回はスキップします。サーバが停止している時間帯の予約は実行されません。
       </p>
 
@@ -318,6 +390,14 @@ export default function Admin() {
 
   // --- Tournament Tab State ---
   const [socket, setSocket] = useState(null);
+  const [tournamentDuration, setTournamentDuration] = useState(null); // イベントの時間（分）。管理画面で変える
+
+  useEffect(() => {
+    fetch(TOURNAMENT_SETTINGS_API)
+      .then(res => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+      .then(data => setTournamentDuration(data.durationMinutes))
+      .catch(err => console.error('Error fetching tournament settings:', err));
+  }, []);
   const [tournaments, setTournaments] = useState([]);
   const [selectedTournament, setSelectedTournament] = useState('');
   const [tournamentScores, setTournamentScores] = useState([]);
@@ -568,7 +648,7 @@ export default function Admin() {
     if (socket) {
       if (window.confirm(`タイピングイベントを開始しますか？（待機中の全ユーザーの画面でカウントダウンが始まります）`)) {
         socket.emit('adminStartTournament');
-        alert(`イベント開始シグナルを送信しました。5分後に自動終了します。`);
+        alert(`イベント開始シグナルを送信しました。${tournamentDuration ?? '設定した'}分後に自動終了します。`);
         setTimeout(fetchTournaments, 2000); // Wait a bit to fetch the newly created tournament
       }
     }
@@ -1345,13 +1425,13 @@ export default function Admin() {
       {activeTab === 'tournament' && (
         <div>
           {/* 大会開催パネル */}
-          <TournamentLobbyMonitor socket={socket} onStartTournament={handleStartTournament} />
+          <TournamentLobbyMonitor socket={socket} onStartTournament={handleStartTournament} durationMinutes={tournamentDuration} onDurationSaved={setTournamentDuration} />
 
           {/* にぎやかし: 開催中の操作（スポットライト） */}
           <CheerLivePanel socket={socket} />
 
           {/* 毎週の自動開始（予約） */}
-          <TournamentScheduleManager socket={socket} />
+          <TournamentScheduleManager socket={socket} durationMinutes={tournamentDuration} />
 
           {/* にぎやかしの設定 */}
           <CheerSettingsPanel />

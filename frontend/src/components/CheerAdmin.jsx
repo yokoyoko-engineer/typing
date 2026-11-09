@@ -14,10 +14,10 @@ const FEATURES = [
 ];
 
 const TELOPS = [
-  { key: 'start', label: 'イベント開始', vars: '' },
+  { key: 'start', label: 'イベント開始', vars: '{minutes}' },
   { key: 'leader', label: '1位が替わったとき', vars: '{name} {id} {score}' },
   { key: 'rankUp', label: '3位以内に浮上したとき', vars: '{name} {id} {score} {rank}' },
-  { key: 'oneMinute', label: '残り1分', vars: '' },
+  { key: 'oneMinute', label: '残り1分（2分以上のイベントだけ）', vars: '' },
   { key: 'meterFull', label: '盛り上がりのレベルアップ', vars: '{level}' },
   { key: 'spotlight', label: 'スポットライト', vars: '{name} {id} {score} {rank}' },
   { key: 'claim', label: '主張スタンプを出したとき', vars: '{name} {id} {claim}' },
@@ -275,7 +275,7 @@ export function CheerSettingsPanel() {
         ))}
       </div>
       <p style={{ fontSize: '0.85em', color: '#777', marginTop: '-10px' }}>
-        {'{name}'} は氏名（未入力なら社員番号）、{'{id}'} は社員番号、{'{score}'} はスコア、{'{rank}'} は順位、{'{level}'} はメーターのレベル、{'{claim}'} は主張スタンプの文言に置き換わります。
+        {'{name}'} は氏名（未入力なら社員番号）、{'{id}'} は社員番号、{'{score}'} はスコア、{'{rank}'} は順位、{'{level}'} はメーターのレベル、{'{claim}'} は主張スタンプの文言、{'{minutes}'} はイベントの時間（分）に置き換わります。
       </p>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>

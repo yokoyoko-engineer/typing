@@ -21,6 +21,7 @@ import { bestPerPlayer, addRecord } from './cpuRankings.js';
 import {
   CheerHub, loadCheerSettings, validateCheerSettings, publicCheerSettings, rankChangeTelop,
 } from './cheer.js';
+import { loadTournamentSettings, validateTournamentSettings } from './tournamentSettings.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -472,6 +473,9 @@ let tournamentState = {
   participants: {} // userId -> maxScore
 };
 
+// イベントの時間などの設定（管理画面から変える。DB の app_settings に保存）
+let tournamentSettings = loadTournamentSettings(null);
+
 let tournamentTimer = null;
 let tournamentOneMinuteTimer = null;
 const tournamentLobbyPlayers = {}; // socketId -> playerName
@@ -498,14 +502,17 @@ function emitTournamentLobbyUpdate() {
 }
 
 /**
- * イベント（5 分間）を開始する。手動開始（管理画面のボタン）と自動開始（予約）で共通。
+ * イベント（時間は管理画面の設定。初期値 5 分）を開始する。手動開始（管理画面のボタン）と自動開始（予約）で共通。
  * 戻り値: 'started' | 'skipped_active'（すでに開催中）
  */
 async function startTournament() {
   if (tournamentState.status === 'active') return 'skipped_active';
 
+  // 開催中に設定を変えても、この回の時間は変わらない
+  const durationMinutes = tournamentSettings.durationMinutes;
+  const durationMs = durationMinutes * 60 * 1000;
   tournamentState.status = 'active';
-  tournamentState.endTime = Date.now() + 5 * 60 * 1000; // 5 minutes
+  tournamentState.endTime = Date.now() + durationMs;
   tournamentState.participants = {};
   cheer.reset();
 
@@ -524,14 +531,18 @@ async function startTournament() {
   }
 
   io.to('tournament_lobby').emit('tournamentStarted', { endTime: tournamentState.endTime });
-  cheer.telop('start');
+  cheer.telop('start', { minutes: durationMinutes });
 
   if (tournamentTimer) clearTimeout(tournamentTimer);
   if (tournamentOneMinuteTimer) clearTimeout(tournamentOneMinuteTimer);
-  tournamentOneMinuteTimer = setTimeout(() => {
-    tournamentOneMinuteTimer = null;
-    if (tournamentState.status === 'active') cheer.telop('oneMinute');
-  }, 4 * 60 * 1000);
+  // 「残り1分」は 2 分以上のイベントだけ出す（1 分のイベントでは開始と重なるため）
+  tournamentOneMinuteTimer = null;
+  if (durationMinutes > 1) {
+    tournamentOneMinuteTimer = setTimeout(() => {
+      tournamentOneMinuteTimer = null;
+      if (tournamentState.status === 'active') cheer.telop('oneMinute');
+    }, durationMs - 60 * 1000);
+  }
 
   tournamentTimer = setTimeout(async () => {
     tournamentState.status = 'finished';
@@ -558,7 +569,7 @@ async function startTournament() {
       tournamentState.participants = {};
     }, 5000);
 
-  }, 5 * 60 * 1000); // 5 minutes
+  }, durationMs);
 
   return 'started';
 }
@@ -1151,6 +1162,38 @@ app.put('/admin-api/cheer-settings', async (req, res) => {
   }
 });
 
+// --- 管理者用 API: イベントの設定（時間） ---
+const TOURNAMENT_SETTINGS_KEY = 'tournament';
+
+async function reloadTournamentSettings() {
+  const db = await getDb();
+  const row = await db.get('SELECT value FROM app_settings WHERE key = ?', [TOURNAMENT_SETTINGS_KEY]);
+  let saved = null;
+  try { saved = row ? JSON.parse(row.value) : null; } catch { saved = null; }
+  tournamentSettings = loadTournamentSettings(saved);
+}
+
+app.get('/admin-api/tournament-settings', (req, res) => {
+  res.json(tournamentSettings);
+});
+
+app.put('/admin-api/tournament-settings', async (req, res) => {
+  const r = validateTournamentSettings(req.body);
+  if (!r.ok) return res.status(400).json({ error: r.error });
+  try {
+    const db = await getDb();
+    await db.run(
+      `INSERT INTO app_settings (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [TOURNAMENT_SETTINGS_KEY, JSON.stringify(r.settings)]);
+    await reloadTournamentSettings();
+    res.json(tournamentSettings);
+  } catch (err) {
+    console.error('Error saving tournament settings:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // 氏名の暗号化鍵を読み込む（無ければ氏名は保存しない）
 initNameCrypto();
 
@@ -1186,6 +1229,7 @@ server.listen(PORT, '0.0.0.0', () => {
   reloadCustomWords().catch(err => console.error('Error loading custom words:', err));
   reloadCpuCategories().catch(err => console.error('Error loading CPU categories:', err));
   reloadCheerSettings().catch(err => console.error('Error loading cheer settings:', err));
+  reloadTournamentSettings().catch(err => console.error('Error loading tournament settings:', err));
 
   // 予約したイベントを自動で開始する。
   // 予定時刻に待機室が 0 人ならスキップ（参加者のいない大会記録を作らない）。
