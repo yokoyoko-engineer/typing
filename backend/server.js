@@ -26,12 +26,23 @@ const app = express();
 // --- Security: Security Headers ---
 app.use(helmet());
 
+// --- 接続元 IP ---
+// 通信は「ブラウザ → edge-proxy → frontend の nginx → このサーバ」と届く。
+// frontend の nginx は X-Forwarded-For の末尾に接続元の実 IP を付けて渡すので、手前の 1 段（その nginx）だけを信頼する。
+// これがないと req.ip が全員「nginx コンテナの IP」になり、下の回数制限を利用者全員で分け合ってしまう。
+// （このサーバはホストにポートを公開しておらず、届くのは frontend の nginx からだけ）
+app.set('trust proxy', 1);
+
 // --- Security: Rate Limiting ---
+// 接続元 IP ごとに 1 分あたりの回数を制限する。
+// 社内 Wi-Fi からは全員が同じ IP に見えるため、上限はその IP からの合計で足りる値にしている
+// （CPU BATTLE はジャンルを選ぶたびに 12 回、1 プレイ終えるたびに 2 回 /api を呼ぶ。200 人規模のイベントでも収まる値）
+const API_RATE_LIMIT_PER_MINUTE = 3000;
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // Limit each IP to 200 requests per 15 minutes
-  standardHeaders: true, 
-  legacyHeaders: false, 
+  windowMs: 60 * 1000,
+  max: API_RATE_LIMIT_PER_MINUTE,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: { error: 'Too many requests from this IP, please try again later.' }
 });
 
