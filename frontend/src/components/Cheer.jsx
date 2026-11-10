@@ -95,7 +95,7 @@ export function CheerTelop({ socket, animate }) {
     );
 }
 
-// E. 盛り上がりメーター（ランキング欄の上）。レベルが上がるほどバーの色が派手になる。
+// E. 盛り上がりメーター（対戦画面の上に横長で置く）。レベルが上がるほどバーの色が派手になる。
 // animate（打っていないとき）は伸びを目立たせる: 増えた分の「+3」が飛び出し、バーの先が光り、
 // もうすぐレベルアップのときは脈打つ。打っている間は、バーが静かに伸びるだけにする
 const METER_BUMP_MS = 900;
@@ -145,11 +145,8 @@ export function CheerMeter({ meter, animate }) {
 
     return (
         <div className={cls} title={isMax ? '盛り上がりは最高レベルです' : `スタンプ・拍手・主張・いいねでたまります（${value} / ${meter.goal}）`}>
-            <div className="cheer-meter-head">
-                <span className="cheer-meter-title">盛り上がり</span>
-                <span key={level} className="cheer-meter-level">Lv.{level}</span>
-                <span className="cheer-meter-next">{next}</span>
-            </div>
+            <span className="cheer-meter-title">盛り上がり</span>
+            <span key={level} className="cheer-meter-level">Lv.{level}</span>
             <div className="cheer-meter-bar">
                 <div className="cheer-meter-track" role="meter" aria-valuemin={0} aria-valuemax={isMax ? 1 : meter.goal} aria-valuenow={isMax ? 1 : value} aria-label="盛り上がりメーター">
                     <div className="cheer-meter-fill" style={{ width: `${pct}%` }}>
@@ -159,9 +156,10 @@ export function CheerMeter({ meter, animate }) {
                 </div>
                 {animate && bump && <span key={`p${bump.seq}`} className="cheer-meter-pulse" />}
                 {animate && bump && (
-                    <span key={`g${bump.seq}`} className="cheer-meter-gain" style={{ left: `${Math.min(94, Math.max(6, realPct))}%` }}>+{bump.gain}</span>
+                    <span key={`g${bump.seq}`} className="cheer-meter-gain" style={{ left: `${Math.min(96, Math.max(4, realPct))}%` }}>+{bump.gain}</span>
                 )}
             </div>
+            <span className="cheer-meter-next">{next}</span>
         </div>
     );
 }

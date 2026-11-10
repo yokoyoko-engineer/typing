@@ -30,7 +30,7 @@ function TopBoard({ title, rows, background, boxShadow, emptyText }) {
 // 1. Live Ranking Component (Optimized to update independently and scrollable)
 // isTyping: 打っている最中（演出を動かさない） / canCheer: タイピングを終えて拍手・いいねを送れる
 // liveRanking は親が受け取って渡す（自分の主張をスタンプ欄でも使うため）
-function TournamentRanking({ socket, playerName, globalLegends, highestScore, isTyping, canCheer, cheerSettings, meter, liveRanking }) {
+function TournamentRanking({ socket, playerName, globalLegends, highestScore, isTyping, canCheer, cheerSettings, liveRanking }) {
     const [clapCooling, runClap] = useCooldown();
     const [likedKeys, setLikedKeys] = useState({}); // `${社員番号}:${主張の番号}` -> いいね済みか
     const clapOn = !!cheerSettings?.clapEnabled;
@@ -79,7 +79,6 @@ function TournamentRanking({ socket, playerName, globalLegends, highestScore, is
                     🔥 リアルタイムランキング
                 </h3>
                 {cheerSettings?.telopEnabled && <CheerTelop socket={socket} animate={!isTyping} />}
-                {cheerSettings?.meterEnabled && <CheerMeter meter={meter} animate={!isTyping} />}
                 <div style={{ flex: 1, overflowY: 'auto', paddingRight: '5px' }}>
                     {liveRanking.length > 0 ? (
                         <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: '0 5px' }}>
@@ -526,6 +525,7 @@ function TournamentBattle({
 // （研修室の共用 PC で次の人に残らないよう、localStorage ではなく sessionStorage）
 // サーバの返事を待つ時間と、待機中にイベントの状態を確かめる間隔
 const SERVER_REPLY_TIMEOUT_MS = 8000;
+const METER_ROW_HEIGHT = 50; // 上に置く盛り上がりメーターの高さ（Cheer.css の .cheer-meter と合わせる）
 const WAITING_CHECK_INTERVAL_MS = 5000;
 
 const DISPLAY_NAME_KEY = 'typing.displayName';
@@ -918,15 +918,18 @@ export default function Tournament({ socket, onBackToHome }) {
         );
     }
 
+    const meterOn = !!cheerSettings?.meterEnabled && !!cheerMeter;
     // まだ打っている人の邪魔をしないよう、打っている間（カウントダウン中も含む）は動く演出を出さない
     const isTyping = gameState === 'countdown' || gameState === 'playing';
     // スタンプと拍手を送れるのは、タイピングを終えて待っている間だけ
     const canCheer = gameState === 'intermission' || gameState === 'spectating';
 
     return (
-        <div className="game-container battle-layout" style={{ position: 'relative', maxWidth: '1200px', width: '95%', height: '700px', background: '#fff', border: '1px solid #e8e8e8', borderRadius: '16px', padding: '2rem', boxSizing: 'border-box' }}>
+        <div className="game-container battle-layout" style={{ position: 'relative', maxWidth: '1200px', width: '95%', height: meterOn ? `${700 + METER_ROW_HEIGHT}px` : '700px', background: '#fff', border: '1px solid #e8e8e8', borderRadius: '16px', padding: '2rem', boxSizing: 'border-box' }}>
             {!isTyping && <CheerEffects socket={socket} settings={cheerSettings} />}
-            <div style={{ display: 'flex', height: '100%', width: '100%', overflow: 'hidden' }}>
+            {/* 盛り上がりメーターは全員が見る場所として、画面の上に横長で置く（その分だけ枠を高くし、下の画面は狭めない） */}
+            {meterOn && <CheerMeter meter={cheerMeter} animate={!isTyping} />}
+            <div style={{ display: 'flex', flex: 1, minHeight: 0, width: '100%', overflow: 'hidden' }}>
                 <TournamentBattle
                     socket={socket}
                     playerName={playerName}
@@ -950,7 +953,6 @@ export default function Tournament({ socket, onBackToHome }) {
                     isTyping={isTyping}
                     canCheer={canCheer}
                     cheerSettings={cheerSettings}
-                    meter={cheerMeter}
                     liveRanking={liveRanking}
                 />
             </div>

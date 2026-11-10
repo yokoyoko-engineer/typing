@@ -21,3 +21,9 @@
   margin-top: 0;
   margin-bottom: 2rem;
 }
+
+/* イベント BATTLE の対戦画面は、上に盛り上がりメーターを置いて枠が高くなるので、
+   タイトルまわりの余白を詰めて、高さ 850px 程度の画面でもページがずれずに収まるようにする */
+#root:has(.battle-layout) { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.app-main:has(.battle-layout) { padding-top: 0; gap: 0.75rem; min-height: auto; }
+.app-main:has(.battle-layout) .game-title { margin-bottom: 0; }
