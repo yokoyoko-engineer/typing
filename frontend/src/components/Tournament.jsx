@@ -79,7 +79,7 @@ function TournamentRanking({ socket, playerName, globalLegends, highestScore, is
                     🔥 リアルタイムランキング
                 </h3>
                 {cheerSettings?.telopEnabled && <CheerTelop socket={socket} animate={!isTyping} />}
-                {cheerSettings?.meterEnabled && <CheerMeter meter={meter} />}
+                {cheerSettings?.meterEnabled && <CheerMeter meter={meter} animate={!isTyping} />}
                 <div style={{ flex: 1, overflowY: 'auto', paddingRight: '5px' }}>
                     {liveRanking.length > 0 ? (
                         <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'separate', borderSpacing: '0 5px' }}>

@@ -95,19 +95,73 @@ export function CheerTelop({ socket, animate }) {
     );
 }
 
-// E. 盛り上がりメーター（ランキング欄の上）。レベルが上がるほどバーの色が派手になる
-export function CheerMeter({ meter }) {
+// E. 盛り上がりメーター（ランキング欄の上）。レベルが上がるほどバーの色が派手になる。
+// animate（打っていないとき）は伸びを目立たせる: 増えた分の「+3」が飛び出し、バーの先が光り、
+// もうすぐレベルアップのときは脈打つ。打っている間は、バーが静かに伸びるだけにする
+const METER_BUMP_MS = 900;
+const METER_NEAR_PCT = 70; // ここから「もうすぐ」の表示にする
+export function CheerMeter({ meter, animate }) {
+    const level = meter?.level ?? 0;
+    const value = meter?.value ?? 0;
+    const [bump, setBump] = useState(null);    // { seq, gain }: 直前に増えた分
+    const [levelUp, setLevelUp] = useState(false); // レベルアップ直後は、満タンのバーを少しの間見せる
+    const prevRef = useRef(null);
+    const seqRef = useRef(0);
+    const bumpTimerRef = useRef(null);
+    const levelTimerRef = useRef(null);
+    const hasMeter = !!meter;
+
+    useEffect(() => {
+        if (!hasMeter) return;
+        const prev = prevRef.current;
+        prevRef.current = { level, value };
+        if (!prev) return;
+        if (level > prev.level) {
+            setBump(null);
+            setLevelUp(true);
+            clearTimeout(levelTimerRef.current);
+            levelTimerRef.current = setTimeout(() => setLevelUp(false), METER_BUMP_MS);
+        } else if (level === prev.level && value > prev.value) {
+            setBump({ seq: ++seqRef.current, gain: value - prev.value });
+            clearTimeout(bumpTimerRef.current);
+            bumpTimerRef.current = setTimeout(() => setBump(null), METER_BUMP_MS);
+        }
+    }, [hasMeter, level, value]);
+    useEffect(() => () => { clearTimeout(bumpTimerRef.current); clearTimeout(levelTimerRef.current); }, []);
+
     if (!meter) return null;
     const isMax = meter.goal === null || meter.goal === undefined;
-    const pct = isMax ? 100 : Math.min(100, Math.round((meter.value / Math.max(1, meter.goal)) * 100));
-    const tier = Math.min(3, Math.floor(meter.level / 3)); // Lv.0-2 / 3-5 / 6-8 / 9-10
+    const realPct = isMax ? 100 : Math.min(100, Math.round((value / Math.max(1, meter.goal)) * 100));
+    const pct = levelUp ? 100 : realPct;
+    const remain = isMax ? 0 : Math.max(0, meter.goal - value);
+    const near = !isMax && !levelUp && realPct >= METER_NEAR_PCT;
+    const tier = Math.min(3, Math.floor(level / 3)); // Lv.0-2 / 3-5 / 6-8 / 9-10
+    let next;
+    if (levelUp) next = 'レベルアップ！';
+    else if (isMax) next = 'MAX！ 最高潮';
+    else if (near) next = `あと ${remain} で Lv.${level + 1}！`;
+    else next = `Lv.${level + 1} まで あと ${remain}`;
+    const cls = ['cheer-meter', `tier-${tier}`, animate && 'is-animated', near && 'is-near', levelUp && 'is-levelup', isMax && 'is-max'].filter(Boolean).join(' ');
+
     return (
-        <div className={`cheer-meter tier-${tier}`} title={isMax ? '盛り上がりは最高レベルです' : `スタンプ・拍手・主張・いいねでたまります（${meter.value} / ${meter.goal}）`}>
-            <span className="cheer-meter-label">盛り上がり Lv.{meter.level}</span>
-            <div className="cheer-meter-track" role="meter" aria-valuemin={0} aria-valuemax={isMax ? 1 : meter.goal} aria-valuenow={isMax ? 1 : meter.value} aria-label="盛り上がりメーター">
-                <div className="cheer-meter-fill" style={{ width: `${pct}%` }} />
+        <div className={cls} title={isMax ? '盛り上がりは最高レベルです' : `スタンプ・拍手・主張・いいねでたまります（${value} / ${meter.goal}）`}>
+            <div className="cheer-meter-head">
+                <span className="cheer-meter-title">盛り上がり</span>
+                <span key={level} className="cheer-meter-level">Lv.{level}</span>
+                <span className="cheer-meter-next">{next}</span>
             </div>
-            <span className="cheer-meter-num">{isMax ? 'MAX' : `${meter.value}/${meter.goal}`}</span>
+            <div className="cheer-meter-bar">
+                <div className="cheer-meter-track" role="meter" aria-valuemin={0} aria-valuemax={isMax ? 1 : meter.goal} aria-valuenow={isMax ? 1 : value} aria-label="盛り上がりメーター">
+                    <div className="cheer-meter-fill" style={{ width: `${pct}%` }}>
+                        {animate && bump && <span key={bump.seq} className="cheer-meter-tip" />}
+                    </div>
+                    <span className="cheer-meter-num">{levelUp ? 'LEVEL UP！' : isMax ? 'MAX' : `${value} / ${meter.goal}`}</span>
+                </div>
+                {animate && bump && <span key={`p${bump.seq}`} className="cheer-meter-pulse" />}
+                {animate && bump && (
+                    <span key={`g${bump.seq}`} className="cheer-meter-gain" style={{ left: `${Math.min(94, Math.max(6, realPct))}%` }}>+{bump.gain}</span>
+                )}
+            </div>
         </div>
     );
 }

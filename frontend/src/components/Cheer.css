@@ -26,27 +26,132 @@
   to { transform: translateY(0); opacity: 1; }
 }
 
-/* E. 盛り上がりメーター */
-.cheer-meter {
+/* E. 盛り上がりメーター。高さは固定して、表示が変わっても下のランキングが動かないようにする */
+.cheer-meter { margin: 0 0 10px; white-space: nowrap; --meter-a: #ff9800; --meter-b: #e53935; --meter-glow: rgba(255, 152, 0, 0.75); }
+.cheer-meter-head { display: flex; align-items: center; gap: 8px; height: 24px; margin-bottom: 4px; }
+.cheer-meter-title { flex: none; font-size: 0.85em; font-weight: bold; color: #666; }
+.cheer-meter-level {
+  flex: none;
+  padding: 1px 10px;
+  border-radius: 12px;
+  font-size: 1em;
+  font-weight: 900;
+  color: #fff;
+  background: linear-gradient(90deg, var(--meter-a), var(--meter-b));
+}
+.cheer-meter-next { flex: 1; min-width: 0; text-align: right; font-size: 0.85em; color: #888; overflow: hidden; text-overflow: ellipsis; }
+.cheer-meter-bar { position: relative; }
+.cheer-meter-track { position: relative; height: 20px; background: #e0e0e0; border-radius: 10px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2); }
+.cheer-meter-fill {
+  position: relative;
+  height: 100%;
+  border-radius: 10px;
+  background: linear-gradient(90deg, var(--meter-a), var(--meter-b));
+  transition: width 0.6s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.cheer-meter-num {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 0 0 10px;
-  font-size: 0.85em;
-  color: #5c6bc0;
-  white-space: nowrap;
+  justify-content: center;
+  font-size: 0.8em;
+  font-weight: bold;
+  color: #333;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+  font-variant-numeric: tabular-nums;
 }
-.cheer-meter-label { flex: none; font-weight: bold; }
-.cheer-meter-track { flex: 1; min-width: 0; height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
-.cheer-meter-fill { height: 100%; background: linear-gradient(90deg, #ff9800, #e53935); transition: width 0.4s ease; }
-.cheer-meter-num { flex: none; color: #888; font-variant-numeric: tabular-nums; }
 /* レベルが上がるほどバーを派手にする（Lv.0-2 / 3-5 / 6-8 / 9-10） */
-.cheer-meter.tier-1 .cheer-meter-fill { background: linear-gradient(90deg, #ec407a, #8e24aa); }
-.cheer-meter.tier-1 .cheer-meter-label { color: #8e24aa; }
-.cheer-meter.tier-2 .cheer-meter-fill { background: linear-gradient(90deg, #ffb300, #ffd700, #ff8f00); }
-.cheer-meter.tier-2 .cheer-meter-label { color: #ef6c00; }
-.cheer-meter.tier-3 .cheer-meter-fill { background: linear-gradient(90deg, #e53935, #fb8c00, #fdd835, #43a047, #1e88e5, #8e24aa); }
-.cheer-meter.tier-3 .cheer-meter-label { color: #e53935; }
+.cheer-meter.tier-1 { --meter-a: #ec407a; --meter-b: #8e24aa; --meter-glow: rgba(236, 64, 122, 0.75); }
+.cheer-meter.tier-2 { --meter-a: #ffb300; --meter-b: #ff6f00; --meter-glow: rgba(255, 193, 7, 0.9); }
+.cheer-meter.tier-3 { --meter-glow: rgba(229, 57, 53, 0.8); }
+.cheer-meter.tier-3 .cheer-meter-fill,
+.cheer-meter.tier-3 .cheer-meter-level { background: linear-gradient(90deg, #e53935, #fb8c00, #fdd835, #43a047, #1e88e5, #8e24aa); }
+/* もうすぐレベルアップ / レベルアップ直後は、打っている人にも文字の色で分かるようにする（動きは付けない） */
+.cheer-meter.is-near .cheer-meter-next,
+.cheer-meter.is-levelup .cheer-meter-next,
+.cheer-meter.is-max .cheer-meter-next { color: #e53935; font-weight: bold; }
+
+/* ここから下は、打っていない人にだけ出す動き */
+/* バーの上を光の筋が流れる */
+.cheer-meter.is-animated .cheer-meter-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.55) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: cheerMeterShine 1.8s linear infinite;
+}
+@keyframes cheerMeterShine { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+/* 増えた瞬間: バーの先が光り、バー全体がふくらみ、増えた数が飛び出す */
+.cheer-meter-tip {
+  position: absolute;
+  top: 50%;
+  right: -6px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background: radial-gradient(circle, #fff 0%, rgba(255, 255, 255, 0.8) 30%, transparent 70%);
+  animation: cheerMeterTip 0.8s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes cheerMeterTip {
+  0% { transform: translateY(-50%) scale(0.3); opacity: 1; }
+  100% { transform: translateY(-50%) scale(1.8); opacity: 0; }
+}
+.cheer-meter-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  animation: cheerMeterPulse 0.7s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes cheerMeterPulse {
+  0% { box-shadow: 0 0 0 0 var(--meter-glow); transform: scaleY(1); }
+  40% { box-shadow: 0 0 14px 5px var(--meter-glow); transform: scaleY(1.25); }
+  100% { box-shadow: 0 0 0 0 transparent; transform: scaleY(1); }
+}
+.cheer-meter-gain {
+  position: absolute;
+  bottom: 14px;
+  transform: translateX(-50%);
+  padding: 0 9px;
+  border: 2px solid var(--meter-b);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 2px 8px var(--meter-glow);
+  font-size: 1.3em;
+  font-weight: 900;
+  line-height: 1.3;
+  color: var(--meter-b);
+  animation: cheerMeterGain 0.9s ease-out forwards;
+  pointer-events: none;
+  z-index: 2;
+}
+@keyframes cheerMeterGain {
+  0% { transform: translate(-50%, 6px) scale(0.5); opacity: 0; }
+  25% { transform: translate(-50%, -4px) scale(1.25); opacity: 1; }
+  100% { transform: translate(-50%, -26px) scale(1); opacity: 0; }
+}
+/* レベルの札: レベルが上がったら弾む */
+.cheer-meter.is-animated .cheer-meter-level { animation: cheerMeterLevel 0.7s cubic-bezier(0.2, 1.8, 0.4, 1); }
+@keyframes cheerMeterLevel { 0% { transform: scale(0.4); } 60% { transform: scale(1.5); } 100% { transform: scale(1); } }
+/* もうすぐレベルアップ: バーが脈打ち、案内の文字が点滅する */
+.cheer-meter.is-animated.is-near .cheer-meter-track { animation: cheerMeterNear 0.9s ease-in-out infinite; }
+@keyframes cheerMeterNear {
+  0%, 100% { box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2), 0 0 0 0 var(--meter-glow); }
+  50% { box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2), 0 0 12px 3px var(--meter-glow); }
+}
+.cheer-meter.is-animated.is-near .cheer-meter-next { animation: cheerMeterBlink 0.9s ease-in-out infinite; }
+@keyframes cheerMeterBlink { 50% { opacity: 0.45; } }
+/* レベルアップ直後: 満タンのバーが白く光る */
+.cheer-meter.is-animated.is-levelup .cheer-meter-track { animation: cheerMeterFull 0.9s ease-out; }
+@keyframes cheerMeterFull {
+  0% { filter: brightness(2.2); box-shadow: 0 0 20px 8px var(--meter-glow); }
+  100% { filter: brightness(1); box-shadow: 0 0 0 0 transparent; }
+}
 
 /* B. スタンプを送るボタン */
 .cheer-stampbar { margin-top: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
@@ -294,6 +399,10 @@
 /* 動きを減らす設定の人には、動かさずに出して消すだけにする */
 @media (prefers-reduced-motion: reduce) {
   .cheer-telop-text.is-animated, .cheer-spotlight, .cheer-meterfull, .cheer-clap-received { animation: none; }
+  .cheer-meter.is-animated .cheer-meter-fill::after, .cheer-meter.is-animated .cheer-meter-level,
+  .cheer-meter.is-animated .cheer-meter-track, .cheer-meter.is-animated .cheer-meter-next { animation: none; }
+  .cheer-meter-tip, .cheer-meter-pulse { display: none; }
+  .cheer-meter-fill { transition: none; }
   .cheer-float { animation: cheerFade 2.8s forwards; bottom: 20px; }
   .cheer-confetti, .cheer-firework, .cheer-rain, .cheer-levelup-flash { display: none; }
   .cheer-levelup-big { animation: none; }
